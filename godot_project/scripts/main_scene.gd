@@ -94,9 +94,13 @@ func _ready() -> void:
 	_connect_game_signals()
 
 
-func _process(_delta: float) -> void:
+var _warning_pulse_time: float = 0.0
+
+func _process(delta: float) -> void:
+	_warning_pulse_time += delta
 	if current_pet and current_pet.is_alive:
 		_update_ui()
+		_update_status_warnings()
 
 
 func _connect_game_signals() -> void:
@@ -216,6 +220,51 @@ func _update_ui() -> void:
 	var emotion_color: Color = EMOTION_COLORS.get(dominant_emotion, Color.WHITE)
 	emotion_label.text = "%s %s" % [emotion_icon, dominant_emotion.capitalize()]
 	emotion_label.add_theme_color_override("font_color", emotion_color)
+
+
+func _update_status_warnings() -> void:
+	if not current_pet:
+		return
+
+	var hunger: float = current_pet.stats.hunger
+	var health: float = current_pet.stats.health
+
+	# 空腹警告 — アイコンがパルスする
+	var hunger_icon: Label = $UIPanel/VBox/StatsBar/HungerIcon
+	if hunger < 0.25:
+		var pulse: float = (sin(_warning_pulse_time * 4.0) + 1.0) * 0.5
+		hunger_icon.modulate = Color(1.0, 0.3 + pulse * 0.4, 0.3 + pulse * 0.2)
+		hunger_icon.add_theme_font_size_override("font_size", int(18 + pulse * 4))
+	else:
+		hunger_icon.modulate = Color.WHITE
+		hunger_icon.add_theme_font_size_override("font_size", 18)
+
+	# 体力警告 — ハートアイコンがパルス
+	var health_icon: Label = $UIPanel/VBox/StatsBar/HealthIcon
+	if health < 0.3:
+		var pulse: float = (sin(_warning_pulse_time * 5.0) + 1.0) * 0.5
+		health_icon.modulate = Color(1.0, 0.2 + pulse * 0.3, 0.2 + pulse * 0.3)
+		health_icon.add_theme_font_size_override("font_size", int(18 + pulse * 5))
+	else:
+		health_icon.modulate = Color.WHITE
+		health_icon.add_theme_font_size_override("font_size", 18)
+
+	# 背景色のムード反映
+	var bg: ColorRect = $Background
+	var dominant: String = _get_dominant_emotion()
+	var mood_color: Color = UI_BG
+	match dominant:
+		"joy":
+			mood_color = UI_BG.lerp(Color(0.12, 0.12, 0.06), 0.3)
+		"love":
+			mood_color = UI_BG.lerp(Color(0.14, 0.08, 0.10), 0.3)
+		"sadness":
+			mood_color = UI_BG.lerp(Color(0.06, 0.07, 0.14), 0.3)
+		"fear":
+			mood_color = UI_BG.lerp(Color(0.10, 0.06, 0.12), 0.3)
+		"excitement":
+			mood_color = UI_BG.lerp(Color(0.14, 0.10, 0.04), 0.3)
+	bg.color = bg.color.lerp(mood_color, 0.02)
 
 
 func _get_dominant_emotion() -> String:
