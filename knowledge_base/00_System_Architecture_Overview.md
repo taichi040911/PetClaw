@@ -535,7 +535,7 @@ signal conversation_ended(participants: Array[int], summary: String)
 signal evolution_triggered_by_conversation(evolution_type: String)
 
 # === Care Signals ===
-signal care_action_performed(pet_id: int, action: String, effectiveness: float)
+signal care_performed(pet_id: int, action: String, effectiveness: float)
 
 # === Evolution Signals ===
 signal evolution_available(pet_id: int, options: Array[Dictionary])

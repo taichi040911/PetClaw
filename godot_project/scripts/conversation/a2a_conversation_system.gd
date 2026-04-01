@@ -6,6 +6,7 @@ extends Node
 signal conversation_started(participants: Array[int])
 signal conversation_ended(participants: Array[int], summary: String)
 signal conversation_message(pet_id: int, message: String, metadata: Dictionary)
+signal evolution_triggered_by_conversation(evolution_type: String)
 
 # === パラメータ ===
 const AUTO_CONVERSATION_INTERVAL: float = 180.0   # 自動会話間隔（秒）
@@ -708,6 +709,9 @@ func _finalize_conversation(pet1: PetEntity, pet2: PetEntity, trigger: String,
 		"turn_count": current_conversation.size(),
 	}
 	GameManager.language_evolution.on_conversation_completed(lang_context)
+
+	# 進化トリガー: 会話が進化カウントに寄与した場合にシグナル発行
+	evolution_triggered_by_conversation.emit(trigger)
 
 	# 言語進化処理（新表現・接尾辞抽出）
 	_process_language_evolution(current_conversation)

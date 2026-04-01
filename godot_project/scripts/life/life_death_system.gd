@@ -6,6 +6,7 @@ extends Node
 signal pet_warning(pet_id: int, warning_type: String)
 signal pet_died(pet_id: int, cause: String)
 signal pet_revived(pet_id: int, method: String)
+signal pet_aged(pet_id: int, new_age: float)
 
 # === 死亡判定パラメータ ===
 const WARNING_THRESHOLD: float = 0.15          # 警告状態に入る閾値
@@ -107,6 +108,9 @@ func _process_aging_effects(pet: PetEntity, delta: float) -> void:
 
 	# 賢さ（calm）が上がる — 老齢の知恵
 	pet.evolve_personality("calm", 0.0001 * elder_factor * delta)
+
+	# 老化シグナルを発行
+	pet_aged.emit(pet.pet_id, pet.age)
 
 
 # === 死亡トリガー ===

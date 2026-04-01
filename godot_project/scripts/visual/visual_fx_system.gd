@@ -5,6 +5,7 @@ extends Node
 
 signal fx_started(fx_type: String, pet_id: int)
 signal fx_completed(fx_type: String, pet_id: int)
+signal fx_request(fx_type: String, params: Dictionary)
 
 # === 粒子プリセット ===
 const PARTICLE_PRESETS: Dictionary = {
@@ -98,6 +99,7 @@ func play_effect(effect_type: String, params: Dictionary) -> void:
 	if not particles:
 		return
 
+	fx_request.emit(effect_type, params)
 	var preset: Dictionary = PARTICLE_PRESETS.get(effect_type, PARTICLE_PRESETS["care"])
 	var color: Color = params.get("color", Color.WHITE)
 	var amount: int = params.get("particle_amount", 50)
