@@ -160,10 +160,11 @@ func _connect_signals() -> void:
 	# 自律行動完了 → ログ + 進化チェック
 	pet_autonomy.autonomous_action_completed.connect(_on_autonomous_action)
 	# ライフサイクル状態変化 → ログ + システム連携
-	lifecycle_fsm.state_changed.connect(_on_lifecycle_state_changed)
-	lifecycle_fsm.lifecycle_milestone.connect(_on_lifecycle_milestone)
-	lifecycle_fsm.sleep_started.connect(_on_pet_sleep_started)
-	lifecycle_fsm.sleep_ended.connect(_on_pet_sleep_ended)
+	if lifecycle_fsm:
+		lifecycle_fsm.state_changed.connect(_on_lifecycle_state_changed)
+		lifecycle_fsm.lifecycle_milestone.connect(_on_lifecycle_milestone)
+		lifecycle_fsm.sleep_started.connect(_on_pet_sleep_started)
+		lifecycle_fsm.sleep_ended.connect(_on_pet_sleep_ended)
 
 	# === ラウンド5: PetBook 統合接続 ===
 	# 死亡 → 追悼投稿
