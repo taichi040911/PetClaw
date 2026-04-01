@@ -17,6 +17,7 @@ __pycache__/
 
 # Exports (built artifacts)
 exports/
+godot_project/export/
 
 # Secrets
 .env
