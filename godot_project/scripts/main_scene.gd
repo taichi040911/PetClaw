@@ -29,6 +29,7 @@ var _petbook_scene: PackedScene = preload("res://scenes/pet_book_screen.tscn")
 var _is_first_launch: bool = false
 var _evolution_screen: EvolutionChoiceScreen
 var _conversation_bubble: ConversationBubble
+var _sfx: SfxManager
 
 # === UI Theme Colors ===
 const UI_BG: Color = Color(0.08, 0.10, 0.18)
@@ -59,6 +60,10 @@ const EMOTION_ICONS: Dictionary = {
 
 
 func _ready() -> void:
+	# SFXマネージャー初期化
+	_sfx = SfxManager.new()
+	add_child(_sfx)
+
 	# UIスタイリング
 	_apply_ui_theme()
 
@@ -237,6 +242,8 @@ func _on_feed_pressed() -> void:
 	if not current_pet or not current_pet.is_alive:
 		return
 	_animate_button(feed_button)
+	if _sfx:
+		_sfx.play(SfxManager.SfxType.FEED)
 	if GameManager.instance and GameManager.instance.care_system:
 		GameManager.instance.care_system.perform_action(current_pet, "feed")
 	else:
@@ -251,6 +258,8 @@ func _on_pet_pressed() -> void:
 	if not current_pet or not current_pet.is_alive:
 		return
 	_animate_button(pet_button)
+	if _sfx:
+		_sfx.play(SfxManager.SfxType.PET)
 	if GameManager.instance and GameManager.instance.care_system:
 		GameManager.instance.care_system.perform_action(current_pet, "pet")
 	else:
@@ -265,6 +274,8 @@ func _on_play_pressed() -> void:
 	if not current_pet or not current_pet.is_alive:
 		return
 	_animate_button(play_button)
+	if _sfx:
+		_sfx.play(SfxManager.SfxType.PLAY)
 	if GameManager.instance and GameManager.instance.care_system:
 		GameManager.instance.care_system.perform_action(current_pet, "play")
 	else:
@@ -319,6 +330,8 @@ func _on_evolution_available(pet_id: int, choices: Array) -> void:
 
 func _on_evolution_chosen(pet_id: int, form_id: String) -> void:
 	_evolution_screen = null
+	if _sfx:
+		_sfx.play(SfxManager.SfxType.EVOLVE)
 
 	if GameManager.instance and GameManager.instance.evolution_mechanics:
 		GameManager.instance.evolution_mechanics.execute_evolution(pet_id, form_id)
@@ -362,6 +375,8 @@ func _on_conversation_message(pet_id: int, message: String, metadata: Dictionary
 # === Pet Death ===
 
 func _on_pet_died(pet_id: int) -> void:
+	if _sfx:
+		_sfx.play(SfxManager.SfxType.DEATH)
 	if current_pet and current_pet.pet_id == pet_id:
 		emotion_label.text = "Your pet has passed away..."
 		feed_button.disabled = true
@@ -392,6 +407,8 @@ func _show_tutorial() -> void:
 
 func _on_settings_pressed() -> void:
 	_animate_button(settings_button)
+	if _sfx:
+		_sfx.play(SfxManager.SfxType.UI_OPEN)
 	var settings: SettingsScreen = SettingsScreen.new()
 	settings.back_requested.connect(func() -> void:
 		settings.queue_free()
@@ -405,6 +422,8 @@ func _on_settings_pressed() -> void:
 
 func _on_pets_pressed() -> void:
 	_animate_button(pets_button)
+	if _sfx:
+		_sfx.play(SfxManager.SfxType.UI_OPEN)
 	var pet_list: PetListScreen = PetListScreen.new()
 	pet_list.back_requested.connect(func() -> void:
 		pet_list.queue_free()
@@ -425,6 +444,8 @@ func _on_petbook_pressed() -> void:
 	if petbook_screen:
 		return
 	_animate_button(petbook_button)
+	if _sfx:
+		_sfx.play(SfxManager.SfxType.UI_OPEN)
 
 	petbook_screen = _petbook_scene.instantiate() as PetBookScreen
 	petbook_screen.back_requested.connect(_on_petbook_back)

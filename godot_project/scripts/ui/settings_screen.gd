@@ -51,13 +51,14 @@ func _build_ui() -> void:
 	_add_section_label("Audio")
 
 	_add_slider_row("BGM Volume", 0.7, func(value: float) -> void:
-		if GameManager.instance:
-			# AudioManager 経由で設定
-			pass
+		if SfxManager.instance:
+			SfxManager.instance.bgm_volume = value
 	)
 
-	_add_slider_row("SFX Volume", 0.8, func(value: float) -> void:
-		pass
+	_add_slider_row("SFX Volume", SfxManager.instance.sfx_volume if SfxManager.instance else 0.8, func(value: float) -> void:
+		if SfxManager.instance:
+			SfxManager.instance.sfx_volume = value
+			SfxManager.instance.play(SfxManager.SfxType.TAP)
 	)
 
 	# === API 設定 ===

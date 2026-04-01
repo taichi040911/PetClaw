@@ -226,6 +226,9 @@ func _gui_input(event: InputEvent) -> void:
 
 func _on_egg_tapped() -> void:
 	_tap_count += 1
+	# タップ効果音
+	if SfxManager.instance:
+		SfxManager.instance.play(SfxManager.SfxType.EGG_TAP)
 	_hatch_progress = float(_tap_count) / float(TAPS_TO_HATCH)
 
 	# ヒビを段階的に表示
@@ -269,6 +272,9 @@ func _on_egg_tapped() -> void:
 
 func _start_hatch_animation() -> void:
 	_is_hatching = true
+	# 孵化効果音
+	if SfxManager.instance:
+		SfxManager.instance.play(SfxManager.SfxType.HATCH)
 	_instruction_label.text = "✨ Hatching...! ✨"
 	_tap_counter_label.text = ""
 
