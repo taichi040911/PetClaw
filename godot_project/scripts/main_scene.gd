@@ -244,6 +244,8 @@ func _on_feed_pressed() -> void:
 	_animate_button(feed_button)
 	if _sfx:
 		_sfx.play(SfxManager.SfxType.FEED)
+	_spawn_floating_text("🍖 +Hunger!", UI_FEED_COLOR)
+	_screen_shake(2.0, 0.1)
 	if GameManager.instance and GameManager.instance.care_system:
 		GameManager.instance.care_system.perform_action(current_pet, "feed")
 	else:
@@ -260,6 +262,7 @@ func _on_pet_pressed() -> void:
 	_animate_button(pet_button)
 	if _sfx:
 		_sfx.play(SfxManager.SfxType.PET)
+	_spawn_floating_text("♥ +Love!", UI_PET_COLOR)
 	if GameManager.instance and GameManager.instance.care_system:
 		GameManager.instance.care_system.perform_action(current_pet, "pet")
 	else:
@@ -276,6 +279,8 @@ func _on_play_pressed() -> void:
 	_animate_button(play_button)
 	if _sfx:
 		_sfx.play(SfxManager.SfxType.PLAY)
+	_spawn_floating_text("⚡ +Fun!", UI_PLAY_COLOR)
+	_screen_shake(3.0, 0.12)
 	if GameManager.instance and GameManager.instance.care_system:
 		GameManager.instance.care_system.perform_action(current_pet, "play")
 	else:
@@ -571,6 +576,36 @@ func _style_progress_bar(bar: ProgressBar, fill_color: Color) -> void:
 
 
 # ========================================================
+# Floating Feedback Text
+# ========================================================
+
+func _spawn_floating_text(text: String, color: Color) -> void:
+	var label: Label = Label.new()
+	label.text = text
+	label.add_theme_font_size_override("font_size", 20)
+	label.add_theme_color_override("font_color", color)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.set_anchors_preset(PRESET_CENTER)
+	label.offset_left = -100
+	label.offset_right = 100
+	label.offset_top = -80
+	label.offset_bottom = -50
+	# ランダムな横方向オフセット
+	label.offset_left += randf_range(-40, 40)
+	label.offset_right += randf_range(-40, 40)
+	label.z_index = 50
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(label)
+
+	var tween: Tween = create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(label, "offset_top", label.offset_top - 80, 0.8).set_ease(Tween.EASE_OUT)
+	tween.tween_property(label, "offset_bottom", label.offset_bottom - 80, 0.8).set_ease(Tween.EASE_OUT)
+	tween.tween_property(label, "modulate:a", 0.0, 0.8).set_delay(0.3)
+	tween.chain().tween_callback(label.queue_free)
+
+
+# ========================================================
 # Button Animation
 # ========================================================
 
@@ -579,6 +614,25 @@ func _animate_button(btn: Button) -> void:
 	tween.tween_property(btn, "scale", Vector2(0.9, 0.9), 0.05)
 	tween.tween_property(btn, "scale", Vector2(1.05, 1.05), 0.1).set_trans(Tween.TRANS_BACK)
 	tween.tween_property(btn, "scale", Vector2(1.0, 1.0), 0.1)
+
+
+# ========================================================
+# Screen Shake
+# ========================================================
+
+func _screen_shake(intensity: float = 4.0, duration: float = 0.15) -> void:
+	var pet_area: SubViewportContainer = $PetArea
+	if not pet_area:
+		return
+	var original_pos: Vector2 = Vector2.ZERO
+	var tween: Tween = create_tween()
+	for i: int in range(4):
+		var offset: Vector2 = Vector2(
+			randf_range(-intensity, intensity),
+			randf_range(-intensity, intensity)
+		)
+		tween.tween_property(pet_area, "position", pet_area.position + offset, duration / 8.0)
+		tween.tween_property(pet_area, "position", pet_area.position, duration / 8.0)
 
 
 # ========================================================
