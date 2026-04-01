@@ -44,6 +44,7 @@ func _load_api_key() -> void:
 func generate(system_prompt: String, user_prompt: String) -> String:
 	if api_key.is_empty():
 		push_warning("ClaudeAPIClient: No API key configured")
+		request_failed.emit("No API key configured")
 		return _generate_fallback(user_prompt)
 
 	var headers := [
@@ -67,6 +68,7 @@ func generate(system_prompt: String, user_prompt: String) -> String:
 
 	if error != OK:
 		push_warning("ClaudeAPIClient: Request failed with error %d" % error)
+		request_failed.emit("HTTP request error: %d" % error)
 		return _generate_fallback(user_prompt)
 
 	# レスポンスを待つ
@@ -76,17 +78,22 @@ func generate(system_prompt: String, user_prompt: String) -> String:
 
 	if response_code != 200:
 		push_warning("ClaudeAPIClient: HTTP %d" % response_code)
+		request_failed.emit("HTTP %d" % response_code)
 		return _generate_fallback(user_prompt)
 
 	var json := JSON.new()
 	var parse_result := json.parse(response_body.get_string_from_utf8())
 	if parse_result != OK:
+		request_failed.emit("JSON parse error")
 		return _generate_fallback(user_prompt)
 
 	var data: Dictionary = json.data
 	if data.has("content") and data["content"].size() > 0:
-		return data["content"][0].get("text", "...")
+		var response_text: String = data["content"][0].get("text", "...")
+		request_completed.emit(response_text)
+		return response_text
 
+	request_failed.emit("Empty content in response")
 	return _generate_fallback(user_prompt)
 
 
