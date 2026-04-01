@@ -85,17 +85,17 @@ func show_choices(pet_id: int, choices: Array[Dictionary]) -> void:
 		hbox.add_theme_constant_override("separation", 12)
 		btn_container.add_child(hbox)
 
-		# 形態アイコン（プレースホルダー：色付き丸）
-		var icon: ColorRect = ColorRect.new()
-		icon.custom_minimum_size = Vector2(48, 48)
-		var color_shift: String = choice.get("visual", {}).get("color_shift", "green")
-		match color_shift:
-			"green": icon.color = Color(0.3, 0.8, 0.4)
-			"blue": icon.color = Color(0.3, 0.5, 0.9)
-			"purple": icon.color = Color(0.6, 0.3, 0.8)
-			"red": icon.color = Color(0.9, 0.3, 0.3)
-			"gold": icon.color = Color(0.9, 0.8, 0.3)
-			_: icon.color = Color(0.5, 0.5, 0.5)
+		# 形態アイコン（実際のスプライトまたはプレースホルダー）
+		var icon: TextureRect = TextureRect.new()
+		icon.custom_minimum_size = Vector2(56, 56)
+		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+		var form_id_for_icon: String = choice.get("id", "blob")
+		var sprite_path: String = "res://assets/sprites/forms/%s.png" % form_id_for_icon
+		if ResourceLoader.exists(sprite_path):
+			icon.texture = load(sprite_path)
+		else:
+			icon.texture = SpritePlaceholderGenerator.generate_placeholder(form_id_for_icon)
 		hbox.add_child(icon)
 
 		var info_vbox: VBoxContainer = VBoxContainer.new()
@@ -137,10 +137,18 @@ func show_choices(pet_id: int, choices: Array[Dictionary]) -> void:
 
 		# 選択ボタン
 		var select_btn: Button = Button.new()
-		select_btn.text = "Evolve"
-		select_btn.custom_minimum_size = Vector2(80, 36)
+		select_btn.text = "⚡ Evolve"
+		select_btn.custom_minimum_size = Vector2(90, 40)
 		var form_id: String = choice.get("id", "")
 		select_btn.pressed.connect(_on_choice_selected.bind(form_id))
+		var evolve_style: StyleBoxFlat = StyleBoxFlat.new()
+		evolve_style.bg_color = Color(0.3, 0.5, 0.9)
+		evolve_style.set_corner_radius_all(8)
+		select_btn.add_theme_stylebox_override("normal", evolve_style)
+		var evolve_hover: StyleBoxFlat = evolve_style.duplicate()
+		evolve_hover.bg_color = Color(0.4, 0.6, 1.0)
+		select_btn.add_theme_stylebox_override("hover", evolve_hover)
+		select_btn.add_theme_color_override("font_color", Color.WHITE)
 		hbox.add_child(select_btn)
 
 	# キャンセルボタン
