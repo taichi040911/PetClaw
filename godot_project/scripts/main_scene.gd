@@ -107,9 +107,15 @@ func _ready() -> void:
 
 
 var _warning_pulse_time: float = 0.0
+var _action_cooldowns: Dictionary = {}  # action_name → time_remaining
+const ACTION_COOLDOWN: float = 2.0
+var _pet_sleeping: bool = false
+var _sleep_label: Label
 
 func _process(delta: float) -> void:
 	_warning_pulse_time += delta
+	_update_cooldowns(delta)
+	_update_sleep_state()
 	if current_pet and current_pet.is_alive:
 		_update_ui()
 		_update_status_warnings()
@@ -313,9 +319,14 @@ func _get_dominant_emotion() -> String:
 func _on_feed_pressed() -> void:
 	if not current_pet or not current_pet.is_alive:
 		return
+	if not _try_action("feed"):
+		return
 	_animate_button(feed_button)
 	if _sfx:
 		_sfx.play(SfxManager.SfxType.FEED)
+	if _pet_sleeping:
+		_spawn_floating_text("Zzz... (sleeping)", Color(0.5, 0.5, 0.7))
+		return
 	_spawn_floating_text("🍖 +Hunger!", UI_FEED_COLOR)
 	_screen_shake(2.0, 0.1)
 	if GameManager.instance and GameManager.instance.care_system:
@@ -331,9 +342,14 @@ func _on_feed_pressed() -> void:
 func _on_pet_pressed() -> void:
 	if not current_pet or not current_pet.is_alive:
 		return
+	if not _try_action("pet"):
+		return
 	_animate_button(pet_button)
 	if _sfx:
 		_sfx.play(SfxManager.SfxType.PET)
+	if _pet_sleeping:
+		_spawn_floating_text("Zzz... (sleeping)", Color(0.5, 0.5, 0.7))
+		return
 	_spawn_floating_text("♥ +Love!", UI_PET_COLOR)
 	if GameManager.instance and GameManager.instance.care_system:
 		GameManager.instance.care_system.perform_action(current_pet, "pet")
@@ -348,9 +364,14 @@ func _on_pet_pressed() -> void:
 func _on_play_pressed() -> void:
 	if not current_pet or not current_pet.is_alive:
 		return
+	if not _try_action("play"):
+		return
 	_animate_button(play_button)
 	if _sfx:
 		_sfx.play(SfxManager.SfxType.PLAY)
+	if _pet_sleeping:
+		_spawn_floating_text("Zzz... (sleeping)", Color(0.5, 0.5, 0.7))
+		return
 	_spawn_floating_text("⚡ +Fun!", UI_PLAY_COLOR)
 	_screen_shake(3.0, 0.12)
 	if GameManager.instance and GameManager.instance.care_system:
@@ -645,6 +666,66 @@ func _style_progress_bar(bar: ProgressBar, fill_color: Color) -> void:
 	fill_style.corner_radius_bottom_left = 6
 	fill_style.corner_radius_bottom_right = 6
 	bar.add_theme_stylebox_override("fill", fill_style)
+
+
+# ========================================================
+# Action Cooldowns
+# ========================================================
+
+func _try_action(action_name: String) -> bool:
+	if _action_cooldowns.has(action_name) and _action_cooldowns[action_name] > 0.0:
+		return false
+	_action_cooldowns[action_name] = ACTION_COOLDOWN
+	return true
+
+
+func _update_cooldowns(delta: float) -> void:
+	for key: String in _action_cooldowns:
+		_action_cooldowns[key] = maxf(0.0, _action_cooldowns[key] - delta)
+
+
+# ========================================================
+# Sleep State
+# ========================================================
+
+func _update_sleep_state() -> void:
+	var should_sleep: bool = _day_night != null and _day_night.is_sleepy_time()
+	if should_sleep != _pet_sleeping:
+		_pet_sleeping = should_sleep
+		if _pet_sleeping:
+			_show_sleep_indicator()
+		else:
+			_hide_sleep_indicator()
+
+
+func _show_sleep_indicator() -> void:
+	if _sleep_label:
+		return
+	_sleep_label = Label.new()
+	_sleep_label.text = "Z z z . . ."
+	_sleep_label.add_theme_font_size_override("font_size", 28)
+	_sleep_label.add_theme_color_override("font_color", Color(0.5, 0.55, 0.8, 0.7))
+	_sleep_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_sleep_label.set_anchors_preset(PRESET_CENTER_TOP)
+	_sleep_label.offset_top = 50
+	_sleep_label.offset_left = -80
+	_sleep_label.offset_right = 80
+	_sleep_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_sleep_label)
+	# フェードイン
+	_sleep_label.modulate.a = 0.0
+	var tween: Tween = create_tween()
+	tween.tween_property(_sleep_label, "modulate:a", 1.0, 0.5)
+
+
+func _hide_sleep_indicator() -> void:
+	if not _sleep_label:
+		return
+	var label: Label = _sleep_label
+	_sleep_label = null
+	var tween: Tween = create_tween()
+	tween.tween_property(label, "modulate:a", 0.0, 0.3)
+	tween.tween_callback(label.queue_free)
 
 
 # ========================================================
