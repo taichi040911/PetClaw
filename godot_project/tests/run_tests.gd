@@ -63,7 +63,7 @@ func _init() -> void:
 	print("\n── Evolution ──")
 
 	var evo: EvolutionMechanics = EvolutionMechanics.new()
-	evo.record_care_miss(1, "hunger")
+	evo.record_care_miss(1)
 	var ed: Dictionary = evo.to_dict()
 	var er: EvolutionMechanics = EvolutionMechanics.new()
 	er.from_dict(ed)
@@ -73,7 +73,7 @@ func _init() -> void:
 	er.queue_free()
 
 	var tree: EvolutionTree = EvolutionTree.new()
-	var paths: Dictionary = tree.get_stage_2_paths()
+	var paths: Array[Dictionary] = EvolutionTree.get_stage_2_paths()
 	if paths.size() >= 3:
 		print("  [PASS] EvolutionTree stage 2 paths (%d forms)" % paths.size())
 		total_passed += 1
@@ -123,9 +123,9 @@ func _init() -> void:
 	breed.queue_free()
 	br.queue_free()
 
-	var fsm: PetLifecycleFSM = PetLifecycleFSM.new()
+	var fsm: PetLifecycleFSM = PetLifecycleFSM.new(1)
 	var fd: Dictionary = fsm.to_dict()
-	var fr: PetLifecycleFSM = PetLifecycleFSM.new()
+	var fr: PetLifecycleFSM = PetLifecycleFSM.new(2)
 	fr.from_dict(fd)
 	print("  [PASS] PetLifecycleFSM round-trip")
 	total_passed += 1

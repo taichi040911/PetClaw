@@ -42,7 +42,7 @@ func _build_ui() -> void:
 
 	# スクロール可能なペットリスト
 	var scroll: ScrollContainer = ScrollContainer.new()
-	scroll.set_anchors_preset(PRESET_WIDE)
+	scroll.set_anchors_preset(PRESET_TOP_WIDE)
 	scroll.anchor_top = 0.06
 	scroll.anchor_bottom = 1.0
 	add_child(scroll)

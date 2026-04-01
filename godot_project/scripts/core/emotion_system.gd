@@ -51,17 +51,17 @@ func _decay_emotions(pet: PetEntity, delta: float) -> void:
 func _apply_personality_bias(pet: PetEntity, delta: float) -> void:
 	# 勇敢 → fearを減少させやすい
 	if pet.personality["brave"] > 0.6:
-		var fear_reduction := (pet.personality["brave"] - 0.6) * 0.002 * delta
+		var fear_reduction: float = (pet.personality["brave"] - 0.6) * 0.002 * delta
 		pet.emotions["fear"] = maxf(0.0, pet.emotions["fear"] - fear_reduction)
 
 	# 好奇心 → excitementを維持しやすい
 	if pet.personality["curious"] > 0.6:
-		var excitement_floor := (pet.personality["curious"] - 0.6) * 0.1
+		var excitement_floor: float = (pet.personality["curious"] - 0.6) * 0.1
 		pet.emotions["excitement"] = maxf(excitement_floor, pet.emotions["excitement"])
 
 	# 愛情深い → loveの減衰が遅い
 	if pet.personality["affectionate"] > 0.6:
-		var love_preservation := (pet.personality["affectionate"] - 0.6) * 0.5
+		var love_preservation: float = (pet.personality["affectionate"] - 0.6) * 0.5
 		# love減衰率を実質的に下げる（すでに減衰済みなので微加算で補正）
 		pet.emotions["love"] = minf(1.0, pet.emotions["love"] + love_preservation * 0.001 * delta)
 
@@ -103,7 +103,7 @@ func stimulate(pet: PetEntity, emotion: String, intensity: float, source: String
 	# 想起による感情再活性化（BiologicalMemorySystem連携）
 	if final_intensity > 0.5 and GameManager.instance and GameManager.instance.biological_memory:
 		var query := {"emotion_tag": emotion, "context_tags": [source]}
-		var recalled := GameManager.instance.biological_memory.retrieve_memories(
+		var recalled: Array = GameManager.instance.biological_memory.retrieve_memories(
 			pet.pet_id, query, pet.personality, 1
 		)
 		for mem in recalled:

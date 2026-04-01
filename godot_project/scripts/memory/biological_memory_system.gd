@@ -130,7 +130,7 @@ func retrieve_memories(pet_id: int, query: Dictionary, personality: Dictionary,
 	for mem in all_memories:
 		var relevance := _calculate_relevance(mem, query)
 		var personality_bias := _calculate_personality_bias(mem, personality)
-		var score := relevance * mem["importance"] * personality_bias
+		var score: float = relevance * mem["importance"] * personality_bias
 		scored.append({"memory": mem, "score": score})
 
 	# スコア降順ソート
@@ -154,7 +154,7 @@ func retrieve_shared_memories(pet_id_1: int, pet_id_2: int, max_results: int = 3
 		return []
 
 	var shared: Array[Dictionary] = []
-	var all_1 := pet_memories[pet_id_1]["hippocampus"] + pet_memories[pet_id_1]["cortex"]
+	var all_1: Array = pet_memories[pet_id_1]["hippocampus"] + pet_memories[pet_id_1]["cortex"]
 
 	for mem in all_1:
 		if mem["content"].get("with", -1) == pet_id_2:
@@ -207,7 +207,7 @@ func _decay_memory_pool(pet_id: int, pool_name: String, current_time: float) -> 
 		var time_passed: float = current_time - mem["timestamp"]
 
 		# 強度に応じた半減期を計算
-		var strength_multiplier := 1.0 + mem["emotion_intensity"] * 0.7 + mem["recall_count"] * 0.2
+		var strength_multiplier: float = 1.0 + mem["emotion_intensity"] * 0.7 + mem["recall_count"] * 0.2
 		var base_half_life: float = HALF_LIFE_SHORT if pool_name == "hippocampus" else HALF_LIFE_LONG
 
 		# Ebbinghaus式: R(t) = e^(-t / (S × multiplier))
@@ -228,8 +228,8 @@ func _decay_memory_pool(pet_id: int, pool_name: String, current_time: float) -> 
 
 func _get_initial_importance(mem: Dictionary) -> float:
 	## 記憶の「元の重要度」を推定（recall_count + emotion考慮）
-	var base := 0.3 + mem["emotion_intensity"] * 0.7
-	var recall_bonus := mem["recall_count"] * 0.1
+	var base: float = 0.3 + mem["emotion_intensity"] * 0.7
+	var recall_bonus: float = mem["recall_count"] * 0.1
 	return clampf(base + recall_bonus, 0.0, 1.0)
 
 

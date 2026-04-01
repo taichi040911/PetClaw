@@ -5,7 +5,7 @@ extends Node
 
 signal breeding_available(pet1_id: int, pet2_id: int)
 signal offspring_born(parent1_id: int, parent2_id: int, child: PetEntity)
-signal trait_inherited(child_id: int, trait: String, from_parent_id: int)
+signal trait_inherited(child_id: int, trait_name: String, from_parent_id: int)
 
 # === 交配条件閾値 ===
 const MIN_AFFECTION: float = 0.6      # 最低愛着度
@@ -58,7 +58,7 @@ func check_compatibility(pet1: PetEntity, pet2: PetEntity) -> Dictionary:
 	var env_bonus: float = GameManager.ecosystem.get_breeding_bonus()
 
 	# 愛着度
-	var affection_score := (pet1.emotions["love"] + pet2.emotions["love"]) / 2.0
+	var affection_score: float = (pet1.emotions["love"] + pet2.emotions["love"]) / 2.0
 
 	# 総合スコア
 	var total_score := (
@@ -85,8 +85,8 @@ func _calculate_personality_compatibility(pet1: PetEntity, pet2: PetEntity) -> f
 	# 補完的な性格の方が相性が良い（正反対ではなく、バランスの取れた組み合わせ）
 	var score := 0.0
 	var trait_count := 0
-	for trait in pet1.personality:
-		var diff := absf(pet1.personality[trait] - pet2.personality[trait])
+	for t_name in pet1.personality:
+		var diff: float = absf(pet1.personality[t_name] - pet2.personality[t_name])
 		# 適度な差（0.2〜0.5）が最高スコア
 		if diff >= 0.2 and diff <= 0.5:
 			score += 1.0
@@ -115,7 +115,7 @@ func breed(pet1: PetEntity, pet2: PetEntity) -> PetEntity:
 		return null
 
 	# 子孫生成
-	var child := _create_offspring(pet1, pet2, compat["score"])
+	var child: Node = _create_offspring(pet1, pet2, compat["score"])
 
 	# 親の感情反応
 	GameManager.emotion_system.stimulate(pet1, "love", 0.5, "breeding")
@@ -150,7 +150,7 @@ func _create_offspring(parent1: PetEntity, parent2: PetEntity, compat_score: flo
 	child.current_environment = parent1.current_environment
 
 	# === 性格の遺伝 ===
-	for trait in parent1.personality:
+	for t_name in parent1.personality:
 		if randf() < TRAIT_INHERIT_CHANCE:
 			# どちらの親から継承するか
 			var from_parent: PetEntity
@@ -158,16 +158,16 @@ func _create_offspring(parent1: PetEntity, parent2: PetEntity, compat_score: flo
 				from_parent = parent1
 			else:
 				from_parent = parent2
-			child.personality[trait] = from_parent.personality[trait]
-			trait_inherited.emit(child.pet_id, trait, from_parent.pet_id)
+			child.personality[t_name] = from_parent.personality[t_name]
+			trait_inherited.emit(child.pet_id, t_name, from_parent.pet_id)
 		else:
 			# ランダム値
-			child.personality[trait] = randf_range(0.3, 0.7)
+			child.personality[t_name] = randf_range(0.3, 0.7)
 
 		# 突然変異
 		if randf() < MUTATION_CHANCE:
 			var mutation := randf_range(-MUTATION_RANGE, MUTATION_RANGE)
-			child.personality[trait] = clampf(child.personality[trait] + mutation, 0.0, 1.0)
+			child.personality[t_name] = clampf(child.personality[t_name] + mutation, 0.0, 1.0)
 
 	# === 記憶の部分継承 ===
 	var inherited_memories: Array[Dictionary] = []
@@ -207,9 +207,9 @@ func _generate_offspring_name(parent1: PetEntity, parent2: PetEntity) -> String:
 
 func _play_breeding_visuals(parent1: PetEntity, parent2: PetEntity, child: PetEntity) -> void:
 	# 親の感情色をブレンド
-	var color1 := GameManager.emotion_system.get_emotion_color(parent1)
-	var color2 := GameManager.emotion_system.get_emotion_color(parent2)
-	var blend_color := color1.lerp(color2, 0.5)
+	var color1: Color = GameManager.emotion_system.get_emotion_color(parent1)
+	var color2: Color = GameManager.emotion_system.get_emotion_color(parent2)
+	var blend_color: Color = color1.lerp(color2, 0.5)
 
 	GameManager.visual_fx.play_effect("breeding", {
 		"parent1_id": parent1.pet_id,
@@ -233,9 +233,9 @@ const GENETIC_TRAITS: Dictionary = {
 	"suffix_affinity": {"heritability": 0.75, "mutation_rate": 0.06},
 }
 
-signal genetic_trait_inherited(child_id: int, trait: String, heritability_value: float)
+signal genetic_trait_inherited(child_id: int, trait_name: String, heritability_value: float)
 signal twin_born(parent1_id: int, parent2_id: int, child1_id: int, child2_id: int)
-signal mutation_occurred(child_id: int, trait: String, mutation_type: String, new_value: float)
+signal mutation_occurred(child_id: int, trait_name: String, mutation_type: String, new_value: float)
 
 
 func calculate_offspring_traits(parent1: PetEntity, parent2: PetEntity) -> Dictionary:
@@ -376,6 +376,24 @@ func check_twin_probability(parent1: PetEntity, parent2: PetEntity) -> float:
 # === 家系図データ（v2追加） ===
 
 var family_tree: Dictionary = {}  # pet_id → FamilyNode
+
+
+func to_dict() -> Dictionary:
+	var tree_data: Dictionary = {}
+	for pid in family_tree:
+		tree_data[str(pid)] = family_tree[pid].to_dict()
+	return {
+		"family_tree": tree_data,
+	}
+
+
+func from_dict(data: Dictionary) -> void:
+	family_tree.clear()
+	var tree_data: Dictionary = data.get("family_tree", {})
+	for pid_str in tree_data:
+		var node: FamilyNode = FamilyNode.from_dict(tree_data[pid_str])
+		family_tree[node.pet_id] = node
+
 
 class FamilyNode:
 	var pet_id: int

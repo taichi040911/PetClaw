@@ -116,8 +116,8 @@ func _discussion_affinity(pet1: PetEntity, pet2: PetEntity) -> float:
 	var score := 0.0
 
 	# 異なる性格は議論を活性化
-	for trait in pet1.personality:
-		var diff := absf(pet1.personality[trait] - pet2.personality[trait])
+	for t_name in pet1.personality:
+		var diff := absf(pet1.personality[t_name] - pet2.personality[t_name])
 		score += diff * 0.3  # 性格の違いは議論の素
 
 	# 共有感情は深い議論を生む
@@ -159,8 +159,8 @@ func _select_discussion_group(pets: Array[PetEntity]) -> Array[PetEntity]:
 
 func _run_pair_discussion(pet1: PetEntity, pet2: PetEntity) -> void:
 	var topic := _select_topic(pet1, pet2)
-	var grammar := GameManager.language_evolution.get_current_grammar()
-	var original_lang := GameManager.original_language.get_vocabulary_summary()
+	var grammar: Dictionary = GameManager.language_evolution.get_current_grammar()
+	var original_lang: String = GameManager.original_language.get_vocabulary_summary()
 
 	var system_prompt := """You are two AI pets in an autonomous community. Humans can only observe, not participate.
 Current language rules: word order=%s, suffixes=%s
@@ -221,7 +221,7 @@ Discuss '%s'. Be authentic to your personalities.""" % [
 
 func _run_group_discussion(group: Array[PetEntity]) -> void:
 	var topic := _select_group_topic(group)
-	var grammar := GameManager.language_evolution.get_current_grammar()
+	var grammar: Dictionary = GameManager.language_evolution.get_current_grammar()
 	var names := []
 	for p in group: names.append(p.pet_name)
 
@@ -278,9 +278,9 @@ func _select_topic(pet1: PetEntity, pet2: PetEntity) -> String:
 				candidates.append("daily_life")
 
 	# 性格に基づくトピック
-	var avg_calm := (pet1.personality["calm"] + pet2.personality["calm"]) / 2.0
-	var avg_curious := (pet1.personality["curious"] + pet2.personality["curious"]) / 2.0
-	var avg_brave := (pet1.personality["brave"] + pet2.personality["brave"]) / 2.0
+	var avg_calm: float = (pet1.personality["calm"] + pet2.personality["calm"]) / 2.0
+	var avg_curious: float = (pet1.personality["curious"] + pet2.personality["curious"]) / 2.0
+	var avg_brave: float = (pet1.personality["brave"] + pet2.personality["brave"]) / 2.0
 
 	if avg_calm > PHILOSOPHY_THRESHOLD:
 		candidates.append("philosophy")
@@ -397,10 +397,10 @@ func _check_faction_formation() -> void:
 	for pet in pets:
 		var max_trait := ""
 		var max_val := 0.0
-		for trait in pet.personality:
-			if pet.personality[trait] > max_val:
-				max_val = pet.personality[trait]
-				max_trait = trait
+		for t_name in pet.personality:
+			if pet.personality[t_name] > max_val:
+				max_val = pet.personality[t_name]
+				max_trait = t_name
 
 		match max_trait:
 			"brave": brave_faction.append(pet.pet_id)
@@ -471,11 +471,11 @@ func _get_max_emotion(pet: PetEntity) -> float:
 
 func _avg_personalities(pets: Array[PetEntity]) -> Dictionary:
 	var avg: Dictionary = {}
-	for trait in pets[0].personality:
+	for t_name in pets[0].personality:
 		var total := 0.0
 		for p in pets:
-			total += p.personality[trait]
-		avg[trait] = total / pets.size()
+			total += p.personality[t_name]
+		avg[t_name] = total / pets.size()
 	return avg
 
 

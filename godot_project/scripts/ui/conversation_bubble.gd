@@ -22,7 +22,7 @@ func _build_ui() -> void:
 	set_anchors_preset(PRESET_FULL_RECT)
 
 	_bubble_container = VBoxContainer.new()
-	_bubble_container.set_anchors_preset(PRESET_WIDE)
+	_bubble_container.set_anchors_preset(PRESET_TOP_WIDE)
 	_bubble_container.anchor_top = 0.05
 	_bubble_container.anchor_bottom = 0.55
 	_bubble_container.offset_left = 16

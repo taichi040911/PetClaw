@@ -88,10 +88,33 @@ var active_event: String = ""
 var event_timer: float = 0.0
 
 # === References ===
-@onready var particle_system: GPUParticles2D = $EnvironmentParticles
+var particle_system: GPUParticles2D
+
+
+func to_dict() -> Dictionary:
+	return {
+		"current_environment": current_environment,
+		"climate_intensity": climate_intensity,
+		"time_in_environment": time_in_environment,
+		"active_event": active_event,
+		"event_timer": event_timer,
+	}
+
+
+func from_dict(data: Dictionary) -> void:
+	current_environment = data.get("current_environment", "forest")
+	climate_intensity = data.get("climate_intensity", 0.5)
+	time_in_environment = data.get("time_in_environment", 0.0)
+	active_event = data.get("active_event", "")
+	event_timer = data.get("event_timer", 0.0)
 
 
 func _ready() -> void:
+	particle_system = get_node_or_null("EnvironmentParticles") as GPUParticles2D
+	if not particle_system:
+		particle_system = GPUParticles2D.new()
+		particle_system.name = "EnvironmentParticles"
+		add_child(particle_system)
 	_apply_environment_visuals()
 
 
@@ -127,8 +150,8 @@ func _apply_immediate_effects(pet: PetEntity) -> void:
 	pet.current_environment = current_environment
 
 	# 性格ブースト（即時は小さめ）
-	for trait in env_data["personality_boosts"]:
-		pet.evolve_personality(trait, env_data["personality_boosts"][trait] * 5.0)
+	for t_name in env_data["personality_boosts"]:
+		pet.evolve_personality(t_name, env_data["personality_boosts"][t_name] * 5.0)
 
 	# 感情刺激
 	GameManager.emotion_system.stimulate(pet, "excitement", 0.2, "environment_change")
@@ -143,8 +166,8 @@ func _apply_long_term_effects(delta: float) -> void:
 			continue
 
 		# 性格の緩やかな変化
-		for trait in env_data["personality_boosts"]:
-			pet.evolve_personality(trait, env_data["personality_boosts"][trait] * delta)
+		for t_name in env_data["personality_boosts"]:
+			pet.evolve_personality(t_name, env_data["personality_boosts"][t_name] * delta)
 
 
 # === 環境修飾子を取得（他システムから参照） ===

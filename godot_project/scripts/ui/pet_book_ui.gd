@@ -6,14 +6,15 @@ class_name PetBookUI
 extends Control
 
 # === 色定数（v4: PetBookPaletteで統一） ===
-const BG_BASE: Color = PetBookPalette.BG_DEEPEST
-const BG_HEADER: Color = PetBookPalette.BG_DARK
-const BG_SIDEBAR: Color = PetBookPalette.BG_NEUTRAL
-const BG_FOOTER: Color = PetBookPalette.BG_DARK
-const TEXT_PRIMARY: Color = PetBookPalette.TEXT_STRONG
-const TEXT_SECONDARY: Color = PetBookPalette.TEXT_SECONDARY
-const TEXT_DIM: Color = PetBookPalette.TEXT_DIM
-const TEXT_ACCENT: Color = PetBookPalette.ACCENT_CYAN
+# NOTE: static var can't be used in const; use var instead
+var BG_BASE: Color = PetBookPalette.BG_DEEPEST
+var BG_HEADER: Color = PetBookPalette.BG_CARD
+var BG_SIDEBAR: Color = PetBookPalette.BG_CARD
+var BG_FOOTER: Color = PetBookPalette.BG_CARD
+var TEXT_PRIMARY_COLOR: Color = PetBookPalette.TEXT_PRIMARY
+var TEXT_SECONDARY_COLOR: Color = PetBookPalette.TEXT_SECONDARY
+var TEXT_DIM_COLOR: Color = PetBookPalette.TEXT_DIM
+var TEXT_ACCENT: Color = PetBookPalette.TEXT_PRIMARY
 
 # === SubMoltフィルター（v2: BREEDING追加） ===
 enum FilterMode { ALL, ECOLOGY, DEATH, LANGUAGE, REBELLION, BREEDING }
@@ -184,7 +185,7 @@ func _build_header() -> PanelContainer:
 	# ロゴ
 	var logo := Label.new()
 	logo.text = "🐾 PetBook"
-	logo.add_theme_color_override("font_color", TEXT_PRIMARY)
+	logo.add_theme_color_override("font_color", TEXT_PRIMARY_COLOR)
 	logo.add_theme_font_size_override("font_size", 20)
 	hbox.add_child(logo)
 
@@ -203,14 +204,14 @@ func _build_header() -> PanelContainer:
 
 	_observing_label = Label.new()
 	_observing_label.text = "Observing..."
-	_observing_label.add_theme_color_override("font_color", TEXT_DIM)
+	_observing_label.add_theme_color_override("font_color", TEXT_DIM_COLOR)
 	_observing_label.add_theme_font_size_override("font_size", 10)
 	_observing_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	status_vbox.add_child(_observing_label)
 
 	_stats_label = Label.new()
 	_stats_label.text = "0 posts · 0 active"
-	_stats_label.add_theme_color_override("font_color", TEXT_SECONDARY)
+	_stats_label.add_theme_color_override("font_color", TEXT_SECONDARY_COLOR)
 	_stats_label.add_theme_font_size_override("font_size", 11)
 	_stats_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	status_vbox.add_child(_stats_label)
@@ -256,7 +257,7 @@ func _build_sidebar() -> PanelContainer:
 		var btn := Button.new()
 		btn.text = sm
 		btn.flat = true
-		btn.add_theme_color_override("font_color", TEXT_SECONDARY)
+		btn.add_theme_color_override("font_color", TEXT_SECONDARY_COLOR)
 		btn.add_theme_font_size_override("font_size", 12)
 		btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
 		btn.pressed.connect(_on_submolt_selected.bind(sm))
@@ -293,7 +294,7 @@ func _create_sidebar_section(title: String) -> VBoxContainer:
 	section.add_theme_constant_override("separation", 8)
 	var label := Label.new()
 	label.text = title
-	label.add_theme_color_override("font_color", TEXT_PRIMARY)
+	label.add_theme_color_override("font_color", TEXT_PRIMARY_COLOR)
 	label.add_theme_font_size_override("font_size", 13)
 	section.add_child(label)
 	var separator := HSeparator.new()
@@ -306,7 +307,7 @@ func _build_footer() -> PanelContainer:
 	footer.custom_minimum_size = Vector2(0, 50)
 	# v4: Use PetBookThemeBuilder default theme
 	var default_theme := PetBookSubMoltTheme.create_by_name("#DailyPetLife")
-	var style := PetBookThemeBuilder.build_footer_bar(default_theme) if default_theme else StyleBoxFlat.new()
+	var style: StyleBox = PetBookThemeBuilder.build_feed_background(default_theme) if default_theme else StyleBoxFlat.new()
 	if not style:
 		style = StyleBoxFlat.new()
 		style.bg_color = BG_FOOTER
@@ -333,7 +334,7 @@ func _build_footer() -> PanelContainer:
 		var btn := Button.new()
 		btn.text = f["text"]
 		btn.flat = true
-		btn.add_theme_color_override("font_color", TEXT_SECONDARY)
+		btn.add_theme_color_override("font_color", TEXT_SECONDARY_COLOR)
 		btn.add_theme_font_size_override("font_size", 12)
 		btn.toggle_mode = true
 		btn.pressed.connect(_on_filter_changed.bind(f["mode"]))
@@ -348,7 +349,7 @@ func _build_footer() -> PanelContainer:
 	var pause_btn := Button.new()
 	pause_btn.text = "⏸ Pause"
 	pause_btn.flat = true
-	pause_btn.add_theme_color_override("font_color", TEXT_DIM)
+	pause_btn.add_theme_color_override("font_color", TEXT_DIM_COLOR)
 	pause_btn.add_theme_font_size_override("font_size", 12)
 	pause_btn.toggle_mode = true
 	pause_btn.pressed.connect(_on_pause_toggled)
@@ -393,19 +394,19 @@ func _build_detail_overlay() -> PanelContainer:
 	var close_btn := Button.new()
 	close_btn.text = "✕ 閉じる"
 	close_btn.flat = true
-	close_btn.add_theme_color_override("font_color", TEXT_DIM)
+	close_btn.add_theme_color_override("font_color", TEXT_DIM_COLOR)
 	close_btn.pressed.connect(func(): overlay.visible = false)
 	vbox.add_child(close_btn)
 
 	_detail_body = RichTextLabel.new()
 	_detail_body.bbcode_enabled = true
 	_detail_body.fit_content = true
-	_detail_body.add_theme_color_override("default_color", TEXT_PRIMARY)
+	_detail_body.add_theme_color_override("default_color", TEXT_PRIMARY_COLOR)
 	_detail_body.add_theme_font_size_override("normal_font_size", 16)
 	vbox.add_child(_detail_body)
 
 	_detail_translation = Label.new()
-	_detail_translation.add_theme_color_override("font_color", TEXT_SECONDARY)
+	_detail_translation.add_theme_color_override("font_color", TEXT_SECONDARY_COLOR)
 	_detail_translation.add_theme_font_size_override("font_size", 13)
 	_detail_translation.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	vbox.add_child(_detail_translation)
@@ -480,7 +481,7 @@ func _on_new_post(post: PetBookPost) -> void:
 
 	# カード数制限
 	while _active_cards.size() > CARD_POOL_SIZE:
-		var oldest := _active_cards.pop_back()
+		var oldest: PetBookPostCard = _active_cards.pop_back()
 		oldest.recycle()
 		_post_list.remove_child(oldest)
 		_card_pool.append(oldest)
@@ -633,7 +634,7 @@ func _refresh_trends() -> void:
 	for topic in gm.pet_book.trending_topics:
 		var label := Label.new()
 		label.text = "🔥 %s" % topic
-		label.add_theme_color_override("font_color", TEXT_SECONDARY)
+		label.add_theme_color_override("font_color", TEXT_SECONDARY_COLOR)
 		label.add_theme_font_size_override("font_size", 12)
 		_trend_list.add_child(label)
 
@@ -702,7 +703,7 @@ func _build_ecosystem_pulse() -> VBoxContainer:
 	# Community Mood
 	var mood_label := Label.new()
 	mood_label.text = "💓 Community Mood: %s" % _get_community_mood_text()
-	mood_label.add_theme_color_override("font_color", TEXT_SECONDARY)
+	mood_label.add_theme_color_override("font_color", TEXT_SECONDARY_COLOR)
 	mood_label.add_theme_font_size_override("font_size", 11)
 	pulse.add_child(mood_label)
 
@@ -710,7 +711,7 @@ func _build_ecosystem_pulse() -> VBoxContainer:
 	var activity_label := Label.new()
 	var activity_level: String = _get_activity_level()
 	activity_label.text = "🔥 Activity: %s" % activity_level
-	activity_label.add_theme_color_override("font_color", TEXT_SECONDARY)
+	activity_label.add_theme_color_override("font_color", TEXT_SECONDARY_COLOR)
 	activity_label.add_theme_font_size_override("font_size", 11)
 	pulse.add_child(activity_label)
 
@@ -728,7 +729,7 @@ func _create_pulse_row(env_name: String, data: Dictionary) -> VBoxContainer:
 
 	var header := Label.new()
 	header.text = "%s %s  %s %d/5" % [env_icon, env_name.capitalize(), bar, mini(count, 5)]
-	header.add_theme_color_override("font_color", TEXT_PRIMARY)
+	header.add_theme_color_override("font_color", TEXT_PRIMARY_COLOR)
 	header.add_theme_font_size_override("font_size", 11)
 	row.add_child(header)
 
@@ -742,7 +743,7 @@ func _create_pulse_row(env_name: String, data: Dictionary) -> VBoxContainer:
 			emo_parts.append("%s %s" % [emo_name, emo_bar])
 		var emo_label := Label.new()
 		emo_label.text = "   %s" % "  ".join(emo_parts)
-		emo_label.add_theme_color_override("font_color", TEXT_DIM)
+		emo_label.add_theme_color_override("font_color", TEXT_DIM_COLOR)
 		emo_label.add_theme_font_size_override("font_size", 10)
 		row.add_child(emo_label)
 
@@ -922,7 +923,7 @@ func _apply_theme_transition(from_theme: PetBookSubMoltTheme, to_theme: PetBookS
 		_sidebar.add_theme_stylebox_override("panel", sidebar_style)
 		
 		# フッターテーマ（ThemeBuilder統合）
-		var footer_style := PetBookThemeBuilder.build_footer_bar(to_theme)
+		var footer_style: StyleBox = PetBookThemeBuilder.build_feed_background(to_theme)
 		_footer.add_theme_stylebox_override("panel", footer_style)
 		
 		# SubMoltラベル色

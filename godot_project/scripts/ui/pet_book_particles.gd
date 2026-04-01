@@ -222,7 +222,7 @@ func spawn_post_particles(post_type: String, emotion_color: Color, spawn_positio
 	_active_event_particles.append(particles)
 
 	# 寿命後にプールに返却
-	var timer := get_tree().create_timer(config["lifetime"] + 0.5)
+	var timer: SceneTreeTimer = get_tree().create_timer(config["lifetime"] + 0.5)
 	timer.timeout.connect(_return_to_pool.bind(particles))
 
 
@@ -251,7 +251,7 @@ func _get_from_pool() -> GPUParticles2D:
 		oldest.emitting = false
 		return oldest
 
-	var p := _particle_pool.pop_back()
+	var p: GPUParticles2D = _particle_pool.pop_back()
 	p.visible = true
 	return p
 
@@ -528,7 +528,9 @@ func _apply_sub_molt_ambient_detailed(theme_id: String) -> void:
 			ambient_config["color_ramp"],
 			ambient_config.get("color_ramp_offsets", [])
 		)
-		mat.color_ramp = gradient
+		var tex := GradientTexture1D.new()
+		tex.gradient = gradient
+		mat.color_initial_ramp = tex
 
 	_ambient_particles.process_material = mat
 	_ambient_particles.amount = ambient_config.get("amount", 30)
@@ -567,7 +569,9 @@ func spawn_sub_molt_event_detailed(theme_id: String, event_type: String, spawn_p
 			event_config["color_ramp"],
 			event_config.get("color_ramp_offsets", [])
 		)
-		mat.color_ramp = gradient
+		var tex := GradientTexture1D.new()
+		tex.gradient = gradient
+		mat.color_initial_ramp = tex
 
 	# 単一色が指定されていれば使用
 	if event_config.has("color"):
@@ -662,8 +666,10 @@ func _apply_detailed_material(mat: ParticleProcessMaterial, config: Dictionary) 
 		# Note: scale_curve の完全な実装にはAnimationCurveが必要
 		# ここではフラグのみ設定
 		if config["scale_curve_enabled"]:
-			var curve := AnimationCurve.new()
-			curve.add_point(0.0, 0.3)
-			curve.add_point(0.5, 1.0)
-			curve.add_point(1.0, 0.5)
-			mat.scale = 1.0
+			var curve: Curve = Curve.new()
+			curve.add_point(Vector2(0.0, 0.3))
+			curve.add_point(Vector2(0.5, 1.0))
+			curve.add_point(Vector2(1.0, 0.5))
+			var curve_tex := CurveTexture.new()
+			curve_tex.curve = curve
+			mat.scale_curve = curve_tex

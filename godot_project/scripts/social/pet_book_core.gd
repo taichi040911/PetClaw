@@ -191,7 +191,8 @@ func _create_post(pet: PetEntity, post_type: PetBookPost.PostType) -> PetBookPos
 
 	# 性格影響
 	post.personality_influence = _get_dominant_personality(pet)
-	post.author_evolution_form = pet.get("current_form", "basic")
+	var _form_1 = pet.get("current_form")
+	post.author_evolution_form = _form_1 if _form_1 != null else "basic"
 
 	return post
 
@@ -211,7 +212,8 @@ func _create_post_legacy(pet: PetEntity, post_type: PetBookPost.PostType) -> Pet
 	post.author_emotion = _get_dominant_emotion(pet)
 	post.author_emotion_intensity = _get_pet_emotion_intensity(pet)
 	post.author_personality_dominant = _get_dominant_personality(pet)
-	post.author_evolution_form = pet.get("current_form", "basic")
+	var _form_2 = pet.get("current_form")
+	post.author_evolution_form = _form_2 if _form_2 != null else "basic"
 
 	if gm.language_evolution:
 		post.word_order = gm.language_evolution.get_pet_word_order(pet.pet_id)

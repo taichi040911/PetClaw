@@ -62,7 +62,7 @@ var resonance_cooldown: Dictionary = {}
 var pulse_timer: float = 0.0
 
 # ゲームマネージャー参照キャッシュ
-var _game_manager: GameManager
+var _game_manager: Node  # GameManager (autoload)
 
 # ───────────────────────────────────────────────────────────────────────────────
 # ライフサイクル / Lifecycle

@@ -132,9 +132,9 @@ func _calculate_order_affinity(
 	var score := 0.0
 
 	# 性格との親和性
-	for trait in order_traits.get("personality", {}):
-		var required: float = order_traits["personality"][trait]
-		var actual: float = avg_personality.get(trait, 0.5)
+	for t_name in order_traits.get("personality", {}):
+		var required: float = order_traits["personality"][t_name]
+		var actual: float = avg_personality.get(t_name, 0.5)
 		if actual >= required:
 			score += 0.3
 
@@ -286,25 +286,25 @@ func _word_order_suffix_interconnection(new_order: int, trigger_reason: String) 
 		WordOrder.SOV:
 			# 親密な語順 → 愛情系接尾辞が強化
 			if "love" in suffixes:
-				var enhanced := suffixes["love"] + "-deep"
+				var enhanced: String = suffixes["love"] + "-deep"
 				suffixes["love_enhanced"] = enhanced
 				suffix_created.emit(enhanced, "love_enhanced", "SOV interconnection")
 
 		WordOrder.VSO:
 			# 命令的語順 → 力強い接尾辞が生成
-			var force_suffix := "-force-" + suffixes.get("excitement", "flash").trim_prefix("-")
+			var force_suffix: String = "-force-" + suffixes.get("excitement", "flash").trim_prefix("-")
 			suffixes["command"] = force_suffix
 			suffix_created.emit(force_suffix, "command", "VSO interconnection")
 
 		WordOrder.OVS:
 			# 強調語順 → 驚きの接尾辞
-			var emphasis_suffix := "-!" + suffixes.get("excitement", "flash").trim_prefix("-")
+			var emphasis_suffix: String = "-!" + suffixes.get("excitement", "flash").trim_prefix("-")
 			suffixes["emphasis"] = emphasis_suffix
 			suffix_created.emit(emphasis_suffix, "emphasis", "OVS interconnection")
 
 		WordOrder.OSV:
 			# 詩的語順 → 美的接尾辞
-			var poetic_suffix := "-" + suffixes.get("joy", "glow").trim_prefix("-") + "-song"
+			var poetic_suffix: String = "-" + suffixes.get("joy", "glow").trim_prefix("-") + "-song"
 			suffixes["poetic"] = poetic_suffix
 			suffix_created.emit(poetic_suffix, "poetic", "OSV interconnection")
 

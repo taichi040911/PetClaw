@@ -162,7 +162,7 @@ func start_conversation(pet1: PetEntity, pet2: PetEntity, trigger: String) -> vo
 	conversation_started.emit([pet1.pet_id, pet2.pet_id])
 
 	# 言語進化の現在の文法を取得
-	var grammar := GameManager.language_evolution.get_current_grammar()
+	var grammar: Dictionary = GameManager.language_evolution.get_current_grammar()
 
 	# プロンプト構築
 	var system_prompt := _build_system_prompt(grammar)
@@ -173,8 +173,8 @@ func start_conversation(pet1: PetEntity, pet2: PetEntity, trigger: String) -> vo
 	var turn := 0
 
 	while turn < MAX_TURNS_PER_CONVERSATION:
-		var current_pet := participants[turn % 2]
-		var other_pet := participants[(turn + 1) % 2]
+		var current_pet: PetEntity = participants[turn % 2]
+		var other_pet: PetEntity = participants[(turn + 1) % 2]
 
 		var prompt := _build_turn_prompt(current_pet, other_pet, context, turn)
 		var response: String = await claude_client.generate(system_prompt, prompt)
@@ -211,7 +211,7 @@ func trigger_reaction_conversation(
 		# キューに入れる（簡易実装）
 		await get_tree().create_timer(5.0).timeout
 
-	var grammar := GameManager.language_evolution.get_current_grammar()
+	var grammar: Dictionary = GameManager.language_evolution.get_current_grammar()
 	var system_prompt := _build_system_prompt(grammar)
 
 	var reaction_prompt := _build_reaction_prompt(pet, target, reaction_type, detail, grammar)
@@ -247,7 +247,7 @@ Your language should feel natural and evolving, not forced.""" % [
 
 
 func _build_conversation_context(pet1: PetEntity, pet2: PetEntity, trigger: String) -> Dictionary:
-	var env_topics := GameManager.ecosystem.get_a2a_topics()
+	var env_topics: Array = GameManager.ecosystem.get_a2a_topics()
 
 	# BiologicalMemorySystem から関連記憶を取得（利用可能な場合）
 	var bio_memories_1: Array[Dictionary] = []
@@ -255,7 +255,7 @@ func _build_conversation_context(pet1: PetEntity, pet2: PetEntity, trigger: Stri
 	var shared_memories: Array[Dictionary] = []
 
 	if GameManager.instance and GameManager.instance.biological_memory:
-		var bio_mem := GameManager.instance.biological_memory
+		var bio_mem: Node = GameManager.instance.biological_memory
 		var query := {
 			"event_type": "conversation",
 			"context_tags": [pet1.current_environment, trigger],
@@ -307,7 +307,7 @@ func _build_turn_prompt(
 	if not bio_mems.is_empty():
 		memory_context = "\nYour relevant memories:\n"
 		for mem in bio_mems:
-			var age_hours := (Time.get_unix_time_from_system() - mem.get("timestamp", 0)) / 3600.0
+			var age_hours: float = (Time.get_unix_time_from_system() - mem.get("timestamp", 0)) / 3600.0
 			memory_context += "- %s (%.0fh ago, feeling: %s, importance: %.1f)\n" % [
 				str(mem.get("content", {}).get("type", "?")),
 				age_hours,
@@ -418,7 +418,7 @@ Weave emotions and evolving language naturally. Don't expose your thinking proce
 	]
 
 
-func _format_pet_profile(context: Dictionary, pet_key: str) -> String:
+func _format_pet_profile(context: Dictionary, pet_key: String) -> String:
 	## ペットプロファイルを簡潔にフォーマット
 	var name = context.get(pet_key + "_name", "Unknown")
 	var personality = context.get(pet_key + "_personality", {})
@@ -454,8 +454,8 @@ func _process_language_evolution(conversation: Array[Dictionary]) -> void:
 		var regex := RegEx.new()
 		regex.compile("-[a-z]+")
 		var matches := regex.search_all(text)
-		for match in matches:
-			var suffix = match.get_string()
+		for m in matches:
+			var suffix = m.get_string()
 			suffix_usage[suffix] = suffix_usage.get(suffix, 0) + 1
 
 	# 言語進化システムに通知
@@ -475,7 +475,7 @@ func _register_conversation_memory(pet: PetEntity, conversation: Array[Dictionar
 	# 感情強度の高いメッセージを抽出
 	var highlight_messages: Array[Dictionary] = []
 	for msg in conversation:
-		var emotion_intensity := msg.get("emotion_intensity", 0.0)
+		var emotion_intensity: float = msg.get("emotion_intensity", 0.0)
 		if emotion_intensity > 0.4:
 			highlight_messages.append(msg)
 
@@ -635,7 +635,7 @@ func _generate_template_conversation(pet1: PetEntity, pet2: PetEntity, trigger: 
 		matching_templates = TEMPLATE_CONVERSATIONS[randi() % TEMPLATE_CONVERSATIONS.size()].get("templates", [])
 
 	# テンプレートから数個を選択
-	var grammar := GameManager.language_evolution.get_current_grammar()
+	var grammar: Dictionary = GameManager.language_evolution.get_current_grammar()
 	var suffix_list = grammar.get("suffixes", [])
 	var selected_suffix = suffix_list[randi() % suffix_list.size()] if not suffix_list.is_empty() else "mii"
 
@@ -696,8 +696,8 @@ func _finalize_conversation(pet1: PetEntity, pet2: PetEntity, trigger: String,
 	var dominant_emotion := _get_dominant_emotion(pet1)
 	var emotion_intensity := _get_emotion_intensity(pet1)
 	var avg_personality := {}
-	for trait in pet1.personality:
-		avg_personality[trait] = (pet1.personality[trait] + pet2.personality[trait]) / 2.0
+	for t_name in pet1.personality:
+		avg_personality[t_name] = (pet1.personality[t_name] + pet2.personality[t_name]) / 2.0
 
 	var lang_context := {
 		"dominant_emotion": dominant_emotion,
@@ -729,7 +729,7 @@ func _finalize_conversation(pet1: PetEntity, pet2: PetEntity, trigger: String,
 
 	# BiologicalMemorySystem: 会話中に言及された記憶をHebbian強化
 	if GameManager.instance and GameManager.instance.biological_memory:
-		var bio_mem := GameManager.instance.biological_memory
+		var bio_mem: Node = GameManager.instance.biological_memory
 		for mem in conv_context.get("bio_memories_1", []):
 			bio_mem.strengthen_related_memories(pet1.pet_id, mem)
 		for mem in conv_context.get("bio_memories_2", []):
@@ -737,7 +737,7 @@ func _finalize_conversation(pet1: PetEntity, pet2: PetEntity, trigger: String,
 
 	# PersistentField: 共有イベント記録 + 関係性スコア更新
 	if GameManager.instance and GameManager.instance.persistent_field:
-		var pf := GameManager.instance.persistent_field
+		var pf: Node = GameManager.instance.persistent_field
 		pf.record_shared_event({
 			"type": "a2a_conversation",
 			"participants": [pet1.pet_id, pet2.pet_id],

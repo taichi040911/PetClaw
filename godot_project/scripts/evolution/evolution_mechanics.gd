@@ -115,8 +115,8 @@ func _check_tree_conditions(pet: PetEntity, path: Dictionary) -> bool:
 				pass  # 上のprimaryで処理済み
 			"personality_balance":
 				if val:
-					for trait in pet.personality:
-						if pet.personality[trait] < 0.4:
+					for t_name in pet.personality:
+						if pet.personality[t_name] < 0.4:
 							return false
 			"a2a_conversation_count_min", "total_a2a_conversations_min":
 				if pet_a2a_counts.get(pet.pet_id, 0) < val:
@@ -323,7 +323,7 @@ func _get_avg_relationship(pet_id: int) -> float:
 	## PersistentField の relationship_graph から平均関係値を取得
 	if not GameManager.instance or not GameManager.instance.persistent_field:
 		return 0.5
-	var pf := GameManager.instance.persistent_field
+	var pf: Node = GameManager.instance.persistent_field
 	var graph: Dictionary = pf.field_state.get("relationship_graph", {})
 	if graph.is_empty():
 		return 0.5
@@ -331,7 +331,7 @@ func _get_avg_relationship(pet_id: int) -> float:
 	var total := 0.0
 	var count := 0
 	for key in graph:
-		var ids := key.split("_")
+		var ids: PackedStringArray = key.split("_")
 		if ids.size() == 2:
 			var id1 := int(ids[0])
 			var id2 := int(ids[1])
@@ -346,12 +346,12 @@ func _get_max_relationship(pet_id: int) -> float:
 	## pet_id の最も高い関係スコアを返す
 	if not GameManager.instance or not GameManager.instance.persistent_field:
 		return 0.0
-	var pf := GameManager.instance.persistent_field
+	var pf: Node = GameManager.instance.persistent_field
 	var graph: Dictionary = pf.field_state.get("relationship_graph", {})
 
 	var max_score := 0.0
 	for key in graph:
-		var ids := key.split("_")
+		var ids: PackedStringArray = key.split("_")
 		if ids.size() == 2:
 			var id1 := int(ids[0])
 			var id2 := int(ids[1])

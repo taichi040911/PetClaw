@@ -6,7 +6,7 @@ extends Node2D
 # === Signals ===
 signal stat_changed(stat_name: String, old_value: float, new_value: float)
 signal emotion_changed(emotion: String, intensity: float)
-signal personality_evolved(trait: String, delta: float)
+signal personality_evolved(trait_name: String, delta: float)
 signal pet_state_critical(warning_type: String)
 
 # === Export ===
@@ -134,11 +134,11 @@ func blend_emotion(emotion_name: String, delta_intensity: float) -> void:
 
 
 # === 性格進化 ===
-func evolve_personality(trait: String, delta: float) -> void:
-	if trait in personality:
-		var old_val := personality[trait]
-		personality[trait] = clampf(old_val + delta, 0.0, 1.0)
-		personality_evolved.emit(trait, delta)
+func evolve_personality(trait_name: String, delta: float) -> void:
+	if trait_name in personality:
+		var old_val: float = personality[trait_name]
+		personality[trait_name] = clampf(old_val + delta, 0.0, 1.0)
+		personality_evolved.emit(trait_name, delta)
 
 
 # === 記憶追加 ===

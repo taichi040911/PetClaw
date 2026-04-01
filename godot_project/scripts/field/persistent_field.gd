@@ -154,7 +154,7 @@ func get_closest_partner(pet_id: int) -> int:
 	var best_score := 0.0
 
 	for key in graph:
-		var ids := key.split("_")
+		var ids: PackedStringArray = key.split("_")
 		if ids.size() == 2:
 			var id1 := int(ids[0])
 			var id2 := int(ids[1])
@@ -286,10 +286,10 @@ func _generate_adventure(pet: Node, offline_seconds: float) -> Dictionary:
 	# 性格で冒険タイプを決定
 	var adventure_type := "explore"
 	var max_trait := 0.0
-	for trait in personality:
-		if personality[trait] > max_trait:
-			max_trait = personality[trait]
-			match trait:
+	for t_name in personality:
+		if personality[t_name] > max_trait:
+			max_trait = personality[t_name]
+			match t_name:
 				"brave": adventure_type = "battle"
 				"curious": adventure_type = "explore"
 				"calm": adventure_type = "meditate"

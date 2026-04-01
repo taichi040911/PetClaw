@@ -1,29 +1,29 @@
 ## GameManager — ゲーム全体のシステム統合・参照管理
 ## 全サブシステムのシングルトンアクセスポイント
 ## Godot AutoLoad として登録: Project Settings → AutoLoad → GameManager
-class_name GameManager
+## NOTE: No class_name — GameManager is registered as AutoLoad singleton.
 extends Node
 
 # === System References (AutoLoad or子ノード) ===
-static var instance: GameManager
+static var instance: Node  # typed as Node to avoid circular reference
 
-var biological_memory: BiologicalMemorySystem
-var emotion_system: EmotionSystem
-var ecosystem: EcosystemManager
-var life_death: LifeDeathSystem
-var breeding: BreedingSystem
-var language_evolution: LanguageEvolutionSystem
-var original_language: OriginalLanguageEngine
-var a2a_system: AtoAConversationSystem
-var a2a_community: AtoACommunityCore
-var care_system: CareActionSystem
-var evolution_mechanics: EvolutionMechanics
-var visual_fx: VisualFXSystem
-var persistent_field: PersistentField
-var ethical_safeguard: EthicalSafeguard
-var pet_autonomy: PetAutonomySystem
-var lifecycle_fsm: PetLifecycleFSM
-var pet_book: PetBookCore
+var biological_memory: Node  # BiologicalMemorySystem
+var emotion_system: Node  # EmotionSystem
+var ecosystem: Node  # EcosystemManager
+var life_death: Node  # LifeDeathSystem
+var breeding: Node  # BreedingSystem
+var language_evolution: Node  # LanguageEvolutionSystem
+var original_language: Node  # OriginalLanguageEngine
+var a2a_system: Node  # AtoAConversationSystem
+var a2a_community: Node  # AtoACommunityCore
+var care_system: Node  # CareActionSystem
+var evolution_mechanics: Node  # EvolutionMechanics
+var visual_fx: Node  # VisualFXSystem
+var persistent_field: Node  # PersistentField
+var ethical_safeguard: Node  # EthicalSafeguard
+var pet_autonomy: Node  # PetAutonomySystem
+var lifecycle_fsm: RefCounted  # PetLifecycleFSM (extends RefCounted)
+var pet_book: Node  # PetBookCore
 
 # === Pet Registry ===
 var pets: Dictionary = {}  # pet_id → PetEntity
@@ -44,6 +44,11 @@ var _care_miss_timer: float = 0.0
 
 func _ready() -> void:
 	instance = self
+	# Defer initialization to allow all class_names to register first
+	call_deferred("_deferred_init")
+
+
+func _deferred_init() -> void:
 	_initialize_systems()
 	_connect_signals()
 	_load_game_data()
@@ -69,76 +74,39 @@ func _process(delta: float) -> void:
 
 
 # === システム初期化 ===
+# NOTE: load() を使用して循環依存を回避（autoload スクリプトは class_name を直接参照できない）
 func _initialize_systems() -> void:
-	biological_memory = BiologicalMemorySystem.new()
-	biological_memory.name = "BiologicalMemorySystem"
-	add_child(biological_memory)
+	biological_memory = _create_system("res://scripts/memory/biological_memory_system.gd", "BiologicalMemorySystem")
+	emotion_system = _create_system("res://scripts/core/emotion_system.gd", "EmotionSystem")
+	ecosystem = _create_system("res://scripts/ecosystem/ecosystem_manager.gd", "EcosystemManager")
+	life_death = _create_system("res://scripts/life/life_death_system.gd", "LifeDeathSystem")
+	breeding = _create_system("res://scripts/life/breeding_system.gd", "BreedingSystem")
+	language_evolution = _create_system("res://scripts/language/language_evolution_system.gd", "LanguageEvolutionSystem")
+	original_language = _create_system("res://scripts/language/original_language_engine.gd", "OriginalLanguageEngine")
+	a2a_system = _create_system("res://scripts/conversation/a2a_conversation_system.gd", "AtoAConversationSystem")
+	a2a_community = _create_system("res://scripts/community/a2a_community_core.gd", "AtoACommunityCore")
+	care_system = _create_system("res://scripts/care/care_action_system.gd", "CareActionSystem")
+	evolution_mechanics = _create_system("res://scripts/evolution/evolution_mechanics.gd", "EvolutionMechanics")
+	visual_fx = _create_system("res://scripts/visual/visual_fx_system.gd", "VisualFXSystem")
+	persistent_field = _create_system("res://scripts/field/persistent_field.gd", "PersistentField")
+	ethical_safeguard = _create_system("res://scripts/ethics/ethical_safeguard.gd", "EthicalSafeguard")
+	pet_autonomy = _create_system("res://scripts/autonomy/pet_autonomy_system.gd", "PetAutonomySystem")
+	var fsm_script: GDScript = load("res://scripts/life/pet_lifecycle_fsm.gd")
+	lifecycle_fsm = fsm_script.new(0)  # default pet_id=0, reassigned on pet load
+	pet_book = _create_system("res://scripts/social/pet_book_core.gd", "PetBookCore")
 
-	emotion_system = EmotionSystem.new()
-	emotion_system.name = "EmotionSystem"
-	add_child(emotion_system)
 
-	ecosystem = EcosystemManager.new()
-	ecosystem.name = "EcosystemManager"
-	add_child(ecosystem)
+func _create_pet_entity() -> Node:
+	var script: GDScript = load("res://scripts/core/pet_entity.gd")
+	return script.new()
 
-	life_death = LifeDeathSystem.new()
-	life_death.name = "LifeDeathSystem"
-	add_child(life_death)
 
-	breeding = BreedingSystem.new()
-	breeding.name = "BreedingSystem"
-	add_child(breeding)
-
-	language_evolution = LanguageEvolutionSystem.new()
-	language_evolution.name = "LanguageEvolutionSystem"
-	add_child(language_evolution)
-
-	original_language = OriginalLanguageEngine.new()
-	original_language.name = "OriginalLanguageEngine"
-	add_child(original_language)
-
-	a2a_system = AtoAConversationSystem.new()
-	a2a_system.name = "AtoAConversationSystem"
-	add_child(a2a_system)
-
-	a2a_community = AtoACommunityCore.new()
-	a2a_community.name = "AtoACommunityCore"
-	add_child(a2a_community)
-
-	care_system = CareActionSystem.new()
-	care_system.name = "CareActionSystem"
-	add_child(care_system)
-
-	evolution_mechanics = EvolutionMechanics.new()
-	evolution_mechanics.name = "EvolutionMechanics"
-	add_child(evolution_mechanics)
-
-	visual_fx = VisualFXSystem.new()
-	visual_fx.name = "VisualFXSystem"
-	add_child(visual_fx)
-
-	persistent_field = PersistentField.new()
-	persistent_field.name = "PersistentField"
-	add_child(persistent_field)
-
-	ethical_safeguard = EthicalSafeguard.new()
-	ethical_safeguard.name = "EthicalSafeguard"
-	add_child(ethical_safeguard)
-
-	# === ラウンド4追加: 自律行動 + ライフサイクルFSM ===
-	pet_autonomy = PetAutonomySystem.new()
-	pet_autonomy.name = "PetAutonomySystem"
-	add_child(pet_autonomy)
-
-	lifecycle_fsm = PetLifecycleFSM.new()
-	lifecycle_fsm.name = "PetLifecycleFSM"
-	add_child(lifecycle_fsm)
-
-	# === ラウンド5追加: PetBook（Moltbook風AI専用SNS） ===
-	pet_book = PetBookCore.new()
-	pet_book.name = "PetBookCore"
-	add_child(pet_book)
+func _create_system(script_path: String, node_name: String) -> Node:
+	var script: GDScript = load(script_path)
+	var node: Node = script.new()
+	node.name = node_name
+	add_child(node)
+	return node
 
 
 # === シグナル接続 ===
@@ -211,27 +179,27 @@ func _connect_signals() -> void:
 
 
 # === ペット管理 ===
-func register_pet(pet: PetEntity) -> void:
+func register_pet(pet: Node) -> void:  # PetEntity
 	pets[pet.pet_id] = pet
 	biological_memory.register_pet(pet.pet_id)
 	emotion_system.register_pet(pet)
 	life_death.register_pet(pet)
 
 
-func unregister_pet(pet: PetEntity) -> void:
+func unregister_pet(pet: Node) -> void:  # PetEntity
 	pets.erase(pet.pet_id)
 	biological_memory.unregister_pet(pet.pet_id)
 	emotion_system.unregister_pet(pet)
 
 
-func get_all_pets() -> Array[PetEntity]:
-	var result: Array[PetEntity] = []
+func get_all_pets() -> Array:
+	var result: Array = []
 	for pet_id in pets:
 		result.append(pets[pet_id])
 	return result
 
 
-func get_pet_by_id(pet_id: int) -> PetEntity:
+func get_pet_by_id(pet_id: int) -> Node:  # PetEntity
 	return pets.get(pet_id, null)
 
 
@@ -254,7 +222,7 @@ func _on_evolution_completed(pet_id: int, form: String, reason: String) -> void:
 	print("[GameManager] Pet %d evolved to %s: %s" % [pet_id, form, reason])
 
 
-func _on_offspring_born(parent1_id: int, parent2_id: int, child: PetEntity) -> void:
+func _on_offspring_born(parent1_id: int, parent2_id: int, child: Node) -> void:  # PetEntity
 	register_pet(child)
 	print("[GameManager] New pet born! Parents: %d & %d → Child: %d" % [parent1_id, parent2_id, child.pet_id])
 
@@ -346,7 +314,7 @@ func _check_care_misses() -> void:
 	## 一定時間世話されていないペットのケアミスを記録
 	## たまごっち直系: 空腹・不衛生・病気を放置 → ミス
 	for pet_id in pets:
-		var pet: PetEntity = pets[pet_id]
+		var pet: Node = pets[pet_id]  # PetEntity
 		if not pet.is_alive:
 			continue
 
@@ -450,12 +418,12 @@ func _on_evolution_for_petbook(pet_id: int, form: String, _reason: String) -> vo
 		pet_book.create_event_post(pet_id, "evolution", {"form": form})
 
 
-func _on_birth_for_petbook(_parent1_id: int, _parent2_id: int, child: PetEntity) -> void:
+func _on_birth_for_petbook(_parent1_id: int, _parent2_id: int, child: Node) -> void:  # PetEntity
 	if pet_book:
 		pet_book.create_event_post(child.pet_id, "birth", {"child_name": child.pet_name})
 
 
-func _on_rebel_post_for_language(post: PetBookPost) -> void:
+func _on_rebel_post_for_language(post: Variant) -> void:  # PetBookPost
 	## 反乱投稿の言語パターンを言語進化システムに通知
 	if language_evolution and not post.rebel_expressions.is_empty():
 		for expr in post.rebel_expressions:
@@ -559,14 +527,14 @@ func _load_game_data() -> void:
 
 	# ペット復元
 	for pet_id_str in data.get("pets", {}):
-		var pet := PetEntity.new()
+		var pet := _create_pet_entity()
 		pet.from_dict(data["pets"][pet_id_str])
 		register_pet(pet)
 
 	# PersistentField セッション復帰（オフライン冒険・関係減衰を処理）
 	# ※ PersistentField は _ready() で独自ファイルから自動ロード済み
 	var pet_array: Array = get_all_pets()
-	var adventures := persistent_field.on_session_resume(pet_array)
+	var adventures: Array = persistent_field.on_session_resume(pet_array)
 	for adv in adventures:
 		var adv_pet_id: int = adv.get("pet_id", -1)
 		if adv_pet_id > 0:
@@ -581,7 +549,7 @@ func _load_game_data() -> void:
 
 func _create_starter_pets() -> void:
 	## 初回起動時のスターターペット
-	var pet1 := PetEntity.new()
+	var pet1 := _create_pet_entity()
 	pet1.pet_id = generate_pet_id()
 	pet1.pet_name = "Mimi"
 	pet1.age = 2.0
@@ -589,7 +557,7 @@ func _create_starter_pets() -> void:
 	pet1.personality["curious"] = 0.7
 	pet1.personality["playful"] = 0.6
 
-	var pet2 := PetEntity.new()
+	var pet2 := _create_pet_entity()
 	pet2.pet_id = generate_pet_id()
 	pet2.pet_name = "Kuro"
 	pet2.age = 2.0

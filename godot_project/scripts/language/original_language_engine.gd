@@ -208,8 +208,8 @@ func _process_daily_decay(delta: float) -> void:
 	for word in vocabulary:
 		var entry: Dictionary = vocabulary[word]
 		# 最後の使用からの時間で減衰を加速
-		var time_since_use := Time.get_unix_time_from_system() - entry.get("last_used", 0)
-		var age_factor := 1.0 + (time_since_use / 86400.0) * 0.5  # 1日経過ごとに50%加速
+		var time_since_use: float = Time.get_unix_time_from_system() - entry.get("last_used", 0)
+		var age_factor: float = 1.0 + (time_since_use / 86400.0) * 0.5  # 1日経過ごとに50%加速
 		entry["strength"] -= decay_per_frame * age_factor
 
 		if entry["strength"] < ARCHIVE_THRESHOLD:

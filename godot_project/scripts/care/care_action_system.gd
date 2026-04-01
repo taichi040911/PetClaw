@@ -85,8 +85,8 @@ func perform_action(pet: PetEntity, action: String) -> float:
 		GameManager.emotion_system.stimulate(pet, emotion, intensity, "care_%s" % action)
 
 	# 性格進化
-	for trait in effects.get("personality", {}):
-		pet.evolve_personality(trait, effects["personality"][trait] * effectiveness)
+	for t_name in effects.get("personality", {}):
+		pet.evolve_personality(t_name, effects["personality"][t_name] * effectiveness)
 
 	# 愛着度
 	var affection_gain: float = effects.get("affection_gain", 0.0) * effectiveness
@@ -161,7 +161,7 @@ func _get_personality_modifier(pet: PetEntity, action: String) -> float:
 
 
 func _play_care_visuals(pet: PetEntity, action: String, effectiveness: float) -> void:
-	var emotion_color := GameManager.emotion_system.get_emotion_color(pet)
+	var emotion_color: Color = GameManager.emotion_system.get_emotion_color(pet)
 	var fx_params := {
 		"pet_id": pet.pet_id,
 		"action": action,
