@@ -1,0 +1,38 @@
+[gd_scene load_steps=3 format=3 uid="uid://pet_display"]
+
+[ext_resource type="Script" path="res://scripts/core/pet_entity.gd" id="1_pet"]
+[ext_resource type="Script" path="res://scripts/visual/pet_visual_bridge.gd" id="2_bridge"]
+
+[node name="PetDisplay" type="Node2D"]
+
+[node name="PetEntity" type="Node2D" parent="."]
+script = ExtResource("1_pet")
+
+[node name="VisualBridge" type="Node2D" parent="PetEntity"]
+script = ExtResource("2_bridge")
+
+[node name="Body" type="Sprite2D" parent="PetEntity/VisualBridge"]
+scale = Vector2(2, 2)
+
+[node name="Eyes" type="Sprite2D" parent="PetEntity/VisualBridge"]
+position = Vector2(0, -20)
+scale = Vector2(2, 2)
+
+[node name="Mouth" type="Sprite2D" parent="PetEntity/VisualBridge"]
+position = Vector2(0, 10)
+scale = Vector2(2, 2)
+
+[node name="ExpressionEffect" type="Sprite2D" parent="PetEntity/VisualBridge"]
+position = Vector2(30, -40)
+visible = false
+
+[node name="EmotionParticles" type="GPUParticles2D" parent="PetEntity/VisualBridge"]
+position = Vector2(0, -30)
+emitting = false
+amount = 8
+lifetime = 1.5
+
+[node name="ShadowSprite" type="Sprite2D" parent="."]
+position = Vector2(0, 60)
+modulate = Color(0, 0, 0, 0.2)
+scale = Vector2(3, 0.5)
