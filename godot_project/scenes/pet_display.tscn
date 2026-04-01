@@ -12,15 +12,18 @@ script = ExtResource("1_pet")
 script = ExtResource("2_bridge")
 
 [node name="Body" type="Sprite2D" parent="PetEntity/VisualBridge"]
-scale = Vector2(2, 2)
+texture_filter = 1
+scale = Vector2(4, 4)
 
 [node name="Eyes" type="Sprite2D" parent="PetEntity/VisualBridge"]
+texture_filter = 1
 position = Vector2(0, -20)
-scale = Vector2(2, 2)
+scale = Vector2(4, 4)
 
 [node name="Mouth" type="Sprite2D" parent="PetEntity/VisualBridge"]
+texture_filter = 1
 position = Vector2(0, 10)
-scale = Vector2(2, 2)
+scale = Vector2(4, 4)
 
 [node name="ExpressionEffect" type="Sprite2D" parent="PetEntity/VisualBridge"]
 position = Vector2(30, -40)

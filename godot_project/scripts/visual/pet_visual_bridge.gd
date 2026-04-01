@@ -119,6 +119,8 @@ func _load_pet_sprites() -> void:
 	else:
 		# プレースホルダーフォールバック
 		body_sprite.texture = SpritePlaceholderGenerator.generate_placeholder(form_id)
+	# ピクセルアートをくっきり表示
+	body_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 
 	# === Expression Sprites (Eyes/Mouth) ===
 	var expr_dir: String = "res://assets/sprites/expressions/%s/" % form_id
