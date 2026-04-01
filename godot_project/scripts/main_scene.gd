@@ -14,6 +14,8 @@ extends Control
 @onready var pet_button: Button = $UIPanel/VBox/ActionButtons/PetButton
 @onready var play_button: Button = $UIPanel/VBox/ActionButtons/PlayButton
 @onready var petbook_button: Button = $UIPanel/VBox/ActionButtons/PetBookButton
+@onready var pets_button: Button = $UIPanel/VBox/NavButtons/PetsButton
+@onready var settings_button: Button = $UIPanel/VBox/NavButtons/SettingsButton
 
 # === Pet Reference ===
 var current_pet: PetEntity
@@ -35,6 +37,8 @@ func _ready() -> void:
 	pet_button.pressed.connect(_on_pet_pressed)
 	play_button.pressed.connect(_on_play_pressed)
 	petbook_button.pressed.connect(_on_petbook_pressed)
+	pets_button.pressed.connect(_on_pets_pressed)
+	settings_button.pressed.connect(_on_settings_pressed)
 
 	# GameManager の初期化完了を待つ
 	await get_tree().process_frame
@@ -46,6 +50,10 @@ func _ready() -> void:
 		_show_egg_hatch()
 	else:
 		_setup_pet_display()
+
+	# 初回チュートリアル判定
+	if not FileAccess.file_exists("user://tutorial_done.flag"):
+		_show_tutorial()
 
 	# GameManager シグナル接続
 	_connect_game_signals()
@@ -308,6 +316,59 @@ func _on_pet_died(pet_id: int) -> void:
 
 
 # === Screen Navigation ===
+
+# === Tutorial ===
+
+func _show_tutorial() -> void:
+	# 卵孵化後にチュートリアルを表示
+	await get_tree().create_timer(1.0).timeout
+
+	var tutorial: TutorialOverlay = TutorialOverlay.new()
+	tutorial.tutorial_completed.connect(func() -> void:
+		# チュートリアル完了フラグを保存
+		var file: FileAccess = FileAccess.open("user://tutorial_done.flag", FileAccess.WRITE)
+		if file:
+			file.store_string("done")
+			file.close()
+	)
+	add_child(tutorial)
+
+
+# === Settings Screen ===
+
+func _on_settings_pressed() -> void:
+	var settings: SettingsScreen = SettingsScreen.new()
+	settings.back_requested.connect(func() -> void:
+		settings.queue_free()
+		$PetArea.visible = true
+		$UIPanel.visible = true
+	)
+	add_child(settings)
+	$PetArea.visible = false
+	$UIPanel.visible = false
+
+
+# === Pet List Screen ===
+
+func _on_pets_pressed() -> void:
+	var pet_list: PetListScreen = PetListScreen.new()
+	pet_list.back_requested.connect(func() -> void:
+		pet_list.queue_free()
+		$PetArea.visible = true
+		$UIPanel.visible = true
+	)
+	pet_list.pet_selected.connect(func(pet_id: int) -> void:
+		if GameManager.instance and GameManager.instance.pets.has(pet_id):
+			current_pet = GameManager.instance.pets[pet_id]
+			pet_name_label.text = current_pet.pet_name
+		pet_list.queue_free()
+		$PetArea.visible = true
+		$UIPanel.visible = true
+	)
+	add_child(pet_list)
+	$PetArea.visible = false
+	$UIPanel.visible = false
+
 
 func _on_petbook_pressed() -> void:
 	if petbook_screen:
