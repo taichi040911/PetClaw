@@ -5,6 +5,7 @@
 [application]
 
 config/name="PetClaw"
+config/version="0.2.0"
 config/description="AI Virtual Pet Simulation - Claude API Driven"
 run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.3", "Mobile")

@@ -5,7 +5,7 @@ set -e
 
 BUTLER=~/bin/butler
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-EXPORT_DIR="$PROJECT_DIR/exports/web"
+EXPORT_DIR="$PROJECT_DIR/godot_project/export/web"
 ZIP_FILE="$PROJECT_DIR/exports/petclaw-web.zip"
 ITCH_TARGET="taichi040911/petclaw:html5"
 
@@ -22,7 +22,7 @@ fi
 if [ ! -f "$EXPORT_DIR/index.html" ]; then
     echo "Building Web export..."
     mkdir -p "$EXPORT_DIR"
-    /Applications/Godot.app/Contents/MacOS/Godot --headless --path "$PROJECT_DIR/godot_project" --export-release "Web (HTML5)"
+    /Applications/Godot.app/Contents/MacOS/Godot --headless --path "$PROJECT_DIR/godot_project" --export-release "Web (HTML5)" "$EXPORT_DIR/index.html"
 fi
 
 # Create zip
