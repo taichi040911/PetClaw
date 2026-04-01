@@ -87,21 +87,22 @@ func _build_ui() -> void:
 	_egg_container.pivot_offset = Vector2(70, 90)
 	egg_center.add_child(_egg_container)
 
-	# 卵本体（楕円的な表現 — 重ねた丸角レクト）
+	# 卵本体（ピクセルアートスプライト）
+	var egg_texture: ImageTexture = SpritePlaceholderGenerator.generate_egg()
+	var egg_sprite: TextureRect = TextureRect.new()
+	egg_sprite.texture = egg_texture
+	egg_sprite.custom_minimum_size = Vector2(120, 160)
+	egg_sprite.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	egg_sprite.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+	egg_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	egg_sprite.mouse_filter = Control.MOUSE_FILTER_PASS
+	_egg_container.add_child(egg_sprite)
+	# _egg_body参照を保持（色変更アニメーション用）
 	_egg_body = ColorRect.new()
 	_egg_body.custom_minimum_size = Vector2(120, 160)
-	_egg_body.position = Vector2(10, 10)
-	_egg_body.color = EGG_COLOR
-	_egg_body.mouse_filter = Control.MOUSE_FILTER_PASS
+	_egg_body.color = Color(1, 1, 1, 0)
+	_egg_body.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_egg_container.add_child(_egg_body)
-
-	# 卵のハイライト
-	var highlight: ColorRect = ColorRect.new()
-	highlight.custom_minimum_size = Vector2(40, 60)
-	highlight.position = Vector2(30, 25)
-	highlight.color = EGG_HIGHLIGHT
-	highlight.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_egg_container.add_child(highlight)
 
 	# ヒビ線（最初は非表示）
 	for i: int in range(5):
