@@ -1,0 +1,64 @@
+{
+  "form_id": "guardian_adult",
+  "sprite_size": 32,
+  "palette": {
+    "body": [
+      255,
+      193,
+      7
+    ],
+    "accent": [
+      255,
+      224,
+      130
+    ],
+    "eye": [
+      33,
+      33,
+      33
+    ]
+  },
+  "eye_sheet": "guardian_adult_eyes.png",
+  "eye_shapes": [
+    "NORMAL",
+    "HAPPY",
+    "EXCITED",
+    "SAD",
+    "ANGRY",
+    "SCARED",
+    "SLEEPY",
+    "LOVE",
+    "CURIOUS",
+    "CLOSED",
+    "DOT",
+    "SPARKLE"
+  ],
+  "eye_frame_width": 32,
+  "mouth_sheet": "guardian_adult_mouths.png",
+  "mouth_shapes": [
+    "NEUTRAL",
+    "SMILE",
+    "WIDE_SMILE",
+    "FROWN",
+    "OPEN",
+    "WAVY",
+    "CHOMP",
+    "POUT",
+    "WHISTLE",
+    "TINY_SMILE"
+  ],
+  "mouth_frame_width": 32,
+  "mouth_frame_height": 16,
+  "preset_sheet": "guardian_adult_presets.png",
+  "presets": [
+    "idle",
+    "happy",
+    "excited",
+    "sad",
+    "scared",
+    "love",
+    "sleepy",
+    "angry"
+  ],
+  "preset_frame_width": 32
+}

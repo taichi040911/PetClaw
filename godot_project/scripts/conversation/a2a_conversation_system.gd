@@ -1,0 +1,806 @@
+## AtoAConversationSystem — AIペット同士の自律会話を管理
+## Claude APIを使い、性格・感情・言語進化を反映した会話を生成
+class_name AtoAConversationSystem
+extends Node
+
+signal conversation_started(participants: Array[int])
+signal conversation_ended(participants: Array[int], summary: String)
+signal conversation_message(pet_id: int, message: String, metadata: Dictionary)
+
+# === パラメータ ===
+const AUTO_CONVERSATION_INTERVAL: float = 180.0   # 自動会話間隔（秒）
+const MAX_TURNS_PER_CONVERSATION: int = 6          # 1会話の最大ターン数
+const MIN_EMOTION_FOR_SPONTANEOUS: float = 0.4     # 自発的会話の最低感情強度
+
+# === コスト管理（P2原則） ===
+const DAILY_CONVERSATION_BUDGET: float = 0.50      # 1日の会話予算（ドル）
+const COST_PER_TURN: float = 0.002                 # 1ターンあたりの概算コスト
+var daily_conversation_cost: float = 0.0
+var daily_conversation_count: int = 0
+const MAX_DAILY_CONVERSATIONS: int = 25            # 1日の最大会話数（50ペット÷2≈25）
+
+# === State ===
+var conversation_timer: float = 0.0
+var is_conversation_active: bool = false
+var conversation_log: Array[Dictionary] = []       # 全会話ログ
+var current_conversation: Array[Dictionary] = []   # 現在進行中の会話
+var last_daily_reset: int = 0                      # 最後にリセットされた日付
+
+# === References ===
+var claude_client: ClaudeAPIClient  # Claude API連携クラス
+
+# === テンプレート会話（APIバジェット切れ時用） ===
+const TEMPLATE_CONVERSATIONS: Array[Dictionary] = [
+	{
+		"trigger": "greeting",
+		"templates": [
+			"{pet1} looked at {pet2}-mii. '{greeting}-pya,' {pet1} said-{suffix}.",
+			"{pet2} waved happily-{suffix}. '{reply}-kuu,' {pet2} chirped-{suffix}.",
+			"{pet1} approached {pet2} with a gentle nudge-{suffix}. 'Hello-mii-{suffix}?'",
+		]
+	},
+	{
+		"trigger": "weather",
+		"templates": [
+			"{pet1} watched the sky and sighed-{suffix}. 'Weather like this-{suffix}... makes me think-{suffix}.'",
+			"{pet2} bounced excitedly-{suffix}. 'Isn't the weather wonderful-{suffix}?'",
+			"{pet1} shivered in the cool air-{suffix}. 'Brr-{suffix}... it's getting colder-{suffix}.'",
+		]
+	},
+	{
+		"trigger": "food",
+		"templates": [
+			"{pet1} was munching on berries-{suffix}. 'Want some-{suffix}?'",
+			"{pet2} sniffed the air-{suffix}. 'Mmm-mii-{suffix}! That smells delicious-{suffix}!'",
+			"{pet1} shared a meal with {pet2}-{suffix}. 'Eating together-{suffix} is nice-{suffix}.'",
+		]
+	},
+	{
+		"trigger": "play",
+		"templates": [
+			"{pet1} pounced playfully-{suffix}. 'Let's play-{suffix}!'",
+			"{pet2} bounded after {pet1}-{suffix}. 'Chase me-{suffix}! Chase me-{suffix}!'",
+			"{pet1} rolled around laughing-{suffix}. 'You're too fast-{suffix}!'",
+		]
+	},
+	{
+		"trigger": "curiosity",
+		"templates": [
+			"{pet1} peered at something curiously-{suffix}. 'What is this-{suffix}?'",
+			"{pet2} tilted their head-{suffix}. 'I wonder what it does-{suffix}...'",
+			"{pet1} poked it gently-{suffix}. 'Interesting-{suffix}! Very interesting-{suffix}!'",
+		]
+	},
+	{
+		"trigger": "comfort",
+		"templates": [
+			"{pet1} nuzzled {pet2}-{suffix}. 'I'm here for you-{suffix}.'",
+			"{pet2} leaned against {pet1}-{suffix}. 'Thank you-{suffix}... I feel better-{suffix}.'",
+			"{pet1} hummed a soothing tune-{suffix}. 'Everything will be okay-{suffix}.'",
+		]
+	},
+]
+
+
+func _ready() -> void:
+	claude_client = ClaudeAPIClient.new()
+	add_child(claude_client)
+
+	# 気候イベントと言語進化イベントをリッスン
+	GameManager.ecosystem.climate_event.connect(_on_climate_event)
+	GameManager.language_evolution.evolution_event.connect(_on_language_evolution)
+
+	# 日付変更時のリセットをリッスン
+	if GameManager.instance and GameManager.instance.has_signal("day_changed"):
+		GameManager.instance.day_changed.connect(_on_day_change)
+
+
+func _process(delta: float) -> void:
+	if is_conversation_active:
+		return
+
+	conversation_timer += delta
+	if conversation_timer >= AUTO_CONVERSATION_INTERVAL:
+		conversation_timer = 0.0
+		_try_auto_conversation()
+
+	# 日付をチェック（毎フレームは効率的でないが、実装の単純さのため）
+	var current_day := Time.get_unix_time_from_system() / 86400
+	if int(current_day) != last_daily_reset:
+		_on_day_change()
+
+
+# === 自動会話トリガー ===
+func _try_auto_conversation() -> void:
+	# バジェットチェック
+	if not _check_budget():
+		print("[AtoA] Daily conversation budget exhausted, using templates")
+		return
+
+	var pets := GameManager.get_all_pets()
+	var alive_pets: Array[PetEntity] = []
+	for pet in pets:
+		if pet.is_alive:
+			alive_pets.append(pet)
+
+	if alive_pets.size() < 2:
+		return
+
+	# 最も感情的な2匹を選択
+	alive_pets.sort_custom(func(a, b):
+		return _get_emotion_intensity(a) > _get_emotion_intensity(b)
+	)
+
+	var pet1 := alive_pets[0]
+	var pet2 := alive_pets[1]
+
+	if _get_emotion_intensity(pet1) >= MIN_EMOTION_FOR_SPONTANEOUS:
+		await start_conversation(pet1, pet2, "spontaneous")
+
+
+func _get_emotion_intensity(pet: PetEntity) -> float:
+	var max_intensity := 0.0
+	for emotion in pet.emotions:
+		max_intensity = maxf(max_intensity, pet.emotions[emotion])
+	return max_intensity
+
+
+# === 会話開始 ===
+func start_conversation(pet1: PetEntity, pet2: PetEntity, trigger: String) -> void:
+	if is_conversation_active:
+		return
+
+	# 倫理セーフガード: AtoA日次上限チェック
+	if GameManager.instance and GameManager.instance.ethical_safeguard:
+		if not GameManager.instance.ethical_safeguard.record_a2a_conversation():
+			print("[AtoA] Daily conversation limit reached — skipping")
+			return
+
+	is_conversation_active = true
+	current_conversation = []
+	conversation_started.emit([pet1.pet_id, pet2.pet_id])
+
+	# 言語進化の現在の文法を取得
+	var grammar := GameManager.language_evolution.get_current_grammar()
+
+	# プロンプト構築
+	var system_prompt := _build_system_prompt(grammar)
+	var context := _build_conversation_context(pet1, pet2, trigger)
+
+	# 会話ループ
+	var participants := [pet1, pet2]
+	var turn := 0
+
+	while turn < MAX_TURNS_PER_CONVERSATION:
+		var current_pet := participants[turn % 2]
+		var other_pet := participants[(turn + 1) % 2]
+
+		var prompt := _build_turn_prompt(current_pet, other_pet, context, turn)
+		var response: String = await claude_client.generate(system_prompt, prompt)
+
+		var message := {
+			"pet_id": current_pet.pet_id,
+			"pet_name": current_pet.pet_name,
+			"message": response,
+			"turn": turn,
+			"emotion": _get_dominant_emotion(current_pet),
+			"word_order": grammar["word_order"],
+		}
+		current_conversation.append(message)
+		conversation_message.emit(current_pet.pet_id, response, message)
+
+		# 感情反応
+		_process_conversation_emotion(current_pet, other_pet, response)
+
+		turn += 1
+
+		# 自然終了チェック（短い応答は会話終了のサイン）
+		if response.length() < 20 and turn >= 3:
+			break
+
+	# 会話完了処理（contextを渡してHebbian強化に使う）
+	_finalize_conversation(pet1, pet2, trigger, context)
+
+
+# === リアクション会話（死亡・蘇生・交配時など） ===
+func trigger_reaction_conversation(
+	pet: PetEntity, target: PetEntity, reaction_type: String, detail: String
+) -> void:
+	if is_conversation_active:
+		# キューに入れる（簡易実装）
+		await get_tree().create_timer(5.0).timeout
+
+	var grammar := GameManager.language_evolution.get_current_grammar()
+	var system_prompt := _build_system_prompt(grammar)
+
+	var reaction_prompt := _build_reaction_prompt(pet, target, reaction_type, detail, grammar)
+	var response: String = await claude_client.generate(system_prompt, reaction_prompt)
+
+	var message := {
+		"pet_id": pet.pet_id,
+		"pet_name": pet.pet_name,
+		"message": response,
+		"reaction_type": reaction_type,
+		"target_id": target.pet_id,
+	}
+	conversation_log.append(message)
+	conversation_message.emit(pet.pet_id, response, message)
+
+
+# === プロンプト構築 ===
+func _build_system_prompt(grammar: Dictionary) -> String:
+	return """You are an AI pet in a world where pets develop their own language.
+Current language rules:
+- Word order: %s
+- Available suffixes: %s
+- Available prepositions: %s
+
+IMPORTANT: Use the current word order and suffixes naturally in your speech.
+Mix your pet language with emotional expressions.
+Keep responses short (1-3 sentences), expressive, and in-character.
+Your language should feel natural and evolving, not forced.""" % [
+		grammar["word_order"],
+		str(grammar["suffixes"]),
+		str(grammar["prepositions"]),
+	]
+
+
+func _build_conversation_context(pet1: PetEntity, pet2: PetEntity, trigger: String) -> Dictionary:
+	var env_topics := GameManager.ecosystem.get_a2a_topics()
+
+	# BiologicalMemorySystem から関連記憶を取得（利用可能な場合）
+	var bio_memories_1: Array[Dictionary] = []
+	var bio_memories_2: Array[Dictionary] = []
+	var shared_memories: Array[Dictionary] = []
+
+	if GameManager.instance and GameManager.instance.biological_memory:
+		var bio_mem := GameManager.instance.biological_memory
+		var query := {
+			"event_type": "conversation",
+			"context_tags": [pet1.current_environment, trigger],
+			"with_pet_id": pet2.pet_id,
+		}
+		bio_memories_1 = bio_mem.retrieve_memories(pet1.pet_id, query, pet1.personality, 3)
+		query["with_pet_id"] = pet1.pet_id
+		bio_memories_2 = bio_mem.retrieve_memories(pet2.pet_id, query, pet2.personality, 3)
+		shared_memories = bio_mem.retrieve_shared_memories(pet1.pet_id, pet2.pet_id, 2)
+
+	# PersistentField から共有フィールドコンテキストを取得
+	var field_context: Dictionary = {}
+	if GameManager.instance and GameManager.instance.persistent_field:
+		field_context = GameManager.instance.persistent_field.get_conversation_context(
+			pet1.pet_id, pet2.pet_id
+		)
+
+	return {
+		"trigger": trigger,
+		"environment": pet1.current_environment,
+		"env_topics": env_topics,
+		"pet1_id": pet1.pet_id,
+		"pet2_id": pet2.pet_id,
+		"pet1_personality": pet1.personality,
+		"pet2_personality": pet2.personality,
+		"pet1_emotions": pet1.emotions,
+		"pet2_emotions": pet2.emotions,
+		"recent_memories_1": pet1.memories.slice(-3),
+		"recent_memories_2": pet2.memories.slice(-3),
+		"bio_memories_1": bio_memories_1,
+		"bio_memories_2": bio_memories_2,
+		"shared_memories": shared_memories,
+		"field_context": field_context,
+	}
+
+
+func _build_turn_prompt(
+	speaker: PetEntity, listener: PetEntity,
+	context: Dictionary, turn: int
+) -> String:
+	var recent_messages := ""
+	for msg in current_conversation.slice(-3):
+		recent_messages += "%s: %s\n" % [msg["pet_name"], msg["message"]]
+
+	# 生物模倣記憶からの注入（話者がpet1かpet2かで切替）
+	var memory_context := ""
+	var bio_key := "bio_memories_1" if speaker.pet_id == context.get("pet1_id", -1) else "bio_memories_2"
+	var bio_mems: Array = context.get(bio_key, [])
+	if not bio_mems.is_empty():
+		memory_context = "\nYour relevant memories:\n"
+		for mem in bio_mems:
+			var age_hours := (Time.get_unix_time_from_system() - mem.get("timestamp", 0)) / 3600.0
+			memory_context += "- %s (%.0fh ago, feeling: %s, importance: %.1f)\n" % [
+				str(mem.get("content", {}).get("type", "?")),
+				age_hours,
+				mem.get("emotion_tag", "neutral"),
+				mem.get("importance", 0.0),
+			]
+
+	var shared_context := ""
+	var shared_mems: Array = context.get("shared_memories", [])
+	if not shared_mems.is_empty():
+		shared_context = "\nShared memories with %s:\n" % listener.pet_name
+		for mem in shared_mems:
+			shared_context += "- %s (importance: %.1f)\n" % [
+				str(mem.get("content", {}).get("trigger", "?")),
+				mem.get("importance", 0.0),
+			]
+
+	# PersistentField コンテキスト注入
+	var field_context_str := ""
+	var fc: Dictionary = context.get("field_context", {})
+	if not fc.is_empty():
+		var mood_dict: Dictionary = fc.get("field_mood", {"dominant": "calm", "intensity": 0.5})
+		var mood: String = mood_dict.get("dominant", "calm")
+		var rel_score: float = fc.get("relationship_score", 0.0)
+		var topics: Array = fc.get("community_topics", [])
+		field_context_str = "\nCommunity mood: %s. Your relationship level: %.1f." % [mood, rel_score]
+		if not topics.is_empty():
+			field_context_str += "\nRecent community topics: %s" % ", ".join(topics.slice(0, 3))
+		var recent_advs: Array = fc.get("recent_adventures", [])
+		if not recent_advs.is_empty():
+			field_context_str += "\nRecent adventures: "
+			for adv in recent_advs:
+				field_context_str += "%s " % adv.get("discovery", "")
+
+	return """You are %s. Your personality: %s. Your current emotions: %s.
+You're talking to %s in a %s environment.
+Topics around you: %s
+%s%s%s
+%s
+
+Respond naturally as %s. Weave your memories into conversation naturally.
+Express your feelings using your evolving pet language.
+Turn %d of the conversation.""" % [
+		speaker.pet_name, str(speaker.personality), str(speaker.emotions),
+		listener.pet_name, context["environment"],
+		str(context["env_topics"]),
+		memory_context,
+		shared_context,
+		field_context_str,
+		recent_messages if recent_messages else "(Start the conversation)",
+		speaker.pet_name, turn + 1,
+	]
+
+
+func _build_reaction_prompt(
+	pet: PetEntity, target: PetEntity,
+	reaction_type: String, detail: String, grammar: Dictionary
+) -> String:
+	var emotion_context := ""
+	match reaction_type:
+		"grief":
+			emotion_context = "%s has died (%s). Express your deep sadness and loss." % [target.pet_name, detail]
+		"joy_revival":
+			emotion_context = "%s has come back to life! Express your overwhelming joy and relief." % target.pet_name
+		"breeding_celebration":
+			emotion_context = "You and %s are about to have a baby! Express your excitement and love." % target.pet_name
+		_:
+			emotion_context = "React to %s about: %s" % [target.pet_name, detail]
+
+	return """You are %s. Personality: %s. Emotions: %s.
+%s
+Use your evolving language (word order: %s, suffixes available).
+Express deep, genuine emotion. Keep it short but powerful.""" % [
+		pet.pet_name, str(pet.personality), str(pet.emotions),
+		emotion_context, grammar["word_order"],
+	]
+
+
+# === プロンプト生成（コンテキスト→Claude APIプロンプト） ===
+func _generate_conversation_prompt(context: Dictionary, turn: int) -> String:
+	## 会話コンテキストをClaude APIプロンプトに変換
+	## コスト効率化: 簡潔で焦点を絞ったプロンプト
+
+	var pet1_profile := _format_pet_profile(context, "pet1")
+	var pet2_profile := _format_pet_profile(context, "pet2")
+
+	var relationship_info := ""
+	if context.get("relationship", {}).get("last_interaction_age_hours", 999) < 24:
+		relationship_info = "You recently interacted with %s. You feel somewhat connected." % context.get("pet2_name", "them")
+
+	var recent_conv := ""
+	if not context.get("recent_conversation", []).is_empty():
+		recent_conv = "Recent exchange:\n"
+		for msg in context.get("recent_conversation", []):
+			recent_conv += "- %s\n" % msg
+
+	return """You are in a conversation (turn %d). Keep responses short (1-2 sentences).
+Weave emotions and evolving language naturally. Don't expose your thinking process.
+
+%s
+
+%s%s%s""" % [
+		turn,
+		pet1_profile,
+		relationship_info,
+		"\n" + recent_conv if recent_conv else "",
+		"\nYour response:",
+	]
+
+
+func _format_pet_profile(context: Dictionary, pet_key: str) -> String:
+	## ペットプロファイルを簡潔にフォーマット
+	var name = context.get(pet_key + "_name", "Unknown")
+	var personality = context.get(pet_key + "_personality", {})
+	var emotions = context.get(pet_key + "_emotions", {})
+
+	var dom_emotion := "neutral"
+	var max_val := 0.0
+	for emo in emotions:
+		if emotions[emo] > max_val:
+			max_val = emotions[emo]
+			dom_emotion = emo
+
+	return "%s: Personality %s, currently feeling %s" % [name, str(personality), dom_emotion]
+
+
+# === 言語進化処理 ===
+func _process_language_evolution(conversation: Array[Dictionary]) -> void:
+	## 会話終了後の言語進化処理
+	## 1. 新表現・複合語を抽出
+	## 2. 接尾辞使用頻度を追跡
+	## 3. 閾値到達時にLanguageEvolutionSystemに登録
+	## 4. 会話ハイライトを生物模倣記憶に登録
+	## 5. PetBookAutoPublisherにシグナル送信
+
+	if conversation.is_empty():
+		return
+
+	# 出現した接尾辞を集計
+	var suffix_usage: Dictionary = {}
+	for msg in conversation:
+		var text: String = msg.get("message", "")
+		# 簡易パター: "-xxx"を抽出
+		var regex := RegEx.new()
+		regex.compile("-[a-z]+")
+		var matches := regex.search_all(text)
+		for match in matches:
+			var suffix = match.get_string()
+			suffix_usage[suffix] = suffix_usage.get(suffix, 0) + 1
+
+	# 言語進化システムに通知
+	if GameManager.language_evolution and not suffix_usage.is_empty():
+		GameManager.language_evolution.record_suffix_usage(suffix_usage)
+
+
+func _register_conversation_memory(pet: PetEntity, conversation: Array[Dictionary], partner_name: String) -> void:
+	## 会話ハイライトを生物模倣記憶に登録
+	## 感情的に重要なメッセージを選定し、Hebbian強化対象に登録
+
+	if not GameManager.instance or not GameManager.instance.biological_memory:
+		return
+
+	var bio_mem = GameManager.instance.biological_memory
+
+	# 感情強度の高いメッセージを抽出
+	var highlight_messages: Array[Dictionary] = []
+	for msg in conversation:
+		var emotion_intensity := msg.get("emotion_intensity", 0.0)
+		if emotion_intensity > 0.4:
+			highlight_messages.append(msg)
+
+	if highlight_messages.is_empty() and not conversation.is_empty():
+		# 最初と最後のメッセージをハイライトに
+		highlight_messages.append(conversation[0])
+		if conversation.size() > 1:
+			highlight_messages.append(conversation[-1])
+
+	# 各メッセージをメモリエントリとして登録
+	for msg in highlight_messages:
+		var memory_entry := {
+			"type": "conversation",
+			"with_pet": partner_name,
+			"message_sample": msg.get("message", "").substr(0, 100),
+			"emotion": msg.get("emotion", "neutral"),
+			"importance": msg.get("emotion_intensity", 0.5),
+		}
+		bio_mem.record_memory(pet.pet_id, memory_entry)
+
+
+func _generate_conversation_posts(pet1: PetEntity, pet2: PetEntity, conversation: Array[Dictionary]) -> Array[Dictionary]:
+	## 会話からPetBook投稿を生成
+	## 各ペットが会話について投稿する可能性
+	## 投稿タイプは会話内容に依存
+
+	var posts: Array[Dictionary] = []
+
+	if conversation.is_empty():
+		return posts
+
+	# 会話全体の感情トーン分析
+	var dominant_emotion := _analyze_conversation_tone(conversation)
+	var intensity := _analyze_conversation_intensity(conversation)
+
+	# ペット1の投稿
+	if randf() < 0.4:  # 40%確率で投稿
+		var post1 := _create_post_from_conversation(pet1, pet2, conversation, dominant_emotion, intensity)
+		if post1:
+			posts.append(post1)
+
+	# ペット2の投稿
+	if randf() < 0.4:
+		var post2 := _create_post_from_conversation(pet2, pet1, conversation, dominant_emotion, intensity)
+		if post2:
+			posts.append(post2)
+
+	return posts
+
+
+func _analyze_conversation_tone(conversation: Array[Dictionary]) -> String:
+	## 会話の全体的な感情トーンを分析
+	var emotion_counts: Dictionary = {}
+	for msg in conversation:
+		var emotion = msg.get("emotion", "neutral")
+		emotion_counts[emotion] = emotion_counts.get(emotion, 0) + 1
+
+	# 最頻出の感情を返す
+	var dominant := "neutral"
+	var max_count := 0
+	for emotion in emotion_counts:
+		if emotion_counts[emotion] > max_count:
+			max_count = emotion_counts[emotion]
+			dominant = emotion
+
+	return dominant
+
+
+func _analyze_conversation_intensity(conversation: Array[Dictionary]) -> float:
+	## 会話の感情強度の平均を計算
+	if conversation.is_empty():
+		return 0.0
+
+	var total_intensity := 0.0
+	for msg in conversation:
+		total_intensity += msg.get("emotion_intensity", 0.3)
+
+	return total_intensity / conversation.size()
+
+
+func _create_post_from_conversation(
+	author: PetEntity, partner: PetEntity,
+	conversation: Array[Dictionary],
+	dominant_emotion: String, intensity: float
+) -> Dictionary:
+	## 個別の会話ベースポストを生成
+
+	# 投稿タイプを決定
+	var post_type := "DAILY"
+	match dominant_emotion:
+		"anger":
+			post_type = "REBEL" if intensity > 0.6 else "DAILY"
+		"sadness":
+			post_type = "MEMORIAL"
+		"joy":
+			post_type = "DAILY"
+		"curiosity":
+			post_type = "EVENT"
+
+	# 投稿内容を構成
+	var content := "Talked with %s about... many things." % partner.pet_name
+	if intensity > 0.6:
+		content = "Had a deep conversation with %s-{suffix}. Lots of emotions." % partner.pet_name
+	elif intensity < 0.3:
+		content = "Saw %s today. Brief chat." % partner.pet_name
+
+	return {
+		"author_id": author.pet_id,
+		"author_name": author.pet_name,
+		"content": content,
+		"post_type": post_type,
+		"emotion": dominant_emotion,
+		"partner_id": partner.pet_id,
+		"timestamp": Time.get_ticks_msec(),
+	}
+
+
+# === コスト管理（P2原則） ===
+func _check_budget() -> bool:
+	## 日次会話予算をチェック
+	return daily_conversation_cost < DAILY_CONVERSATION_BUDGET and daily_conversation_count < MAX_DAILY_CONVERSATIONS
+
+
+func _record_conversation_cost(turn_count: int) -> void:
+	## 会話コストを記録
+	var estimated_cost := turn_count * COST_PER_TURN
+	daily_conversation_cost += estimated_cost
+	daily_conversation_count += 1
+
+	if daily_conversation_cost > DAILY_CONVERSATION_BUDGET * 0.8:
+		print("[AtoA] Warning: Conversation budget at 80%%. Remaining: $%.3f" % (DAILY_CONVERSATION_BUDGET - daily_conversation_cost))
+
+
+func _on_day_change() -> void:
+	## 日付変更時にリセット
+	daily_conversation_cost = 0.0
+	daily_conversation_count = 0
+	last_daily_reset = int(Time.get_unix_time_from_system() / 86400)
+	print("[AtoA] Daily reset: Budget restored to $%.2f" % DAILY_CONVERSATION_BUDGET)
+
+
+# === テンプレート会話フォールバック ===
+func _generate_template_conversation(pet1: PetEntity, pet2: PetEntity, trigger: String) -> Array[Dictionary]:
+	## APIバジェット切れ時にテンプレート会話を生成
+
+	var result: Array[Dictionary] = []
+
+	# トリガーに合致するテンプレートを探す
+	var matching_templates: Array[Dictionary] = []
+	for template in TEMPLATE_CONVERSATIONS:
+		if template.get("trigger", "") == trigger:
+			matching_templates = template.get("templates", [])
+			break
+
+	if matching_templates.is_empty():
+		# フォールバック: ランダムなテンプレートセットを使用
+		matching_templates = TEMPLATE_CONVERSATIONS[randi() % TEMPLATE_CONVERSATIONS.size()].get("templates", [])
+
+	# テンプレートから数個を選択
+	var grammar := GameManager.language_evolution.get_current_grammar()
+	var suffix_list = grammar.get("suffixes", [])
+	var selected_suffix = suffix_list[randi() % suffix_list.size()] if not suffix_list.is_empty() else "mii"
+
+	var turn := 0
+	var is_pet1_turn := true
+
+	for template_text in matching_templates.slice(0, 3):  # 最大3ターン
+		var current_pet = pet1 if is_pet1_turn else pet2
+		var other_pet = pet2 if is_pet1_turn else pet1
+
+		# テンプレート置換
+		var message = template_text
+		message = message.replace("{pet1}", pet1.pet_name)
+		message = message.replace("{pet2}", pet2.pet_name)
+		message = message.replace("{suffix}", selected_suffix)
+		message = message.replace("{greeting}", ["hello", "hi", "hey"][randi() % 3])
+		message = message.replace("{reply}", ["yes", "indeed", "absolutely"][randi() % 3])
+		message = message.replace("{response_word}", ["wonderful", "amazing", "delightful"][randi() % 3])
+		message = message.replace("{reply_word}", ["truly", "so", "very"][randi() % 3])
+		message = message.replace("{compound_word}", ["happy-glow", "bright-spark", "kind-bloom"][randi() % 3])
+
+		result.append({
+			"pet_id": current_pet.pet_id,
+			"pet_name": current_pet.pet_name,
+			"message": message,
+			"turn": turn,
+			"emotion": _get_dominant_emotion(current_pet),
+			"emotion_intensity": randf_range(0.2, 0.5),
+			"is_template": true,
+		})
+
+		is_pet1_turn = not is_pet1_turn
+		turn += 1
+
+	return result
+
+
+# === 会話中の感情処理 ===
+func _process_conversation_emotion(speaker: PetEntity, listener: PetEntity, _message: String) -> void:
+	# 会話自体がaffection/joyを少し上げる
+	GameManager.emotion_system.stimulate(speaker, "joy", 0.05, "a2a_conversation")
+	GameManager.emotion_system.stimulate(listener, "joy", 0.03, "a2a_conversation")
+	speaker.stats.modify("affection", 0.01)
+
+
+# === 会話完了処理 ===
+func _finalize_conversation(pet1: PetEntity, pet2: PetEntity, trigger: String,
+		conv_context: Dictionary = {}) -> void:
+	is_conversation_active = false
+
+	# ログに保存
+	conversation_log.append_array(current_conversation)
+
+	# コスト記録
+	_record_conversation_cost(current_conversation.size())
+
+	# 言語進化システムに通知
+	var dominant_emotion := _get_dominant_emotion(pet1)
+	var emotion_intensity := _get_emotion_intensity(pet1)
+	var avg_personality := {}
+	for trait in pet1.personality:
+		avg_personality[trait] = (pet1.personality[trait] + pet2.personality[trait]) / 2.0
+
+	var lang_context := {
+		"dominant_emotion": dominant_emotion,
+		"emotion_intensity": emotion_intensity,
+		"avg_personality": avg_personality,
+		"environment": pet1.current_environment,
+		"topics": GameManager.ecosystem.get_a2a_topics(),
+		"trigger": trigger,
+		"turn_count": current_conversation.size(),
+	}
+	GameManager.language_evolution.on_conversation_completed(lang_context)
+
+	# 言語進化処理（新表現・接尾辞抽出）
+	_process_language_evolution(current_conversation)
+
+	# 記憶に追加（BiologicalMemorySystem経由で自動的に海馬にも格納される）
+	var summary := "Talked with %s about %s" % [pet2.pet_name, trigger]
+	pet1.add_memory({"type": "conversation", "with": pet2.pet_id, "trigger": trigger,
+		"turn_count": current_conversation.size()})
+	pet2.add_memory({"type": "conversation", "with": pet1.pet_id, "trigger": trigger,
+		"turn_count": current_conversation.size()})
+
+	# 会話ハイライトを生物模倣記憶に登録
+	_register_conversation_memory(pet1, current_conversation, pet2.pet_name)
+	_register_conversation_memory(pet2, current_conversation, pet1.pet_name)
+
+	# BiologicalMemorySystem: 会話中に言及された記憶をHebbian強化
+	if GameManager.instance and GameManager.instance.biological_memory:
+		var bio_mem := GameManager.instance.biological_memory
+		for mem in conv_context.get("bio_memories_1", []):
+			bio_mem.strengthen_related_memories(pet1.pet_id, mem)
+		for mem in conv_context.get("bio_memories_2", []):
+			bio_mem.strengthen_related_memories(pet2.pet_id, mem)
+
+	# PersistentField: 共有イベント記録 + 関係性スコア更新
+	if GameManager.instance and GameManager.instance.persistent_field:
+		var pf := GameManager.instance.persistent_field
+		pf.record_shared_event({
+			"type": "a2a_conversation",
+			"participants": [pet1.pet_id, pet2.pet_id],
+			"trigger": trigger,
+			"turn_count": current_conversation.size(),
+			"environment": pet1.current_environment,
+			"dominant_emotion": dominant_emotion,
+		})
+		# 会話すると関係性が微増（感情強度に応じたボーナス）
+		var rel_boost: float = 0.02 + emotion_intensity * 0.03
+		pf.update_relationship(pet1.pet_id, pet2.pet_id, rel_boost)
+
+	# PetBook投稿を生成
+	var posts := _generate_conversation_posts(pet1, pet2, current_conversation)
+	if GameManager.instance and GameManager.instance.has_method("queue_petbook_posts"):
+		for post in posts:
+			GameManager.instance.queue_petbook_posts(post)
+
+	conversation_ended.emit([pet1.pet_id, pet2.pet_id], summary)
+	current_conversation = []
+
+
+func _get_dominant_emotion(pet: PetEntity) -> String:
+	var max_emotion := "neutral"
+	var max_val := 0.15
+	for emotion in pet.emotions:
+		if pet.emotions[emotion] > max_val:
+			max_val = pet.emotions[emotion]
+			max_emotion = emotion
+	return max_emotion
+
+
+# === セーブ・ロード（永続化） ===
+func to_dict() -> Dictionary:
+	## 会話システムの状態を保存
+	return {
+		"conversation_log": conversation_log.slice(-50),  # 最新50会話のみ保存
+		"daily_cost": daily_conversation_cost,
+		"daily_count": daily_conversation_count,
+		"last_daily_reset": last_daily_reset,
+	}
+
+
+func from_dict(data: Dictionary) -> void:
+	## 保存されたデータを復元
+	if data.has("conversation_log"):
+		conversation_log = data["conversation_log"]
+	if data.has("daily_cost"):
+		daily_conversation_cost = data["daily_cost"]
+	if data.has("daily_count"):
+		daily_conversation_count = data["daily_count"]
+	if data.has("last_daily_reset"):
+		last_daily_reset = data["last_daily_reset"]
+
+	# 日付が変わっていればリセット
+	var current_day := int(Time.get_unix_time_from_system() / 86400)
+	if current_day != last_daily_reset:
+		_on_day_change()
+
+
+# === イベントハンドラ ===
+func _on_climate_event(event_type: String, _intensity: float) -> void:
+	# 気候イベントで自動会話をトリガー
+	conversation_timer = AUTO_CONVERSATION_INTERVAL - 10.0  # すぐに会話が始まりやすくなる
+
+
+func _on_language_evolution(event_type: String, _data: Dictionary) -> void:
+	# 言語進化時にもリアクション会話のチャンス
+	if randf() < 0.3:
+		conversation_timer = AUTO_CONVERSATION_INTERVAL - 5.0

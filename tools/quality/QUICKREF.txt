@@ -1,0 +1,140 @@
+PETCLAW QUALITY TOOLS — QUICK REFERENCE
+========================================
+
+Setup:
+  bash install.sh
+
+1. PETCLAW_AGENT_LINT.PY (Configuration Validator)
+   ─────────────────────────────────────────────────
+   Checks: Agent Teams configs (.claude/agents/, .claude/commands/)
+   
+   Usage:
+     python3 petclaw_agent_lint.py
+     python3 petclaw_agent_lint.py --json
+     python3 petclaw_agent_lint.py --project-root /path
+   
+   Exit codes:
+     0 = PASS (no failures)
+     1 = FAIL (config issues)
+   
+   Key rules:
+     - Agent YAML frontmatter (name, tools, model, memory)
+     - Model must be: opus, sonnet, haiku
+     - Memory must be: project
+     - Commands have numbered steps
+     - Commands use TeammateTool
+     - CLAUDE.md lists all agents/commands
+
+2. PETCLAW_DESLOP.PY (Code Quality Analyzer)
+   ──────────────────────────────────────────
+   Checks: GDScript files for "slop" patterns (3 phases)
+   
+   Usage:
+     python3 petclaw_deslop.py
+     python3 petclaw_deslop.py --json
+     python3 petclaw_deslop.py --scripts-dir /path
+   
+   Exit codes:
+     0 = OK (no FAIL issues)
+     1 = FAIL (critical issues)
+   
+   Phase 1 (Patterns):
+     - Excessive comments (comments > code)
+     - Debug prints (print with DEBUG/TODO/FIXME/TEST)
+     - Empty match branches (only 'pass')
+     - Redundant null checks
+     - Trailing whitespace
+   
+   Phase 2 (Structure):
+     - Missing class_name declaration [FAIL]
+     - Deep nesting (4+ levels)
+     - Long functions (>50 lines)
+     - Missing type annotations
+     - Unsafe GameManager access [FAIL]
+   
+   Phase 3 (PetClaw-Specific):
+     - Missing to_dict/from_dict (for stateful classes)
+     - Orphan signals (declared but not emitted)
+     - Emotion values outside [0.0, 1.0] [FAIL]
+
+3. PETCLAW_DRIFT.PY (Documentation Sync Detector)
+   ───────────────────────────────────────────────
+   Checks: Design docs vs implementation (4 aspects)
+   
+   Usage:
+     python3 petclaw_drift.py
+     python3 petclaw_drift.py --json
+     python3 petclaw_drift.py --architecture-doc path/to/doc.md
+   
+   Exit codes:
+     0 = OK (no drift)
+     1 = DRIFT or MISSING (alignment issues)
+   
+   Status values:
+     MATCH   = Documentation matches implementation
+     DRIFT   = Documentation exists but differs
+     MISSING = Documentation incomplete or impl missing
+   
+   Certainty:
+     HIGH   = Exact match/verified
+     MEDIUM = Naming convention inference
+     LOW    = Fuzzy matching/uncertain
+   
+   Checks:
+     1. Signal Drift (documented signals exist)
+     2. System Listing Drift (systems have files)
+     3. File Structure Drift (paths exist)
+     4. Dependency Matrix Drift (deps are valid)
+
+COMMON WORKFLOWS
+════════════════
+
+✓ Check all quality aspects:
+  python3 petclaw_agent_lint.py && \
+  python3 petclaw_deslop.py && \
+  python3 petclaw_drift.py
+
+✓ CI/CD (get JSON results):
+  python3 petclaw_agent_lint.py --json > agent-lint.json
+  python3 petclaw_deslop.py --json > code-quality.json
+  python3 petclaw_drift.py --json > drift-report.json
+
+✓ Quick status (just summary):
+  python3 petclaw_deslop.py 2>&1 | tail -1
+
+✓ Find all FAIL issues:
+  python3 petclaw_deslop.py --json | jq '.issues[] | select(.level == "FAIL")'
+
+DEPENDENCIES
+═════════════
+  pip install click pyyaml
+
+AUTO-DISCOVERY
+═══════════════
+All tools auto-discover .claude/ directory from script location.
+Use --project-root to override if needed.
+
+EXAMPLE OUTPUTS
+════════════════
+
+Agent Lint PASS:
+  [PASS] AGENT_REFERENCES: gdscript-engineer
+  [PASS] AGENT_REFERENCES: code-reviewer
+  [PASS] COMMAND_STEPS: implement.md (5 steps)
+  Lint complete: 15 checks (15 PASS, 0 WARN, 0 FAIL)
+
+Deslop FAIL:
+  [FAIL] MISSING_CLASS_NAME (Pet.gd:1): Missing 'class_name' declaration
+  [WARN] LONG_FUNCTION (AIBrain.gd:42): Function is 65 lines (exceeds 50)
+  Scanned 42 files: 8 issues (2 FAIL, 3 WARN, 3 INFO)
+
+Drift DRIFT:
+  [MATCH] Signal Drift: Signal "pet_evolved"
+      Certainty: HIGH - Found in implementation
+  [DRIFT] System Listing Drift: System "EthicalSafeguard"
+      Certainty: MEDIUM - Not found as [EthicalSafeguard...]
+  Drift check complete: 23 checks (18 MATCH, 4 DRIFT, 1 MISSING)
+
+For more details, see:
+  - README.md (user guide)
+  - ARCHITECTURE.md (technical design)

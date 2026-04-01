@@ -1,0 +1,1693 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PetClaw — UI/UX Prototype</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Courier New', monospace;
+    background: #0a0a1a;
+    color: #e0e0e0;
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  #app {
+    width: 420px; height: 700px;
+    background: linear-gradient(180deg, #0d1117 0%, #161b22 100%);
+    border-radius: 24px;
+    border: 2px solid #30363d;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 0 60px rgba(88,166,255,0.08);
+  }
+
+  /* === ステータスバー === */
+  #status-bar {
+    display: flex; gap: 6px; padding: 12px 16px 8px;
+    background: rgba(13,17,23,0.9);
+    border-bottom: 1px solid #21262d;
+    z-index: 10; position: relative;
+  }
+  .stat-item {
+    flex: 1; text-align: center;
+  }
+  .stat-icon { font-size: 14px; display: block; margin-bottom: 2px; }
+  .stat-bar-bg {
+    height: 4px; background: #21262d; border-radius: 2px; overflow: hidden;
+  }
+  .stat-bar-fill {
+    height: 100%; border-radius: 2px;
+    transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.5s;
+  }
+  .stat-label { font-size: 8px; color: #8b949e; margin-top: 2px; }
+
+  /* === ペットビュー === */
+  #pet-view {
+    width: 100%; height: 380px;
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  #pet-canvas { position: absolute; top: 0; left: 0; }
+  #environment-bg {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    transition: background 1.5s;
+    opacity: 0.4;
+  }
+  #pet-sprite {
+    position: relative; z-index: 2;
+    width: 80px; height: 80px;
+    image-rendering: pixelated;
+    transition: transform 0.3s;
+  }
+  #pet-sprite:hover { transform: scale(1.1); }
+  #emotion-bubble {
+    position: absolute; z-index: 3;
+    top: 100px; right: 80px;
+    font-size: 24px;
+    opacity: 0;
+    transition: opacity 0.5s, transform 0.5s;
+    filter: drop-shadow(0 0 8px rgba(255,255,255,0.3));
+  }
+  #emotion-bubble.show { opacity: 1; transform: translateY(-5px); }
+  #pet-name-tag {
+    position: absolute; z-index: 3;
+    bottom: 20px; left: 50%; transform: translateX(-50%);
+    background: rgba(13,17,23,0.8);
+    padding: 4px 12px; border-radius: 8px;
+    font-size: 12px; color: #c9d1d9;
+    border: 1px solid #30363d;
+  }
+  #memory-indicator {
+    position: absolute; z-index: 3;
+    top: 12px; right: 12px;
+    font-size: 10px; color: #8b949e;
+    background: rgba(13,17,23,0.7);
+    padding: 3px 8px; border-radius: 6px;
+  }
+
+  /* === AtoAログ === */
+  #a2a-log {
+    height: 100px; overflow-y: auto;
+    padding: 8px 16px;
+    border-top: 1px solid #21262d;
+    background: rgba(13,17,23,0.6);
+    font-size: 11px; line-height: 1.5;
+    scrollbar-width: thin;
+    scrollbar-color: #30363d transparent;
+  }
+  .a2a-msg {
+    margin-bottom: 4px; opacity: 0;
+    animation: fadeIn 0.5s forwards;
+  }
+  @keyframes fadeIn { to { opacity: 1; } }
+  .a2a-name { font-weight: bold; }
+  .a2a-name.pet1 { color: #7ee787; }
+  .a2a-name.pet2 { color: #79c0ff; }
+  .a2a-emotion { font-size: 9px; color: #8b949e; margin-left: 4px; }
+
+  /* === アクションメニュー === */
+  #action-menu {
+    display: flex; gap: 4px; padding: 10px 12px;
+    background: rgba(13,17,23,0.95);
+    border-top: 1px solid #21262d;
+    position: absolute; bottom: 0; width: 100%;
+  }
+  .action-btn {
+    flex: 1;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 12px;
+    padding: 10px 4px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.2s;
+    color: #c9d1d9;
+  }
+  .action-btn:hover {
+    background: #21262d;
+    border-color: #58a6ff;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(88,166,255,0.15);
+  }
+  .action-btn:active { transform: translateY(0); }
+  .action-btn .icon { font-size: 20px; display: block; }
+  .action-btn .label { font-size: 8px; margin-top: 2px; display: block; }
+  .action-btn.cooldown {
+    opacity: 0.4; pointer-events: none;
+  }
+
+  /* === パーティクル === */
+  .particle {
+    position: absolute; z-index: 5;
+    pointer-events: none;
+    border-radius: 50%;
+    animation: particleFloat 1.5s ease-out forwards;
+  }
+  @keyframes particleFloat {
+    0% { opacity: 1; transform: translate(0,0) scale(1); }
+    100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0); }
+  }
+  .particle.heart::after {
+    content: '♥'; position: absolute; font-size: 12px;
+  }
+  .particle.star::after {
+    content: '★'; position: absolute; font-size: 10px;
+  }
+
+  /* === 環境切替タブ === */
+  #env-tabs {
+    position: absolute; top: 64px; left: 12px; z-index: 4;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  .env-tab {
+    width: 32px; height: 32px;
+    background: rgba(13,17,23,0.7);
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 16px;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.2s;
+  }
+  .env-tab:hover { border-color: #58a6ff; }
+  .env-tab.active {
+    border-color: #58a6ff;
+    background: rgba(88,166,255,0.15);
+    box-shadow: 0 0 8px rgba(88,166,255,0.2);
+  }
+
+  /* === 記憶パネル === */
+  #memory-panel {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(13,17,23,0.95);
+    z-index: 20;
+    display: none;
+    flex-direction: column;
+    padding: 16px;
+  }
+  #memory-panel.show { display: flex; }
+  #memory-panel h3 {
+    font-size: 14px; color: #58a6ff; margin-bottom: 12px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .memory-section { margin-bottom: 12px; }
+  .memory-section h4 {
+    font-size: 11px; color: #8b949e; margin-bottom: 6px;
+    border-bottom: 1px solid #21262d; padding-bottom: 4px;
+  }
+  .memory-item {
+    font-size: 10px; padding: 6px 8px; margin-bottom: 3px;
+    background: #161b22; border-radius: 6px;
+    border-left: 3px solid;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .memory-item .importance-bar {
+    width: 40px; height: 3px;
+    background: #21262d; border-radius: 2px; overflow: hidden;
+  }
+  .memory-item .importance-fill {
+    height: 100%; border-radius: 2px;
+  }
+  .close-btn {
+    background: none; border: 1px solid #30363d;
+    color: #8b949e; border-radius: 4px;
+    padding: 2px 8px; cursor: pointer; font-size: 11px;
+  }
+  .close-btn:hover { border-color: #58a6ff; color: #58a6ff; }
+
+  /* === トースト通知 === */
+  #toast {
+    position: absolute; top: 70px; left: 50%; transform: translateX(-50%);
+    background: rgba(88,166,255,0.15);
+    border: 1px solid #58a6ff;
+    border-radius: 8px;
+    padding: 6px 14px;
+    font-size: 11px; color: #79c0ff;
+    z-index: 15;
+    opacity: 0; transition: opacity 0.3s;
+    pointer-events: none;
+  }
+  #toast.show { opacity: 1; }
+
+  /* === フラッシュバルブ効果 === */
+  #flashbulb {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    background: white; z-index: 25;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.1s;
+  }
+  #flashbulb.flash { opacity: 0.6; }
+
+  /* === オフライン冒険レポート === */
+  #adventure-report {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: 340px; background: rgba(13,17,23,0.97);
+    border: 1px solid #58a6ff; border-radius: 16px;
+    padding: 20px; z-index: 30;
+    display: none; flex-direction: column; gap: 10px;
+    box-shadow: 0 0 40px rgba(88,166,255,0.2);
+  }
+  #adventure-report.show { display: flex; }
+  #adventure-report h3 {
+    font-size: 14px; color: #d2a8ff; text-align: center;
+  }
+  .adventure-item {
+    background: #161b22; border-radius: 8px; padding: 10px;
+    border-left: 3px solid #d2a8ff; font-size: 11px; line-height: 1.5;
+  }
+  .adventure-item .adv-pet { color: #7ee787; font-weight: bold; }
+  .adventure-item .adv-discovery { color: #79c0ff; font-style: italic; }
+
+  /* === 倫理セーフガード透明性バー === */
+  #ethics-bar {
+    position: absolute; bottom: 0; left: 0; width: 100%;
+    background: rgba(13,17,23,0.95);
+    border-top: 1px solid #21262d;
+    padding: 4px 12px;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 9px; color: #8b949e;
+    z-index: 12; cursor: pointer;
+  }
+  #ethics-bar:hover { color: #c9d1d9; }
+  .dep-indicator {
+    display: inline-block; width: 8px; height: 8px;
+    border-radius: 50%; margin-right: 4px;
+    vertical-align: middle;
+  }
+  .dep-healthy { background: #3fb950; }
+  .dep-moderate { background: #d29922; }
+  .dep-warning { background: #f0883e; }
+  .dep-critical { background: #f85149; }
+
+  /* === Sweekar風 卵インキュベーター === */
+  #egg-hatch {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: 300px; background: rgba(13,17,23,0.97);
+    border: 2px solid #f778ba; border-radius: 20px;
+    padding: 24px; z-index: 30;
+    display: none; flex-direction: column; align-items: center; gap: 12px;
+    box-shadow: 0 0 60px rgba(247,120,186,0.2);
+  }
+  #egg-hatch.show { display: flex; }
+  #egg-canvas { border-radius: 12px; }
+
+  /* === 進化アニメーション === */
+  #evolution-overlay {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.95);
+    z-index: 40;
+    display: none; flex-direction: column;
+    justify-content: center; align-items: center;
+    gap: 12px;
+  }
+  #evolution-overlay.show { display: flex; }
+  #evolution-canvas { z-index: 41; }
+  #evo-stage-label {
+    font-size: 10px; color: #8b949e; letter-spacing: 2px; text-transform: uppercase;
+  }
+  #evo-form-name {
+    font-size: 18px; color: #d2a8ff; font-weight: bold;
+    opacity: 0; transform: translateY(10px);
+    transition: opacity 0.8s, transform 0.8s;
+  }
+  #evo-form-name.reveal { opacity: 1; transform: translateY(0); }
+  #evo-description {
+    font-size: 11px; color: #8b949e; text-align: center;
+    max-width: 280px; line-height: 1.5;
+    opacity: 0; transition: opacity 1s 0.5s;
+  }
+  #evo-description.reveal { opacity: 1; }
+  @keyframes evoGlow {
+    0%   { box-shadow: 0 0 20px rgba(210,168,255,0.3); }
+    50%  { box-shadow: 0 0 80px rgba(210,168,255,0.8), 0 0 120px rgba(88,166,255,0.3); }
+    100% { box-shadow: 0 0 20px rgba(210,168,255,0.3); }
+  }
+  @keyframes evoPulse {
+    0%   { transform: scale(1); }
+    50%  { transform: scale(1.15); }
+    100% { transform: scale(1); }
+  }
+  @keyframes evoSpin {
+    0%   { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+  @keyframes darkEvoPulse {
+    0%   { transform: scale(1); filter: brightness(1); }
+    50%  { transform: scale(1.2); filter: brightness(0.5) saturate(2); }
+    100% { transform: scale(1); filter: brightness(1); }
+  }
+
+  /* === 進化ツリーパネル === */
+  #evo-tree-panel {
+    position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(13,17,23,0.97);
+    z-index: 20; display: none; flex-direction: column;
+    padding: 16px; overflow-y: auto;
+  }
+  #evo-tree-panel.show { display: flex; }
+  #evo-tree-panel h3 {
+    font-size: 14px; color: #d2a8ff; margin-bottom: 12px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .evo-stage-section { margin-bottom: 14px; }
+  .evo-stage-section h4 {
+    font-size: 11px; color: #8b949e; margin-bottom: 6px;
+    border-bottom: 1px solid #21262d; padding-bottom: 4px;
+  }
+  .evo-form-card {
+    font-size: 10px; padding: 8px 10px; margin-bottom: 4px;
+    background: #161b22; border-radius: 8px;
+    border-left: 3px solid #30363d;
+    cursor: pointer; transition: all 0.2s;
+  }
+  .evo-form-card:hover {
+    border-left-color: #d2a8ff;
+    background: #1c2128;
+  }
+  .evo-form-card.dark-route { border-left-color: #8b5cf6; }
+  .evo-form-card.special-route { border-left-color: #f0883e; }
+  .evo-form-card.reachable { border-left-color: #3fb950; background: rgba(63,185,80,0.08); }
+  .evo-form-card .form-name { color: #c9d1d9; font-weight: bold; }
+  .evo-form-card .form-desc { color: #8b949e; margin-top: 2px; }
+  .evo-form-card .form-conditions { color: #6e7681; margin-top: 3px; font-size: 9px; }
+
+  /* === 進化ステージインジケーター === */
+  #evo-progress-bar {
+    position: absolute; top: 62px; right: 12px; z-index: 4;
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+  }
+  .evo-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #21262d; border: 1px solid #30363d;
+    transition: all 0.3s;
+  }
+  .evo-dot.active { background: #d2a8ff; border-color: #d2a8ff; box-shadow: 0 0 6px rgba(210,168,255,0.5); }
+  .evo-dot.completed { background: #3fb950; border-color: #3fb950; }
+  .evo-dot-line { width: 1px; height: 6px; background: #30363d; }
+
+  /* スクロールバー */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 2px; }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <!-- ステータスバー -->
+  <div id="status-bar">
+    <div class="stat-item">
+      <span class="stat-icon">🍖</span>
+      <div class="stat-bar-bg"><div class="stat-bar-fill" id="bar-hunger" style="width:70%;background:#f0883e;"></div></div>
+      <div class="stat-label">HUNGER</div>
+    </div>
+    <div class="stat-item">
+      <span class="stat-icon">💚</span>
+      <div class="stat-bar-bg"><div class="stat-bar-fill" id="bar-health" style="width:85%;background:#3fb950;"></div></div>
+      <div class="stat-label">HEALTH</div>
+    </div>
+    <div class="stat-item">
+      <span class="stat-icon">⚡</span>
+      <div class="stat-bar-bg"><div class="stat-bar-fill" id="bar-energy" style="width:60%;background:#d2a8ff;"></div></div>
+      <div class="stat-label">ENERGY</div>
+    </div>
+    <div class="stat-item">
+      <span class="stat-icon">😊</span>
+      <div class="stat-bar-bg"><div class="stat-bar-fill" id="bar-mood" style="width:75%;background:#58a6ff;"></div></div>
+      <div class="stat-label">MOOD</div>
+    </div>
+    <div class="stat-item">
+      <span class="stat-icon">💕</span>
+      <div class="stat-bar-bg"><div class="stat-bar-fill" id="bar-affection" style="width:55%;background:#f778ba;"></div></div>
+      <div class="stat-label">LOVE</div>
+    </div>
+  </div>
+
+  <!-- 環境タブ -->
+  <div id="env-tabs">
+    <div class="env-tab active" data-env="forest" title="Forest">🌲</div>
+    <div class="env-tab" data-env="sea" title="Sea">🌊</div>
+    <div class="env-tab" data-env="ruins" title="Ruins">🏚️</div>
+    <div class="env-tab" data-env="city" title="City">🏙️</div>
+  </div>
+
+  <!-- ペットビュー -->
+  <div id="pet-view">
+    <div id="environment-bg"></div>
+    <canvas id="pet-canvas" width="420" height="380"></canvas>
+    <div id="pet-sprite"></div>
+    <div id="emotion-bubble"></div>
+    <div id="pet-name-tag">Mimi <span style="font-size:9px;color:#8b949e;">Lv.2 Infant</span> <span style="font-size:9px;color:#d2a8ff;cursor:pointer;margin-left:4px;" onclick="toggleEvoTree()">🌳</span></div>
+    <div id="memory-indicator" onclick="toggleMemoryPanel()">🧠 海馬: 5 / 皮質: 2</div>
+  </div>
+
+  <!-- AtoAログ -->
+  <div id="a2a-log">
+    <div class="a2a-msg" style="animation-delay:0s">
+      <span class="a2a-name pet1">Mimi:</span> blorpf-iku! sun-da warm-kuru~
+      <span class="a2a-emotion">(joy 0.7)</span>
+    </div>
+    <div class="a2a-msg" style="animation-delay:0.3s">
+      <span class="a2a-name pet2">Kuro:</span> hmm... forest-ka quiet-nda.
+      <span class="a2a-emotion">(calm 0.6)</span>
+    </div>
+    <div class="a2a-msg" style="animation-delay:0.6s">
+      <span class="a2a-name pet1">Mimi:</span> remember-suru? last play-toki... fun-datta!
+      <span class="a2a-emotion">(excitement 0.5)</span>
+    </div>
+  </div>
+
+  <!-- アクションメニュー -->
+  <div id="action-menu">
+    <div class="action-btn" onclick="performAction('feed')">
+      <span class="icon">🍖</span><span class="label">Feed</span>
+    </div>
+    <div class="action-btn" onclick="performAction('clean')">
+      <span class="icon">✨</span><span class="label">Clean</span>
+    </div>
+    <div class="action-btn" onclick="performAction('play')">
+      <span class="icon">🎾</span><span class="label">Play</span>
+    </div>
+    <div class="action-btn" onclick="performAction('train')">
+      <span class="icon">💪</span><span class="label">Train</span>
+    </div>
+    <div class="action-btn" onclick="performAction('a2a')">
+      <span class="icon">💬</span><span class="label">A2A</span>
+    </div>
+    <div class="action-btn" onclick="triggerEvolution()" id="btn-evolve" style="border-color:#d2a8ff40;">
+      <span class="icon">✦</span><span class="label">Evolve</span>
+    </div>
+  </div>
+
+  <!-- 記憶パネル -->
+  <div id="memory-panel">
+    <h3>
+      🧠 Mimi's Memory
+      <button class="close-btn" onclick="toggleMemoryPanel()">Close</button>
+    </h3>
+    <div style="overflow-y:auto;flex:1;">
+      <div class="memory-section">
+        <h4>🔴 海馬（短期記憶）— Hippocampus</h4>
+        <div id="hippo-memories"></div>
+      </div>
+      <div class="memory-section">
+        <h4>🔵 大脳皮質（長期記憶）— Cortex</h4>
+        <div id="cortex-memories"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- オフライン冒険レポート -->
+  <div id="adventure-report">
+    <h3>🌙 Offline Adventures</h3>
+    <div id="adventure-list"></div>
+    <button class="close-btn" onclick="closeAdventureReport()" style="align-self:center;margin-top:6px;">Got it!</button>
+  </div>
+
+  <!-- Sweekar風 卵孵化 -->
+  <div id="egg-hatch">
+    <h3 style="font-size:14px;color:#f778ba;">🥚 New Life Hatching...</h3>
+    <canvas id="egg-canvas" width="200" height="200"></canvas>
+    <div id="egg-progress" style="font-size:11px;color:#8b949e;">Tap the egg to help it hatch!</div>
+    <button class="close-btn" onclick="closeEggHatch()">Close</button>
+  </div>
+
+  <!-- 倫理セーフガード透明性バー -->
+  <div id="ethics-bar" onclick="showEthicsDetail()">
+    <span><span class="dep-indicator dep-healthy" id="dep-dot"></span>AI Simulation</span>
+    <span id="session-time">Session: 0:00</span>
+    <span id="dep-level">Healthy</span>
+  </div>
+
+  <!-- 進化ステージインジケーター -->
+  <div id="evo-progress-bar">
+    <div class="evo-dot completed" title="Egg"></div>
+    <div class="evo-dot-line"></div>
+    <div class="evo-dot completed" title="Blob"></div>
+    <div class="evo-dot-line"></div>
+    <div class="evo-dot active" title="Infant"></div>
+    <div class="evo-dot-line"></div>
+    <div class="evo-dot" title="Youth"></div>
+    <div class="evo-dot-line"></div>
+    <div class="evo-dot" title="Adult"></div>
+    <div class="evo-dot-line"></div>
+    <div class="evo-dot" title="Elder"></div>
+  </div>
+
+  <!-- 進化アニメーションオーバーレイ -->
+  <div id="evolution-overlay">
+    <div id="evo-stage-label">Evolution</div>
+    <canvas id="evolution-canvas" width="300" height="300"></canvas>
+    <div id="evo-form-name"></div>
+    <div id="evo-description"></div>
+    <button class="close-btn" id="evo-close-btn" onclick="closeEvolution()" style="margin-top:12px;display:none;">Continue</button>
+  </div>
+
+  <!-- 進化ツリーパネル -->
+  <div id="evo-tree-panel">
+    <h3>
+      🌳 Evolution Tree
+      <button class="close-btn" onclick="toggleEvoTree()">Close</button>
+    </h3>
+    <div id="evo-tree-content"></div>
+  </div>
+
+  <!-- トースト -->
+  <div id="toast"></div>
+
+  <!-- フラッシュバルブ -->
+  <div id="flashbulb"></div>
+</div>
+
+<script>
+// ===== Pet State =====
+const pet = {
+  name: 'Mimi',
+  stats: { hunger: 0.7, health: 0.85, energy: 0.6, mood: 0.75, affection: 0.55 },
+  emotions: { joy: 0.3, fear: 0.0, excitement: 0.2, sadness: 0.0, love: 0.4 },
+  personality: { brave: 0.4, curious: 0.7, calm: 0.5, affectionate: 0.5, playful: 0.6 },
+  environment: 'forest',
+};
+
+// ===== Memory System (Biological) =====
+const memorySystem = {
+  nextId: 1,
+  hippocampus: [],
+  cortex: [],
+
+  consolidate(eventType, content, emotionTag, emotionIntensity, tags) {
+    const importance = Math.min(1.0, 0.3 + emotionIntensity * 0.7);
+    const mem = {
+      id: this.nextId++,
+      event_type: eventType,
+      content: content,
+      importance: importance,
+      emotion_tag: emotionTag,
+      emotion_intensity: emotionIntensity,
+      timestamp: Date.now(),
+      recall_count: 0,
+      context_tags: tags || [],
+    };
+
+    // Flashbulb memory
+    if (emotionIntensity >= 0.8) {
+      this.cortex.push(mem);
+      triggerFlashbulb();
+      showToast('⚡ Flashbulb memory! Instant long-term storage');
+    } else {
+      this.hippocampus.push(mem);
+    }
+
+    // Capacity check
+    while (this.hippocampus.length > 30) this.hippocampus.shift();
+    while (this.cortex.length > 100) this.cortex.shift();
+
+    updateMemoryIndicator();
+    return mem;
+  },
+
+  decay() {
+    const now = Date.now();
+    // Hippocampus: 30min half-life
+    this.hippocampus = this.hippocampus.filter(m => {
+      const t = (now - m.timestamp) / 1000;
+      const multiplier = 1.0 + m.emotion_intensity * 0.7 + m.recall_count * 0.2;
+      m.importance *= Math.exp(-t / (1800 * multiplier));
+      return m.importance >= 0.05;
+    });
+    // Cortex: 7-day half-life
+    this.cortex = this.cortex.filter(m => {
+      const t = (now - m.timestamp) / 1000;
+      const multiplier = 1.0 + m.emotion_intensity * 0.7 + m.recall_count * 0.2;
+      m.importance *= Math.exp(-t / (604800 * multiplier));
+      return m.importance >= 0.05;
+    });
+    // Promote
+    const toPromote = [];
+    this.hippocampus.forEach((m, i) => {
+      if (m.importance >= 0.75 || m.recall_count >= 3) toPromote.push(i);
+    });
+    for (let i = toPromote.length - 1; i >= 0; i--) {
+      const m = this.hippocampus.splice(toPromote[i], 1)[0];
+      this.cortex.push(m);
+      showToast('🧠 Memory promoted to long-term!');
+    }
+    updateMemoryIndicator();
+  }
+};
+
+// Initial memories
+memorySystem.consolidate('care', { action: 'feed', detail: 'gave berry' }, 'joy', 0.5, ['forest', 'feed']);
+memorySystem.consolidate('conversation', { with: 'Kuro', trigger: 'spontaneous' }, 'love', 0.6, ['forest', 'social']);
+memorySystem.consolidate('play', { game: 'chase', detail: 'played together' }, 'excitement', 0.7, ['forest', 'play']);
+memorySystem.consolidate('environment', { biome: 'forest', event: 'rain' }, 'calm', 0.3, ['forest', 'weather']);
+memorySystem.consolidate('evolution', { stage: 'baby', form: 'nature' }, 'joy', 0.85, ['evolution']);
+memorySystem.hippocampus[0].recall_count = 2;
+memorySystem.hippocampus[1].recall_count = 1;
+
+// ===== Pixel Art Pet Renderer =====
+const canvas = document.getElementById('pet-canvas');
+const ctx = canvas.getContext('2d');
+let animFrame = 0;
+let petBounce = 0;
+let petState = 'idle'; // idle, happy, eating, playing, training
+let stateTimer = 0;
+
+const PIXEL = 4;
+const PET_COLORS = {
+  body: '#7ee787',
+  belly: '#aff5b4',
+  eye: '#0d1117',
+  cheek: '#f778ba',
+  highlight: '#ffffff',
+};
+
+function drawPet(x, y, frame) {
+  const bounce = Math.sin(frame * 0.05) * 3;
+  const squish = petState === 'happy' ? Math.sin(frame * 0.15) * 2 : 0;
+  const py = y + bounce;
+
+  ctx.save();
+  ctx.translate(x, py);
+
+  // Body (rounded square)
+  ctx.fillStyle = PET_COLORS.body;
+  roundRect(-20 - squish, -20 + squish, 40 + squish * 2, 40 - squish, 8);
+
+  // Belly
+  ctx.fillStyle = PET_COLORS.belly;
+  roundRect(-12, -6, 24, 20, 6);
+
+  // Eyes — Ollobot-style emotional expressions
+  const blink = (frame % 120 < 5);
+  ctx.fillStyle = PET_COLORS.eye;
+  if (blink) {
+    ctx.fillRect(-10, -10, 6, 2);
+    ctx.fillRect(4, -10, 6, 2);
+  } else {
+    // Dynamic eye shape based on dominant emotion
+    const dominantEmo = Object.entries(pet.emotions).reduce((a, b) => b[1] > a[1] ? b : a, ['neutral', 0]);
+    let eyeW = 6, eyeH = 5, eyeY = -12;
+    let pupilX = 0, pupilY = 0;  // pupil offset for "looking" effect
+    let eyeColor = PET_COLORS.eye;
+
+    if (dominantEmo[0] === 'joy' && dominantEmo[1] > 0.3) {
+      eyeH = 3; // squinted happy eyes
+      eyeY = -10;
+    } else if (dominantEmo[0] === 'fear' && dominantEmo[1] > 0.3) {
+      eyeW = 8; eyeH = 8; // wide frightened eyes
+      eyeY = -14;
+    } else if (dominantEmo[0] === 'sadness' && dominantEmo[1] > 0.3) {
+      eyeH = 4;
+      pupilY = 1; // looking down
+    } else if (dominantEmo[0] === 'excitement' && dominantEmo[1] > 0.3) {
+      eyeW = 7; eyeH = 7; // sparkle eyes
+      const sparkle = Math.sin(frame * 0.2) * 0.5 + 0.5;
+      eyeColor = `rgb(${13 + sparkle * 50}, ${17 + sparkle * 50}, ${23 + sparkle * 80})`;
+    } else if (dominantEmo[0] === 'love' && dominantEmo[1] > 0.4) {
+      // Heart-shaped eye effect (drawn after)
+      eyeW = 6; eyeH = 6;
+    }
+
+    ctx.fillStyle = eyeColor;
+    roundRect(-10 + pupilX, eyeY + pupilY, eyeW, eyeH, 2);
+    roundRect(4 + pupilX, eyeY + pupilY, eyeW, eyeH, 2);
+
+    // Heart-eye overlay for high love
+    if (dominantEmo[0] === 'love' && dominantEmo[1] > 0.4) {
+      ctx.fillStyle = '#f778ba';
+      ctx.font = '8px serif';
+      ctx.fillText('♥', -10, -6);
+      ctx.fillText('♥', 4, -6);
+    }
+
+    // Sparkle overlay for excitement
+    if (dominantEmo[0] === 'excitement' && dominantEmo[1] > 0.3) {
+      ctx.fillStyle = '#ffffff';
+      const sx = Math.sin(frame * 0.3) * 2;
+      ctx.fillRect(-8 + sx, eyeY + 1, 1, 1);
+      ctx.fillRect(6 + sx, eyeY + 1, 1, 1);
+    }
+
+    // Eye highlights
+    ctx.fillStyle = PET_COLORS.highlight;
+    ctx.fillRect(-9, eyeY + 1, 2, 2);
+    ctx.fillRect(5, eyeY + 1, 2, 2);
+  }
+
+  // Cheeks (emotion-responsive)
+  const cheekAlpha = Math.min(1, pet.emotions.joy * 1.5 + pet.emotions.love * 0.5);
+  ctx.fillStyle = `rgba(247,120,186,${cheekAlpha * 0.6})`;
+  roundRect(-16, -4, 5, 4, 2);
+  roundRect(11, -4, 5, 4, 2);
+
+  // Mouth
+  ctx.fillStyle = PET_COLORS.eye;
+  if (petState === 'happy' || petState === 'eating') {
+    ctx.beginPath();
+    ctx.arc(0, -2, 3, 0, Math.PI);
+    ctx.fill();
+  } else {
+    ctx.fillRect(-2, -3, 4, 2);
+  }
+
+  // Ears
+  ctx.fillStyle = PET_COLORS.body;
+  ctx.beginPath();
+  ctx.moveTo(-16, -20);
+  ctx.lineTo(-22, -32 + Math.sin(frame * 0.08) * 2);
+  ctx.lineTo(-8, -22);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(16, -20);
+  ctx.lineTo(22, -32 + Math.sin(frame * 0.08 + 1) * 2);
+  ctx.lineTo(8, -22);
+  ctx.fill();
+
+  // Tail
+  const tailWag = Math.sin(frame * 0.1) * 8;
+  ctx.strokeStyle = PET_COLORS.body;
+  ctx.lineWidth = 4;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(20, 10);
+  ctx.quadraticCurveTo(30 + tailWag, 5, 28 + tailWag, -5);
+  ctx.stroke();
+
+  // Feet
+  ctx.fillStyle = PET_COLORS.body;
+  const walkOffset = petState === 'playing' ? Math.sin(frame * 0.2) * 3 : 0;
+  roundRect(-14, 18 + walkOffset, 10, 6, 3);
+  roundRect(4, 18 - walkOffset, 10, 6, 3);
+
+  ctx.restore();
+}
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.roundRect(x, y, w, h, r);
+  ctx.fill();
+}
+
+// ===== Particles =====
+const particles = [];
+
+function spawnParticles(x, y, type, count, color) {
+  for (let i = 0; i < count; i++) {
+    particles.push({
+      x: x + (Math.random() - 0.5) * 40,
+      y: y + (Math.random() - 0.5) * 20,
+      vx: (Math.random() - 0.5) * 3,
+      vy: -Math.random() * 3 - 1,
+      life: 1.0,
+      decay: 0.01 + Math.random() * 0.02,
+      size: 3 + Math.random() * 5,
+      color: color,
+      type: type,
+    });
+  }
+}
+
+function updateParticles() {
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.x += p.vx;
+    p.y += p.vy;
+    p.vy += 0.02; // gravity
+    p.life -= p.decay;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+}
+
+function drawParticles() {
+  for (const p of particles) {
+    ctx.globalAlpha = p.life;
+    ctx.fillStyle = p.color;
+    if (p.type === 'heart') {
+      ctx.font = `${p.size * 2}px serif`;
+      ctx.fillText('♥', p.x, p.y);
+    } else if (p.type === 'star') {
+      ctx.font = `${p.size * 2}px serif`;
+      ctx.fillText('✦', p.x, p.y);
+    } else if (p.type === 'bubble') {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = p.life * 0.5;
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.arc(p.x - p.size * 0.3, p.y - p.size * 0.3, p.size * 0.3, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (p.type === 'energy') {
+      ctx.fillRect(p.x, p.y, p.size, p.size * 0.5);
+    } else if (p.type === 'synapse') {
+      ctx.strokeStyle = p.color;
+      ctx.lineWidth = 1;
+      ctx.globalAlpha = p.life * 0.6;
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(p.x + p.vx * 10, p.y + p.vy * 10);
+      ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+}
+
+// ===== Environment =====
+const ENV_COLORS = {
+  forest: { bg: 'radial-gradient(ellipse at 50% 80%, #0d2818 0%, #0a1a12 100%)', particle: '#3fb950' },
+  sea: { bg: 'radial-gradient(ellipse at 50% 80%, #0a1929 0%, #071420 100%)', particle: '#58a6ff' },
+  ruins: { bg: 'radial-gradient(ellipse at 50% 80%, #1a1520 0%, #110d18 100%)', particle: '#bc8cff' },
+  city: { bg: 'radial-gradient(ellipse at 50% 80%, #1a1a12 0%, #14140d 100%)', particle: '#d29922' },
+};
+
+function setEnvironment(env) {
+  pet.environment = env;
+  document.getElementById('environment-bg').style.background = ENV_COLORS[env].bg;
+  document.querySelectorAll('.env-tab').forEach(t => t.classList.toggle('active', t.dataset.env === env));
+
+  // Environment ambient particles
+  for (let i = 0; i < 8; i++) {
+    setTimeout(() => {
+      spawnParticles(
+        Math.random() * 420, 300 + Math.random() * 60,
+        'circle', 1, ENV_COLORS[env].particle
+      );
+    }, i * 100);
+  }
+}
+
+document.querySelectorAll('.env-tab').forEach(tab => {
+  tab.addEventListener('click', () => setEnvironment(tab.dataset.env));
+});
+
+// ===== Actions =====
+const ACTION_CONFIG = {
+  feed: {
+    stat: { hunger: 0.15, affection: 0.05 },
+    emotion: { joy: 0.2, excitement: 0.05 },
+    particle: { type: 'heart', count: 15, color: '#f0883e' },
+    petAnim: 'eating',
+    messages: [
+      { name: 'Mimi', cls: 'pet1', text: 'yummy-da! fudo-oishii~', emotion: 'joy 0.7' },
+    ],
+    toast: '🍖 Fed Mimi!',
+    memType: 'care',
+    memContent: { action: 'feed' },
+  },
+  clean: {
+    stat: { health: 0.1, energy: 0.05 },
+    emotion: { joy: 0.15, love: 0.1 },
+    particle: { type: 'bubble', count: 20, color: '#79c0ff' },
+    petAnim: 'happy',
+    messages: [
+      { name: 'Mimi', cls: 'pet1', text: 'kirei-naru! sparkle-kuru~', emotion: 'calm 0.6' },
+    ],
+    toast: '✨ Cleaned Mimi!',
+    memType: 'care',
+    memContent: { action: 'clean' },
+  },
+  play: {
+    stat: { mood: 0.15, energy: -0.08 },
+    emotion: { excitement: 0.3, joy: 0.2 },
+    particle: { type: 'star', count: 25, color: '#d2a8ff' },
+    petAnim: 'playing',
+    messages: [
+      { name: 'Mimi', cls: 'pet1', text: 'wheee! play-tanoshii! catch-suru!', emotion: 'excitement 0.8' },
+      { name: 'Kuro', cls: 'pet2', text: '... ok. run-suru-ka.', emotion: 'calm 0.4' },
+    ],
+    toast: '🎾 Playing with Mimi!',
+    memType: 'play',
+    memContent: { action: 'play', game: 'chase' },
+  },
+  train: {
+    stat: { mood: 0.05, energy: -0.12 },
+    emotion: { excitement: 0.15 },
+    personality: { brave: 0.02 },
+    particle: { type: 'energy', count: 18, color: '#f0883e' },
+    petAnim: 'happy',
+    messages: [
+      { name: 'Mimi', cls: 'pet1', text: 'strong-naru! brave-suru!', emotion: 'excitement 0.6' },
+    ],
+    toast: '💪 Training Mimi!',
+    memType: 'train',
+    memContent: { action: 'train' },
+  },
+  a2a: {
+    stat: { affection: 0.08 },
+    emotion: { love: 0.15, joy: 0.1 },
+    particle: { type: 'synapse', count: 12, color: '#58a6ff' },
+    petAnim: 'happy',
+    messages: [
+      { name: 'Mimi', cls: 'pet1', text: 'Kuro! talk-shiyou! remember-suru? rain-day...', emotion: 'love 0.5' },
+      { name: 'Kuro', cls: 'pet2', text: 'ah... rain-toki warm-datta. together-good.', emotion: 'love 0.6' },
+      { name: 'Mimi', cls: 'pet1', text: 'ne! blorpf-happy! friend-forever-da!', emotion: 'joy 0.8' },
+    ],
+    toast: '💬 AtoA Conversation triggered!',
+    memType: 'conversation',
+    memContent: { with: 'Kuro', trigger: 'manual_a2a' },
+  },
+};
+
+let actionCooldown = false;
+
+function performAction(action) {
+  if (actionCooldown) return;
+  actionCooldown = true;
+
+  const config = ACTION_CONFIG[action];
+  const btn = document.querySelector(`.action-btn[onclick="performAction('${action}')"]`);
+  btn.classList.add('cooldown');
+
+  // Apply stats
+  for (const [stat, delta] of Object.entries(config.stat || {})) {
+    pet.stats[stat] = Math.max(0, Math.min(1, pet.stats[stat] + delta));
+  }
+  // Apply emotions
+  for (const [emo, delta] of Object.entries(config.emotion || {})) {
+    pet.emotions[emo] = Math.max(0, Math.min(1, pet.emotions[emo] + delta));
+  }
+  // Apply personality
+  for (const [trait, delta] of Object.entries(config.personality || {})) {
+    pet.personality[trait] = Math.max(0, Math.min(1, pet.personality[trait] + delta));
+  }
+
+  // Visual feedback
+  petState = config.petAnim;
+  stateTimer = 120;
+
+  // Particles
+  const p = config.particle;
+  spawnParticles(210, 200, p.type, p.count, p.color);
+
+  // Emotion bubble
+  showEmotionBubble();
+
+  // AtoA messages
+  const log = document.getElementById('a2a-log');
+  config.messages.forEach((msg, i) => {
+    setTimeout(() => {
+      const div = document.createElement('div');
+      div.className = 'a2a-msg';
+      div.innerHTML = `<span class="a2a-name ${msg.cls}">${msg.name}:</span> ${msg.text} <span class="a2a-emotion">(${msg.emotion})</span>`;
+      log.appendChild(div);
+      log.scrollTop = log.scrollHeight;
+    }, i * 800);
+  });
+
+  // Toast
+  showToast(config.toast);
+
+  // Memory consolidation
+  const emotionTag = getDominantEmotion();
+  const emotionIntensity = getMaxEmotionIntensity();
+  memorySystem.consolidate(
+    config.memType,
+    config.memContent,
+    emotionTag,
+    emotionIntensity,
+    [pet.environment, action]
+  );
+
+  // Update UI
+  updateStatBars();
+
+  // Cooldown
+  setTimeout(() => {
+    actionCooldown = false;
+    btn.classList.remove('cooldown');
+  }, 2000);
+}
+
+// ===== UI Helpers =====
+function updateStatBars() {
+  const bars = {
+    'bar-hunger': { val: pet.stats.hunger, color: '#f0883e' },
+    'bar-health': { val: pet.stats.health, color: '#3fb950' },
+    'bar-energy': { val: pet.stats.energy, color: '#d2a8ff' },
+    'bar-mood': { val: pet.stats.mood, color: '#58a6ff' },
+    'bar-affection': { val: pet.stats.affection, color: '#f778ba' },
+  };
+  for (const [id, data] of Object.entries(bars)) {
+    const el = document.getElementById(id);
+    el.style.width = `${data.val * 100}%`;
+    // Low stat warning
+    if (data.val < 0.2) {
+      el.style.background = '#da3633';
+      el.style.animation = 'pulse 1s infinite';
+    } else {
+      el.style.background = data.color;
+      el.style.animation = '';
+    }
+  }
+}
+
+function showEmotionBubble() {
+  const bubble = document.getElementById('emotion-bubble');
+  const dom = getDominantEmotion();
+  const emojis = { joy: '😊', fear: '😰', excitement: '🤩', sadness: '😢', love: '💕', neutral: '😐' };
+  bubble.textContent = emojis[dom] || '😐';
+  bubble.classList.add('show');
+  setTimeout(() => bubble.classList.remove('show'), 2000);
+}
+
+function getDominantEmotion() {
+  let best = 'neutral', bestVal = 0.15;
+  for (const [emo, val] of Object.entries(pet.emotions)) {
+    if (val > bestVal) { bestVal = val; best = emo; }
+  }
+  return best;
+}
+
+function getMaxEmotionIntensity() {
+  return Math.max(...Object.values(pet.emotions));
+}
+
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 2000);
+}
+
+function triggerFlashbulb() {
+  const fb = document.getElementById('flashbulb');
+  fb.classList.add('flash');
+  setTimeout(() => fb.classList.remove('flash'), 150);
+}
+
+function updateMemoryIndicator() {
+  const el = document.getElementById('memory-indicator');
+  el.textContent = `🧠 海馬: ${memorySystem.hippocampus.length} / 皮質: ${memorySystem.cortex.length}`;
+}
+
+function toggleMemoryPanel() {
+  const panel = document.getElementById('memory-panel');
+  panel.classList.toggle('show');
+  if (panel.classList.contains('show')) renderMemories();
+}
+
+function renderMemories() {
+  const emotionColors = {
+    joy: '#f0883e', fear: '#bc8cff', excitement: '#d2a8ff',
+    sadness: '#58a6ff', love: '#f778ba', calm: '#3fb950', neutral: '#8b949e'
+  };
+
+  function renderPool(pool, containerId) {
+    const container = document.getElementById(containerId);
+    container.innerHTML = '';
+    const sorted = [...pool].sort((a, b) => b.importance - a.importance);
+    for (const mem of sorted) {
+      const color = emotionColors[mem.emotion_tag] || '#8b949e';
+      const age = ((Date.now() - mem.timestamp) / 60000).toFixed(0);
+      const div = document.createElement('div');
+      div.className = 'memory-item';
+      div.style.borderLeftColor = color;
+      div.innerHTML = `
+        <div>
+          <span style="color:${color}">${mem.emotion_tag}</span>
+          ${mem.event_type}: ${JSON.stringify(mem.content).slice(0, 40)}...
+          <br><span style="color:#8b949e">${age}m ago | recalled ${mem.recall_count}x | tags: ${mem.context_tags.join(', ')}</span>
+        </div>
+        <div class="importance-bar">
+          <div class="importance-fill" style="width:${mem.importance * 100}%;background:${color};"></div>
+        </div>
+      `;
+      container.appendChild(div);
+    }
+    if (pool.length === 0) {
+      container.innerHTML = '<div style="font-size:10px;color:#8b949e;padding:8px;">Empty</div>';
+    }
+  }
+
+  renderPool(memorySystem.hippocampus, 'hippo-memories');
+  renderPool(memorySystem.cortex, 'cortex-memories');
+}
+
+// ===== Natural Decay =====
+setInterval(() => {
+  // Stats decay
+  pet.stats.hunger = Math.max(0, pet.stats.hunger - 0.003);
+  pet.stats.energy = Math.max(0, pet.stats.energy - 0.002);
+  pet.stats.health = Math.max(0, pet.stats.health - (pet.stats.hunger < 0.2 ? 0.003 : 0.001));
+
+  // Emotion decay
+  const decayRates = { joy: 0.008, fear: 0.01, excitement: 0.015, sadness: 0.005, love: 0.003 };
+  for (const [emo, rate] of Object.entries(decayRates)) {
+    pet.emotions[emo] = Math.max(0, pet.emotions[emo] - rate);
+  }
+
+  // Mood calculation
+  pet.stats.mood = Math.max(0, Math.min(1,
+    pet.stats.hunger * 0.25 + pet.stats.health * 0.3 + pet.stats.energy * 0.15 +
+    pet.emotions.joy * 0.2 - pet.emotions.sadness * 0.15 + pet.emotions.love * 0.15
+  ));
+
+  updateStatBars();
+}, 1000);
+
+// Memory decay every 30s
+setInterval(() => memorySystem.decay(), 30000);
+
+// ===== Animation Loop =====
+function gameLoop() {
+  ctx.clearRect(0, 0, 420, 380);
+  animFrame++;
+
+  // State timer
+  if (stateTimer > 0) {
+    stateTimer--;
+    if (stateTimer === 0) petState = 'idle';
+  }
+
+  // Draw pet
+  drawPet(210, 200, animFrame);
+
+  // Update & draw particles
+  updateParticles();
+  drawParticles();
+
+  // Ambient particles
+  if (animFrame % 60 === 0) {
+    spawnParticles(
+      Math.random() * 420, 340 + Math.random() * 40,
+      'circle', 1, ENV_COLORS[pet.environment].particle + '60'
+    );
+  }
+
+  requestAnimationFrame(gameLoop);
+}
+
+// ===== Offline Adventure Report =====
+const sampleAdventures = [
+  { pet: 'Mimi', type: 'explore', discovery: 'Found a glowing mushroom in the deep forest!', environment: 'forest' },
+  { pet: 'Kuro', type: 'battle', discovery: 'Defeated a shadow creature and gained courage!', environment: 'ruins' },
+];
+
+function showAdventureReport(adventures) {
+  const list = document.getElementById('adventure-list');
+  list.innerHTML = '';
+  for (const adv of adventures) {
+    const div = document.createElement('div');
+    div.className = 'adventure-item';
+    div.innerHTML = `
+      <span class="adv-pet">${adv.pet}</span> went on a <b>${adv.type}</b> adventure
+      <br><span class="adv-discovery">"${adv.discovery}"</span>
+    `;
+    list.appendChild(div);
+  }
+  document.getElementById('adventure-report').classList.add('show');
+}
+
+function closeAdventureReport() {
+  document.getElementById('adventure-report').classList.remove('show');
+}
+
+// ===== Ethical Safeguard Display =====
+const ethicsState = {
+  sessionStart: Date.now(),
+  interactionCount: 0,
+  dependencyScore: 0.15,
+  a2aCount: 0,
+};
+
+function updateEthicsBar() {
+  const elapsed = (Date.now() - ethicsState.sessionStart) / 1000;
+  const mins = Math.floor(elapsed / 60);
+  const secs = Math.floor(elapsed % 60);
+  document.getElementById('session-time').textContent = `Session: ${mins}:${String(secs).padStart(2, '0')}`;
+
+  // Update dependency level
+  let level = 'Healthy', dotClass = 'dep-healthy';
+  if (ethicsState.dependencyScore >= 0.8) { level = 'Critical'; dotClass = 'dep-critical'; }
+  else if (ethicsState.dependencyScore >= 0.6) { level = 'Warning'; dotClass = 'dep-warning'; }
+  else if (ethicsState.dependencyScore >= 0.3) { level = 'Moderate'; dotClass = 'dep-moderate'; }
+
+  document.getElementById('dep-level').textContent = level;
+  const dot = document.getElementById('dep-dot');
+  dot.className = 'dep-indicator ' + dotClass;
+}
+
+function showEthicsDetail() {
+  showToast(`🤖 AI Simulation | Dependency: ${(ethicsState.dependencyScore * 100).toFixed(0)}% | A2A today: ${ethicsState.a2aCount}/50 | Local data only`);
+}
+
+// Track interactions for ethics
+const origPerformAction = performAction;
+performAction = function(action) {
+  ethicsState.interactionCount++;
+  ethicsState.dependencyScore = Math.min(1, ethicsState.dependencyScore + 0.01);
+  if (action === 'a2a') ethicsState.a2aCount++;
+  origPerformAction(action);
+};
+
+setInterval(updateEthicsBar, 1000);
+
+// ===== Sweekar-style Egg Hatch =====
+let eggTaps = 0;
+const eggCtx = document.getElementById('egg-canvas')?.getContext('2d');
+
+function showEggHatch() {
+  eggTaps = 0;
+  document.getElementById('egg-hatch').classList.add('show');
+  drawEgg();
+}
+
+function closeEggHatch() {
+  document.getElementById('egg-hatch').classList.remove('show');
+}
+
+function drawEgg() {
+  if (!eggCtx) return;
+  eggCtx.clearRect(0, 0, 200, 200);
+  const crack = eggTaps / 10;
+  const wobble = Math.sin(Date.now() * 0.005) * (crack * 3);
+
+  // Egg glow
+  const glow = eggCtx.createRadialGradient(100, 100, 20, 100, 100, 80);
+  glow.addColorStop(0, `rgba(247,120,186,${0.1 + crack * 0.2})`);
+  glow.addColorStop(1, 'transparent');
+  eggCtx.fillStyle = glow;
+  eggCtx.fillRect(0, 0, 200, 200);
+
+  // Egg body
+  eggCtx.save();
+  eggCtx.translate(100 + wobble, 105);
+  eggCtx.scale(1, 1.2);
+  eggCtx.fillStyle = '#f0e6ff';
+  eggCtx.beginPath();
+  eggCtx.arc(0, 0, 35, 0, Math.PI * 2);
+  eggCtx.fill();
+
+  // Egg spots
+  eggCtx.fillStyle = '#d2a8ff';
+  eggCtx.beginPath(); eggCtx.arc(-12, -8, 5, 0, Math.PI * 2); eggCtx.fill();
+  eggCtx.beginPath(); eggCtx.arc(10, 5, 4, 0, Math.PI * 2); eggCtx.fill();
+  eggCtx.beginPath(); eggCtx.arc(-5, 12, 3, 0, Math.PI * 2); eggCtx.fill();
+
+  // Cracks
+  if (crack > 0) {
+    eggCtx.strokeStyle = '#0d1117';
+    eggCtx.lineWidth = 1.5;
+    eggCtx.beginPath();
+    eggCtx.moveTo(-5, -20);
+    eggCtx.lineTo(-2 + crack * 3, -10);
+    eggCtx.lineTo(3, -15 + crack * 5);
+    if (crack > 0.3) {
+      eggCtx.lineTo(8, -5 + crack * 4);
+      eggCtx.lineTo(2, 0 + crack * 3);
+    }
+    eggCtx.stroke();
+  }
+
+  eggCtx.restore();
+
+  // Progress text
+  const progress = document.getElementById('egg-progress');
+  if (eggTaps >= 10) {
+    progress.textContent = '🎉 Hatched! Welcome to the world!';
+    progress.style.color = '#7ee787';
+  } else {
+    progress.textContent = `Tap to hatch! (${eggTaps}/10)`;
+    progress.style.color = '#8b949e';
+  }
+}
+
+document.getElementById('egg-canvas')?.addEventListener('click', () => {
+  if (eggTaps < 10) {
+    eggTaps++;
+    drawEgg();
+    // Hatch particles
+    if (eggTaps >= 10) {
+      spawnParticles(210, 200, 'star', 20, '#f778ba');
+      spawnParticles(210, 200, 'heart', 10, '#d2a8ff');
+      showToast('🐣 A new pet has hatched!');
+    }
+  }
+});
+
+// ===== Evolution System =====
+const EVOLUTION_TREE = {
+  2: [
+    { id: 'forest_infant', name: '森の幼子', desc: '木漏れ日に包まれ、小さな葉っぱの耳が生えた', color: '#3fb950', conditions: 'forest + good care' },
+    { id: 'sea_infant', name: '海の幼子', desc: '潮風を浴びて、小さなヒレが見え始めた', color: '#79c0ff', conditions: 'sea + good care' },
+    { id: 'ruins_infant', name: '遺跡の幼子', desc: '古代の力に触れ、額に不思議な紋章が浮かんだ', color: '#d2a8ff', conditions: 'ruins + good care' },
+    { id: 'city_infant', name: '街の幼子', desc: '人々の賑わいの中で、小さなスカーフを纏った', color: '#f0883e', conditions: 'city + good care' },
+    { id: 'neglected_infant', name: 'さすらいの幼子', desc: 'ひとりで過ごす時間が長く、瞳が少し鋭くなった', color: '#8b5cf6', dark: true, conditions: 'poor care' },
+  ],
+  3: [
+    { id: 'warrior_youth', name: '勇者の若者', desc: '勇気ある心で前に進む。小さな体に大きな意志', color: '#f85149', conditions: 'brave ≥ 0.65 + good care' },
+    { id: 'scholar_youth', name: '知恵の若者', desc: '知識への渇望が止まらない。目がキラキラと輝く', color: '#79c0ff', conditions: 'curious ≥ 0.65 + good care' },
+    { id: 'healer_youth', name: '癒しの若者', desc: '温かい心で周りを包む。手から優しい光がこぼれる', color: '#f778ba', conditions: 'affectionate ≥ 0.65 + excellent care' },
+    { id: 'trickster_youth', name: 'いたずらの若者', desc: '好奇心とユーモアが爆発。尻尾がくるりと巻いた', color: '#d29922', conditions: 'playful ≥ 0.65 + good care' },
+    { id: 'diplomat_youth', name: '語り部の若者', desc: '多くの仲間と話し合い、言葉の力に目覚めた', color: '#e3b341', conditions: 'AtoA ≥ 20 + good care' },
+    { id: 'shadow_youth', name: '影の若者', desc: '孤独の中で強さを見つけた。暗い炎が瞳に宿る', color: '#8b5cf6', dark: true, conditions: 'poor care + isolated' },
+  ],
+  4: [
+    { id: 'guardian_adult', name: '守護者', desc: '仲間を守る盾となる。愛と勇気の結晶', color: '#e3b341', conditions: 'brave+affectionate + excellent care' },
+    { id: 'sage_adult', name: '賢者', desc: '静かなる知の探求者。あらゆる答えを持つ', color: '#79c0ff', conditions: 'calm+curious + good care' },
+    { id: 'bond_master_adult', name: '絆の達人', desc: 'すべてのペットと深い絆を結ぶ', color: '#f778ba', conditions: 'affectionate + high bond + AtoA ≥ 40' },
+    { id: 'dark_sovereign_adult', name: '闇の覇者', desc: '孤独と苦難が究極の力を生んだ', color: '#8b5cf6', dark: true, conditions: 'poor care + dark history' },
+  ],
+  5: [
+    { id: 'ancient_elder', name: '太古の長老', desc: '時の流れを見守ってきた存在。すべてを受け入れる穏やかさ', color: '#e3b341', conditions: 'age ≥ 100h + balanced personality' },
+    { id: 'eternal_companion', name: '永遠の伴侶', desc: 'プレイヤーとの絆が永遠の光を纏った', color: '#f778ba', conditions: 'affection ≥ 0.9 + excellent care + AtoA ≥ 80' },
+    { id: 'language_sage_elder', name: '言語の大賢者', desc: '独自言語を完全にマスター。すべてのペットの通訳者', color: '#79c0ff', conditions: 'vocabulary ≥ 50 + AtoA ≥ 100' },
+    { id: 'redeemed_elder', name: '闇からの帰還者', desc: '闇を経て真の強さを知った。最も稀少な形態', color: '#f0883e', special: true, conditions: 'dark history + excellent care + affection ≥ 0.7' },
+  ],
+};
+
+const STAGE_NAMES = ['Egg', 'Blob', 'Infant', 'Youth', 'Adult', 'Elder/Legend'];
+let currentEvolutionStage = 2; // Currently at Infant
+const evoCanvas = document.getElementById('evolution-canvas');
+const evoCtx = evoCanvas ? evoCanvas.getContext('2d') : null;
+let evoAnimFrame = 0;
+let evoAnimId = null;
+let evoPhase = 'idle'; // idle, charging, flash, reveal
+
+function triggerEvolution() {
+  // Pick a form based on current environment
+  const envForms = EVOLUTION_TREE[3]; // Evolving to Youth stage
+  const envMap = { forest: 'warrior_youth', sea: 'scholar_youth', ruins: 'healer_youth', city: 'trickster_youth' };
+  const targetId = envMap[pet.environment] || 'warrior_youth';
+  const form = envForms.find(f => f.id === targetId) || envForms[0];
+
+  showEvolutionAnimation(form, false);
+}
+
+function showEvolutionAnimation(form, isDark) {
+  evoPhase = 'charging';
+  evoAnimFrame = 0;
+  document.getElementById('evolution-overlay').classList.add('show');
+  document.getElementById('evo-form-name').classList.remove('reveal');
+  document.getElementById('evo-description').classList.remove('reveal');
+  document.getElementById('evo-close-btn').style.display = 'none';
+  document.getElementById('evo-stage-label').textContent = `Stage ${currentEvolutionStage} → ${currentEvolutionStage + 1}`;
+
+  const formColor = form.color || '#d2a8ff';
+  const darkMode = isDark || form.dark;
+
+  // Evolution animation loop
+  function evoLoop() {
+    evoCtx.clearRect(0, 0, 300, 300);
+    evoAnimFrame++;
+    const cx = 150, cy = 150;
+
+    if (evoPhase === 'charging') {
+      // Phase 1: Charging — pet silhouette pulses, particles converge
+      const progress = Math.min(evoAnimFrame / 120, 1);
+      const pulse = 1 + Math.sin(evoAnimFrame * 0.1) * 0.1 * progress;
+
+      // Background glow
+      const glowR = 40 + progress * 60;
+      const glow = evoCtx.createRadialGradient(cx, cy, 10, cx, cy, glowR);
+      glow.addColorStop(0, darkMode ? 'rgba(139,92,246,0.4)' : `${formColor}66`);
+      glow.addColorStop(1, 'transparent');
+      evoCtx.fillStyle = glow;
+      evoCtx.fillRect(0, 0, 300, 300);
+
+      // Converging particles
+      for (let i = 0; i < 8; i++) {
+        const angle = (i / 8) * Math.PI * 2 + evoAnimFrame * 0.02;
+        const dist = 100 * (1 - progress * 0.7) + Math.sin(evoAnimFrame * 0.05 + i) * 10;
+        const px = cx + Math.cos(angle) * dist;
+        const py = cy + Math.sin(angle) * dist;
+        const size = 2 + progress * 3;
+        evoCtx.fillStyle = formColor;
+        evoCtx.globalAlpha = 0.3 + progress * 0.5;
+        evoCtx.beginPath();
+        evoCtx.arc(px, py, size, 0, Math.PI * 2);
+        evoCtx.fill();
+      }
+      evoCtx.globalAlpha = 1;
+
+      // Pet silhouette (pulsing)
+      evoCtx.save();
+      evoCtx.translate(cx, cy);
+      evoCtx.scale(pulse, pulse);
+      drawEvoPet(0, 0, darkMode ? '#4c1d95' : '#1c2128', formColor, progress);
+      evoCtx.restore();
+
+      // Ring effect
+      if (progress > 0.5) {
+        const ringAlpha = (progress - 0.5) * 2;
+        evoCtx.strokeStyle = formColor;
+        evoCtx.globalAlpha = ringAlpha * 0.5;
+        evoCtx.lineWidth = 1.5;
+        evoCtx.beginPath();
+        evoCtx.arc(cx, cy, 50 + ringAlpha * 30, 0, Math.PI * 2);
+        evoCtx.stroke();
+        evoCtx.globalAlpha = 1;
+      }
+
+      if (evoAnimFrame >= 120) {
+        evoPhase = 'flash';
+        evoAnimFrame = 0;
+      }
+    } else if (evoPhase === 'flash') {
+      // Phase 2: Flash — white/dark explosion
+      const progress = evoAnimFrame / 30;
+      const flashAlpha = progress < 0.3 ? progress / 0.3 : 1 - (progress - 0.3) / 0.7;
+
+      if (darkMode) {
+        evoCtx.fillStyle = `rgba(75, 0, 130, ${flashAlpha * 0.9})`;
+      } else {
+        evoCtx.fillStyle = `rgba(255, 255, 255, ${flashAlpha * 0.9})`;
+      }
+      evoCtx.fillRect(0, 0, 300, 300);
+
+      // Burst particles
+      if (evoAnimFrame < 10) {
+        for (let i = 0; i < 12; i++) {
+          const angle = (i / 12) * Math.PI * 2;
+          const dist = evoAnimFrame * 8;
+          const px = cx + Math.cos(angle) * dist;
+          const py = cy + Math.sin(angle) * dist;
+          evoCtx.fillStyle = formColor;
+          evoCtx.globalAlpha = 1 - progress;
+          evoCtx.beginPath();
+          evoCtx.arc(px, py, 4 - progress * 3, 0, Math.PI * 2);
+          evoCtx.fill();
+        }
+        evoCtx.globalAlpha = 1;
+      }
+
+      if (evoAnimFrame >= 30) {
+        evoPhase = 'reveal';
+        evoAnimFrame = 0;
+      }
+    } else if (evoPhase === 'reveal') {
+      // Phase 3: Reveal — new form appears with celebration particles
+      const progress = Math.min(evoAnimFrame / 60, 1);
+
+      // Ambient glow
+      const glow = evoCtx.createRadialGradient(cx, cy, 20, cx, cy, 120);
+      glow.addColorStop(0, `${formColor}33`);
+      glow.addColorStop(1, 'transparent');
+      evoCtx.fillStyle = glow;
+      evoCtx.fillRect(0, 0, 300, 300);
+
+      // Celebration sparkles
+      for (let i = 0; i < 6; i++) {
+        const angle = (i / 6) * Math.PI * 2 + evoAnimFrame * 0.03;
+        const dist = 60 + Math.sin(evoAnimFrame * 0.05 + i * 2) * 20;
+        const px = cx + Math.cos(angle) * dist;
+        const py = cy + Math.sin(angle) * dist;
+        evoCtx.fillStyle = formColor;
+        evoCtx.globalAlpha = 0.4 + Math.sin(evoAnimFrame * 0.1 + i) * 0.3;
+        const starSize = 2 + Math.sin(evoAnimFrame * 0.15 + i) * 1.5;
+        drawStar(evoCtx, px, py, starSize);
+      }
+      evoCtx.globalAlpha = 1;
+
+      // New form (fading in)
+      evoCtx.save();
+      evoCtx.translate(cx, cy);
+      evoCtx.globalAlpha = progress;
+      const floatY = Math.sin(evoAnimFrame * 0.04) * 3;
+      drawEvoPet(0, floatY, formColor, '#ffffff', 1.0);
+      evoCtx.restore();
+
+      // Show name after brief delay
+      if (evoAnimFrame === 20) {
+        document.getElementById('evo-form-name').textContent = form.name;
+        document.getElementById('evo-form-name').classList.add('reveal');
+        if (darkMode) {
+          document.getElementById('evo-form-name').style.color = '#8b5cf6';
+        } else {
+          document.getElementById('evo-form-name').style.color = formColor;
+        }
+      }
+      if (evoAnimFrame === 40) {
+        document.getElementById('evo-description').textContent = form.desc;
+        document.getElementById('evo-description').classList.add('reveal');
+      }
+      if (evoAnimFrame === 60) {
+        document.getElementById('evo-close-btn').style.display = 'inline-block';
+      }
+    }
+
+    if (evoPhase !== 'idle') {
+      evoAnimId = requestAnimationFrame(evoLoop);
+    }
+  }
+
+  evoLoop();
+}
+
+function drawEvoPet(x, y, bodyColor, accentColor, glow) {
+  // Simplified pet silhouette for evolution scene
+  evoCtx.fillStyle = bodyColor;
+  evoCtx.beginPath();
+  evoCtx.roundRect(x - 22, y - 22, 44, 44, 10);
+  evoCtx.fill();
+
+  // Accent belly
+  evoCtx.fillStyle = accentColor;
+  evoCtx.globalAlpha = 0.3;
+  evoCtx.beginPath();
+  evoCtx.roundRect(x - 12, y - 6, 24, 18, 6);
+  evoCtx.fill();
+  evoCtx.globalAlpha = 1;
+
+  // Eyes (glowing)
+  evoCtx.fillStyle = accentColor;
+  evoCtx.beginPath();
+  evoCtx.arc(x - 7, y - 8, 3, 0, Math.PI * 2);
+  evoCtx.arc(x + 7, y - 8, 3, 0, Math.PI * 2);
+  evoCtx.fill();
+
+  // Eye glow
+  if (glow > 0.5) {
+    evoCtx.fillStyle = accentColor;
+    evoCtx.globalAlpha = (glow - 0.5) * 0.6;
+    evoCtx.beginPath();
+    evoCtx.arc(x - 7, y - 8, 6, 0, Math.PI * 2);
+    evoCtx.arc(x + 7, y - 8, 6, 0, Math.PI * 2);
+    evoCtx.fill();
+    evoCtx.globalAlpha = 1;
+  }
+
+  // Ears
+  evoCtx.fillStyle = bodyColor;
+  evoCtx.beginPath();
+  evoCtx.moveTo(x - 18, y - 22);
+  evoCtx.lineTo(x - 24, y - 36);
+  evoCtx.lineTo(x - 8, y - 24);
+  evoCtx.fill();
+  evoCtx.beginPath();
+  evoCtx.moveTo(x + 18, y - 22);
+  evoCtx.lineTo(x + 24, y - 36);
+  evoCtx.lineTo(x + 8, y - 24);
+  evoCtx.fill();
+}
+
+function drawStar(context, x, y, r) {
+  context.beginPath();
+  for (let i = 0; i < 5; i++) {
+    const angle = (i / 5) * Math.PI * 2 - Math.PI / 2;
+    const outerX = x + Math.cos(angle) * r;
+    const outerY = y + Math.sin(angle) * r;
+    if (i === 0) context.moveTo(outerX, outerY);
+    else context.lineTo(outerX, outerY);
+    const innerAngle = angle + Math.PI / 5;
+    const innerX = x + Math.cos(innerAngle) * r * 0.4;
+    const innerY = y + Math.sin(innerAngle) * r * 0.4;
+    context.lineTo(innerX, innerY);
+  }
+  context.closePath();
+  context.fill();
+}
+
+function closeEvolution() {
+  evoPhase = 'idle';
+  if (evoAnimId) cancelAnimationFrame(evoAnimId);
+  document.getElementById('evolution-overlay').classList.remove('show');
+
+  // Update stage dots
+  currentEvolutionStage++;
+  updateEvoDots();
+
+  // Update name tag
+  document.getElementById('pet-name-tag').innerHTML =
+    `Mimi <span style="font-size:9px;color:#8b949e;">Lv.${currentEvolutionStage} ${STAGE_NAMES[currentEvolutionStage]}</span>`;
+
+  showToast(`✦ Evolved to ${STAGE_NAMES[currentEvolutionStage]}!`);
+  spawnParticles(210, 200, 'star', 15, '#d2a8ff');
+  memorySystem.consolidate('evolution', `Evolved to ${STAGE_NAMES[currentEvolutionStage]}`, 'excitement', 0.9, ['evolution']);
+}
+
+function updateEvoDots() {
+  const dots = document.querySelectorAll('.evo-dot');
+  dots.forEach((dot, i) => {
+    dot.classList.remove('active', 'completed');
+    if (i < currentEvolutionStage) dot.classList.add('completed');
+    else if (i === currentEvolutionStage) dot.classList.add('active');
+  });
+}
+
+// === Evolution Tree Viewer ===
+function toggleEvoTree() {
+  const panel = document.getElementById('evo-tree-panel');
+  panel.classList.toggle('show');
+  if (panel.classList.contains('show')) renderEvoTree();
+}
+
+function renderEvoTree() {
+  const container = document.getElementById('evo-tree-content');
+  container.innerHTML = '';
+  for (const stage of [2, 3, 4, 5]) {
+    const section = document.createElement('div');
+    section.className = 'evo-stage-section';
+    section.innerHTML = `<h4>Stage ${stage}: ${STAGE_NAMES[stage]}</h4>`;
+
+    for (const form of EVOLUTION_TREE[stage]) {
+      const card = document.createElement('div');
+      card.className = 'evo-form-card';
+      if (form.dark) card.classList.add('dark-route');
+      if (form.special) card.classList.add('special-route');
+      // Mark reachable forms (simple demo: current stage +1 forms matching environment)
+      if (stage === currentEvolutionStage + 1) {
+        if (!form.dark) card.classList.add('reachable');
+      }
+      card.style.borderLeftColor = form.color;
+      card.innerHTML = `
+        <div class="form-name" style="color:${form.color}">${form.name}${form.dark ? ' 🌑' : ''}${form.special ? ' ⭐' : ''}</div>
+        <div class="form-desc">${form.desc}</div>
+        <div class="form-conditions">条件: ${form.conditions}</div>
+      `;
+      card.onclick = () => {
+        // Preview: show evolution animation for this form
+        toggleEvoTree();
+        showEvolutionAnimation(form, form.dark);
+      };
+      section.appendChild(card);
+    }
+    container.appendChild(section);
+  }
+}
+
+// Show offline adventures on "load" (simulate session resume)
+setTimeout(() => showAdventureReport(sampleAdventures), 2000);
+
+// ===== Init =====
+setEnvironment('forest');
+updateStatBars();
+updateMemoryIndicator();
+updateEthicsBar();
+updateEvoDots();
+gameLoop();
+</script>
+</body>
+</html>

@@ -1,0 +1,204 @@
+{
+  "project": "PetClaw",
+  "version": "0.1.0",
+  "last_updated": "2026-04-01",
+  "sources": {
+    "kenney": {
+      "url": "https://kenney.nl/assets",
+      "license": "CC0 1.0 / Public Domain",
+      "assets": [
+        {
+          "name": "UI Pack",
+          "url": "https://kenney.nl/assets/ui-pack",
+          "target_dir": "assets/ui/kenney_ui/",
+          "usage": "ステータスバー、ボタン、パネル背景、アイコンフレーム",
+          "status": "planned"
+        },
+        {
+          "name": "UI Pack - RPG Expansion",
+          "url": "https://kenney.nl/assets/ui-pack-rpg-expansion",
+          "target_dir": "assets/ui/kenney_rpg/",
+          "usage": "HP/MP/EXPバー、インベントリスロット、ダイアログ枠",
+          "status": "planned"
+        },
+        {
+          "name": "Pixel UI Pack",
+          "url": "https://kenney.nl/assets/pixel-ui-pack",
+          "target_dir": "assets/ui/kenney_pixel/",
+          "usage": "ピクセルアートスタイルに統一されたUI部品",
+          "status": "planned"
+        },
+        {
+          "name": "Game Icons",
+          "url": "https://kenney.nl/assets/game-icons",
+          "target_dir": "assets/ui/kenney_icons/",
+          "usage": "ケアアクションアイコン（Feed/Clean/Play/Train）",
+          "status": "planned"
+        },
+        {
+          "name": "Particle Pack",
+          "url": "https://kenney.nl/assets/particle-pack",
+          "target_dir": "assets/sprites/particles/",
+          "usage": "進化エフェクト、感情パーティクル、環境パーティクル",
+          "status": "planned"
+        }
+      ]
+    },
+    "opengameart": {
+      "url": "https://opengameart.org",
+      "license": "Various (CC-BY, CC0, GPL)",
+      "assets": [
+        {
+          "name": "Pixel Art Tileset (forest)",
+          "search_query": "pixel forest tileset 16x16",
+          "target_dir": "assets/tiles/forest/",
+          "usage": "森環境の背景タイル",
+          "status": "planned"
+        },
+        {
+          "name": "Pixel Art Tileset (sea/beach)",
+          "search_query": "pixel beach ocean tileset",
+          "target_dir": "assets/tiles/sea/",
+          "usage": "海環境の背景タイル",
+          "status": "planned"
+        },
+        {
+          "name": "Pixel Art Tileset (ruins/dungeon)",
+          "search_query": "pixel ruins dungeon tileset",
+          "target_dir": "assets/tiles/ruins/",
+          "usage": "遺跡環境の背景タイル",
+          "status": "planned"
+        },
+        {
+          "name": "Pixel Art Tileset (city)",
+          "search_query": "pixel city town tileset",
+          "target_dir": "assets/tiles/city/",
+          "usage": "街環境の背景タイル",
+          "status": "planned"
+        }
+      ]
+    },
+    "freesound": {
+      "url": "https://freesound.org",
+      "license": "CC0 / CC-BY (varies per sound)",
+      "assets": [
+        {
+          "name": "Forest Ambience",
+          "search_query": "forest ambience birds wind loop",
+          "target_dir": "assets/audio/ambient/forest/",
+          "usage": "森環境BGM",
+          "format": "ogg",
+          "status": "planned"
+        },
+        {
+          "name": "Ocean Waves",
+          "search_query": "ocean waves beach loop",
+          "target_dir": "assets/audio/ambient/sea/",
+          "usage": "海環境BGM",
+          "format": "ogg",
+          "status": "planned"
+        },
+        {
+          "name": "Cave/Ruins Ambience",
+          "search_query": "cave ruins dark ambient loop",
+          "target_dir": "assets/audio/ambient/ruins/",
+          "usage": "遺跡環境BGM",
+          "format": "ogg",
+          "status": "planned"
+        },
+        {
+          "name": "City Ambience",
+          "search_query": "city crowd street ambient loop",
+          "target_dir": "assets/audio/ambient/city/",
+          "usage": "街環境BGM",
+          "format": "ogg",
+          "status": "planned"
+        }
+      ]
+    },
+    "freesfx": {
+      "url": "https://freesfx.co.uk",
+      "license": "Free for personal/commercial use",
+      "assets": [
+        {
+          "name": "UI Click/Select",
+          "target_dir": "assets/audio/sfx/ui/",
+          "usage": "ボタン押下、メニュー選択",
+          "status": "planned"
+        },
+        {
+          "name": "Care Action Sounds",
+          "target_dir": "assets/audio/sfx/care/",
+          "usage": "Feed(もぐもぐ), Clean(シャワー), Play(ポイン), Train(パンチ)",
+          "status": "planned"
+        },
+        {
+          "name": "Evolution Sounds",
+          "target_dir": "assets/audio/sfx/evolution/",
+          "usage": "進化チャージ音、フラッシュ音、完了ジングル、ダーク進化音",
+          "status": "planned"
+        },
+        {
+          "name": "Emotion Sounds",
+          "target_dir": "assets/audio/sfx/emotion/",
+          "usage": "感情スパイク効果音（joy=チャイム, fear=ゾクッ, love=キュン）",
+          "status": "planned"
+        },
+        {
+          "name": "AtoA Conversation",
+          "target_dir": "assets/audio/sfx/a2a/",
+          "usage": "会話バブル出現音、ターン切替音、会話完了音",
+          "status": "planned"
+        }
+      ]
+    },
+    "custom_pixel_icons": {
+      "url": "https://game-icons.net",
+      "license": "CC-BY 3.0",
+      "assets": [
+        {
+          "name": "RPG Action Icons",
+          "target_dir": "assets/ui/action_icons/",
+          "usage": "ケアアクション・進化・AtoA等の各種アイコン",
+          "status": "planned"
+        }
+      ]
+    }
+  },
+  "godot_import_settings": {
+    "sprites": {
+      "filter_mode": "nearest",
+      "compress_mode": "lossless",
+      "image_rendering": "pixelated"
+    },
+    "audio": {
+      "sfx_format": "wav",
+      "ambient_format": "ogg",
+      "loop_ambient": true
+    },
+    "tiles": {
+      "tile_size": 16,
+      "atlas_mode": "auto"
+    }
+  },
+  "directory_structure": {
+    "assets/": {
+      "sprites/": {
+        "expressions/": "表情スプライトシート（22フォーム × eyes/mouths/presets）",
+        "evolution_forms/": "進化フォーム完成スプライト",
+        "particles/": "パーティクルテクスチャ"
+      },
+      "ui/": "UIパーツ（ボタン、バー、パネル、アイコン）",
+      "tiles/": {
+        "forest/": "森環境タイル",
+        "sea/": "海環境タイル",
+        "ruins/": "遺跡環境タイル",
+        "city/": "街環境タイル"
+      },
+      "audio/": {
+        "sfx/": "効果音（ui/care/evolution/emotion/a2a）",
+        "ambient/": "環境アンビエント（forest/sea/ruins/city）"
+      }
+    }
+  }
+}

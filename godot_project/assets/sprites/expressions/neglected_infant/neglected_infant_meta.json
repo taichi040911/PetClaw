@@ -1,0 +1,64 @@
+{
+  "form_id": "neglected_infant",
+  "sprite_size": 32,
+  "palette": {
+    "body": [
+      97,
+      97,
+      97
+    ],
+    "accent": [
+      66,
+      66,
+      66
+    ],
+    "eye": [
+      183,
+      28,
+      28
+    ]
+  },
+  "eye_sheet": "neglected_infant_eyes.png",
+  "eye_shapes": [
+    "NORMAL",
+    "HAPPY",
+    "EXCITED",
+    "SAD",
+    "ANGRY",
+    "SCARED",
+    "SLEEPY",
+    "LOVE",
+    "CURIOUS",
+    "CLOSED",
+    "DOT",
+    "SPARKLE"
+  ],
+  "eye_frame_width": 32,
+  "mouth_sheet": "neglected_infant_mouths.png",
+  "mouth_shapes": [
+    "NEUTRAL",
+    "SMILE",
+    "WIDE_SMILE",
+    "FROWN",
+    "OPEN",
+    "WAVY",
+    "CHOMP",
+    "POUT",
+    "WHISTLE",
+    "TINY_SMILE"
+  ],
+  "mouth_frame_width": 32,
+  "mouth_frame_height": 16,
+  "preset_sheet": "neglected_infant_presets.png",
+  "presets": [
+    "idle",
+    "happy",
+    "excited",
+    "sad",
+    "scared",
+    "love",
+    "sleepy",
+    "angry"
+  ],
+  "preset_frame_width": 32
+}

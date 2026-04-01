@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PetClaw - キャラクターコンセプトシート</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', -apple-system, sans-serif;
+    background: #0a0a1a;
+    color: #e0e0f0;
+    min-height: 100vh;
+  }
+  .header {
+    text-align: center;
+    padding: 40px 20px 20px;
+    background: linear-gradient(180deg, #1a1a3a 0%, #0a0a1a 100%);
+  }
+  .header h1 {
+    font-size: 2.2em;
+    background: linear-gradient(135deg, #ff9f43, #ee5a24, #ff6b81);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 8px;
+  }
+  .header p { color: #8888aa; font-size: 0.95em; }
+
+  .stage-nav {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    padding: 20px;
+    flex-wrap: wrap;
+  }
+  .stage-btn {
+    padding: 10px 20px;
+    border: 2px solid #333355;
+    border-radius: 25px;
+    background: #15152a;
+    color: #8888cc;
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: all 0.3s;
+  }
+  .stage-btn:hover { border-color: #6666aa; color: #aaaaee; }
+  .stage-btn.active {
+    border-color: #ff9f43;
+    background: #2a1a10;
+    color: #ff9f43;
+  }
+
+  .content { max-width: 1200px; margin: 0 auto; padding: 0 20px 40px; }
+
+  .stage-section { display: none; }
+  .stage-section.active { display: block; }
+
+  .stage-header {
+    text-align: center;
+    padding: 30px 0 20px;
+  }
+  .stage-header h2 { font-size: 1.6em; margin-bottom: 8px; }
+  .stage-header .stage-desc { color: #8888aa; max-width: 600px; margin: 0 auto; }
+
+  .char-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 24px;
+    margin-top: 24px;
+  }
+
+  .char-card {
+    background: #12122a;
+    border: 1px solid #222244;
+    border-radius: 16px;
+    overflow: hidden;
+    transition: transform 0.3s, box-shadow 0.3s;
+  }
+  .char-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 32px rgba(100, 80, 200, 0.2);
+  }
+
+  .char-visual {
+    height: 200px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 80px;
+    position: relative;
+    overflow: hidden;
+  }
+  .char-visual .pixel-art {
+    image-rendering: pixelated;
+    width: 128px;
+    height: 128px;
+  }
+  .char-visual canvas { image-rendering: pixelated; }
+
+  .char-info { padding: 20px; }
+  .char-name {
+    font-size: 1.2em;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+  .char-form { color: #8888aa; font-size: 0.85em; margin-bottom: 12px; }
+
+  .trait-bars { margin: 12px 0; }
+  .trait-bar {
+    display: flex;
+    align-items: center;
+    margin-bottom: 6px;
+    font-size: 0.82em;
+  }
+  .trait-label {
+    width: 80px;
+    color: #8888aa;
+    flex-shrink: 0;
+  }
+  .trait-track {
+    flex: 1;
+    height: 6px;
+    background: #1a1a3a;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .trait-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.5s;
+  }
+  .trait-val {
+    width: 36px;
+    text-align: right;
+    color: #6666aa;
+    font-size: 0.8em;
+  }
+
+  .prompt-section {
+    margin-top: 16px;
+    padding: 12px;
+    background: #0a0a1a;
+    border-radius: 8px;
+    border: 1px solid #222244;
+  }
+  .prompt-label {
+    font-size: 0.75em;
+    color: #ff9f43;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+  }
+  .prompt-text {
+    font-family: 'Courier New', monospace;
+    font-size: 0.78em;
+    color: #aaaacc;
+    line-height: 1.5;
+    word-break: break-all;
+  }
+  .copy-btn {
+    margin-top: 8px;
+    padding: 6px 14px;
+    background: #222244;
+    border: 1px solid #333366;
+    border-radius: 6px;
+    color: #8888cc;
+    cursor: pointer;
+    font-size: 0.78em;
+    transition: all 0.2s;
+  }
+  .copy-btn:hover { background: #333366; color: #aaaaee; }
+  .copy-btn.copied { background: #1a3a1a; border-color: #336633; color: #66cc66; }
+
+  .env-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 0.75em;
+    margin: 2px;
+  }
+  .env-forest { background: #1a3a1a; color: #66cc66; }
+  .env-sea { background: #1a2a3a; color: #66aaee; }
+  .env-ruins { background: #2a1a3a; color: #aa66ee; }
+  .env-city { background: #3a2a1a; color: #eeaa44; }
+
+  .evo-arrow {
+    text-align: center;
+    padding: 20px;
+    color: #444466;
+    font-size: 1.4em;
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+  .floating { animation: float 3s ease-in-out infinite; }
+
+  @keyframes sparkle {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 1; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>PetClaw Character Concept Sheet</h1>
+  <p>進化段階別キャラクターデザイン & 生成AIプロンプト集</p>
+</div>
+
+<div class="stage-nav">
+  <button class="stage-btn active" onclick="showStage('egg')">Egg (0)</button>
+  <button class="stage-btn" onclick="showStage('baby')">Baby (1)</button>
+  <button class="stage-btn" onclick="showStage('child')">Child (2)</button>
+  <button class="stage-btn" onclick="showStage('teen')">Teen (3)</button>
+  <button class="stage-btn" onclick="showStage('adult')">Adult (4)</button>
+  <button class="stage-btn" onclick="showStage('elder')">Elder (5)</button>
+</div>
+
+<div class="content">
+
+  <!-- === EGG === -->
+  <div class="stage-section active" id="stage-egg">
+    <div class="stage-header">
+      <h2>Stage 0: Egg</h2>
+      <p class="stage-desc">命の始まり。卵の色と模様が将来の性格を暗示する。プレイヤーが最初に出会う存在。</p>
+    </div>
+    <div class="char-grid">
+      <div class="char-card">
+        <div class="char-visual" style="background: linear-gradient(135deg, #1a1a2e, #16213e);">
+          <canvas id="egg-canvas-1" width="128" height="128"></canvas>
+        </div>
+        <div class="char-info">
+          <div class="char-name">Standard Egg</div>
+          <div class="char-form">基本形 — 性格未確定</div>
+          <div class="trait-bars">
+            <div class="trait-bar"><span class="trait-label">Mystery</span><div class="trait-track"><div class="trait-fill" style="width:90%;background:#8866ee;"></div></div><span class="trait-val">0.9</span></div>
+            <div class="trait-bar"><span class="trait-label">Warmth</span><div class="trait-track"><div class="trait-fill" style="width:50%;background:#ff9f43;"></div></div><span class="trait-val">0.5</span></div>
+          </div>
+          <div class="prompt-section">
+            <div class="prompt-label">Leonardo.ai Prompt</div>
+            <div class="prompt-text">Stylish 2D pixel art mysterious egg, glowing softly from within, swirling pastel patterns on shell, warm inner light, sitting on soft moss, clean 32x32 pixel art, magical and inviting, subtle particle glow around shell, vibrant yet mysterious color palette, professional indie game sprite, no blur, no artifacts</div>
+            <button class="copy-btn" onclick="copyPrompt(this)">Copy Prompt</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- === BABY === -->
+  <div class="stage-section" id="stage-baby">
+    <div class="stage-header">
+      <h2>Stage 1: Baby</h2>
+      <p class="stage-desc">孵化直後。丸くてふわふわ、大きな瞳。基本的な感情表現を見せ始める。</p>
+    </div>
+    <div class="char-grid">
+      <div class="char-card">
+        <div class="char-visual" style="background: linear-gradient(135deg, #2a1a0a, #1a1520);">
+          <canvas id="baby-canvas-1" width="128" height="128"></canvas>
+        </div>
+        <div class="char-info">
+          <div class="char-name">Mimi (Baby)</div>
+          <div class="char-form">好奇心旺盛タイプ — curious: 0.7, playful: 0.6</div>
+          <span class="env-badge env-forest">森向き</span>
+          <span class="env-badge env-city">街向き</span>
+          <div class="trait-bars">
+            <div class="trait-bar"><span class="trait-label">Curious</span><div class="trait-track"><div class="trait-fill" style="width:70%;background:#44ccaa;"></div></div><span class="trait-val">0.7</span></div>
+            <div class="trait-bar"><span class="trait-label">Playful</span><div class="trait-track"><div class="trait-fill" style="width:60%;background:#ffaa44;"></div></div><span class="trait-val">0.6</span></div>
+            <div class="trait-bar"><span class="trait-label">Brave</span><div class="trait-track"><div class="trait-fill" style="width:50%;background:#ee5544;"></div></div><span class="trait-val">0.5</span></div>
+          </div>
+          <div class="prompt-section">
+            <div class="prompt-label">Leonardo.ai Prompt</div>
+            <div class="prompt-text">Stylish 2D pixel art baby digital pet, round fluffy blob creature, soft orange and cream colors, big sparkling curious eyes, tiny ears and tail, innocent happy expression, sitting pose with tilted head, clean 32x32 pixel art, adorable and huggable, subtle warm glow, game-ready, vibrant yet soft palette, no blur, professional indie game character</div>
+            <button class="copy-btn" onclick="copyPrompt(this)">Copy Prompt</button>
+          </div>
+        </div>
+      </div>
+      <div class="char-card">
+        <div class="char-visual" style="background: linear-gradient(135deg, #0a1a2a, #151525);">
+          <canvas id="baby-canvas-2" width="128" height="128"></canvas>
+        </div>
+        <div class="char-info">
+          <div class="char-name">Kuro (Baby)</div>
+          <div class="char-form">勇敢タイプ — brave: 0.7, calm: 0.5</div>
+          <span class="env-badge env-ruins">廃墟向き</span>
+          <span class="env-badge env-forest">森向き</span>
+          <div class="trait-bars">
+            <div class="trait-bar"><span class="trait-label">Brave</span><div class="trait-track"><div class="trait-fill" style="width:70%;background:#ee5544;"></div></div><span class="trait-val">0.7</span></div>
+            <div class="trait-bar"><span class="trait-label">Calm</span><div class="trait-track"><div class="trait-fill" style="width:50%;background:#6688ee;"></div></div><span class="trait-val">0.5</span></div>
+            <div class="trait-bar"><span class="trait-label">Curious</span><div class="trait-track"><div class="trait-fill" style="width:50%;background:#44ccaa;"></div></div><span class="trait-val">0.5</span></div>
+          </div>
+          <div class="prompt-section">
+            <div class="prompt-label">Leonardo.ai Prompt</div>
+            <div class="prompt-text">Stylish 2D pixel art baby digital pet, small round dark-furred creature, deep blue-black color with silver accents, determined brave eyes, small pointed ears, confident sitting pose, clean 32x32 pixel art, cute but strong presence, subtle cool glow, game-ready, professional indie game character, no blur</div>
+            <button class="copy-btn" onclick="copyPrompt(this)">Copy Prompt</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- === CHILD === -->
+  <div class="stage-section" id="stage-child">
+    <div class="stage-header">
+      <h2>Stage 2: Child</h2>
+      <p class="stage-desc">環境の影響を受けて最初の進化分岐。性格が明確になり始める。</p>
+    </div>
+    <div class="char-grid">
+      <div class="char-card">
+        <div class="char-visual" style="background: linear-gradient(135deg, #0a2a0a, #152015);">
+          <canvas id="child-canvas-1" width="128" height="128"></canvas>
+        </div>
+        <div class="char-info">
+          <div class="char-name">自然の子 (Nature Child)</div>
+          <div class="char-form">森環境 + curious ≥ 0.6 で進化</div>
+          <span class="env-badge env-forest">森</span>
+          <div class="trait-bars">
+            <div class="trait-bar"><span class="trait-label">Curious</span><div class="trait-track"><div class="trait-fill" style="width:75%;background:#44ccaa;"></div></div><span class="trait-val">0.75</span></div>
+            <div class="trait-bar"><span class="trait-label">Health</span><div class="trait-track"><div class="trait-fill" style="width:85%;background:#66ee66;"></div></div><span class="trait-val">+0.1</span></div>
+          </div>
+          <div class="prompt-section">
+            <div class="prompt-label">Leonardo.ai Prompt</div>
+            <div class="prompt-text">Stylish 2D pixel art child-stage digital pet, leaf-themed creature with green-brown fur, curious wide eyes with leaf-shaped pupils, small vine-like tail, wearing a tiny acorn cap, playful exploring pose, forest background hints, clean 64x64 pixel art, adorable nature aesthetic, warm green palette, game-ready sprite, professional character design</div>
+            <button class="copy-btn" onclick="copyPrompt(this)">Copy Prompt</button>
+          </div>
+        </div>
+      </div>
+      <div class="char-card">
+        <div class="char-visual" style="background: linear-gradient(135deg, #0a1a2e, #101828);">
+          <canvas id="child-canvas-2" width="128" height="128"></canvas>
+        </div>
+        <div class="char-info">
+          <div class="char-name">海の子 (Ocean Child)</div>
+          <div class="char-form">海環境 + calm ≥ 0.5 で進化</div>
+          <span class="env-badge env-sea">海</span>
+          <div class="trait-bars">
+            <div class="trait-bar"><span class="trait-label">Calm</span><div class="trait-track"><div class="trait-fill" style="width:65%;background:#6688ee;"></div></div><span class="trait-val">0.65</span></div>
+            <div class="trait-bar"><span class="trait-label">Energy</span><div class="trait-track"><div class="trait-fill" style="width:80%;background:#44aaee;"></div></div><span class="trait-val">+0.1</span></div>
+          </div>
+          <div class="prompt-section">
+            <div class="prompt-label">Leonardo.ai Prompt</div>
+            <div class="prompt-text">Stylish 2D pixel art child-stage digital pet, aquatic-themed creature with smooth blue-white fur, serene gentle eyes, small fin-like ears, bubble patterns on body, calm floating pose, ocean background hints, clean 64x64 pixel art, peaceful aquatic aesthetic, cool blue palette with pearl accents, game-ready sprite, professional character design</div>
+            <button class="copy-btn" onclick="copyPrompt(this)">Copy Prompt</button>
+          </div>
+        </div>
+      </div>
+      <div class="char-card">
+        <div class="char-visual" style="background: linear-gradient(135deg, #1a0a2a, #181020);">
+          <canvas id="child-canvas-3" width="128" height="128"></canvas>
+        </div>
+        <div class="char-info">
+          <div class="char-name">影の子 (Shadow Child)</div>
+          <div class="char-form">廃墟環境 + brave ≥ 0.5 で進化</div>
+          <span class="env-badge env-ruins">廃墟</span>
+          <div class="trait-bars">
+            <div class="trait-bar"><span class="trait-label">Brave</span><div class="trait-track"><div class="trait-fill" style="width:70%;background:#ee5544;"></div></div><span class="trait-val">0.70</span></div>
+            <div class="trait-bar"><span class="trait-label">Resist</span><div class="trait-track"><div class="trait-fill" style="width:75%;background:#aa66ee;"></div></div><span class="trait-val">+0.1</span></div>
+          </div>
+          <div class="prompt-section">
+            <div class="prompt-label">Leonardo.ai Prompt</div>
+            <div class="prompt-text">Stylish 2D pixel art child-stage digital pet, shadow-themed creature with dark purple-gray fur, brave glowing eyes, small horn-like tufts, wispy shadow tendrils from body, confident standing pose, ruins background hints, clean 64x64 pixel art, cute but mysterious aesthetic, dark purple palette with faint glow, game-ready sprite, professional character design</div>
+            <button class="copy-btn" onclick="copyPrompt(this)">Copy Prompt</button>
+          </div>
+        </div>
+      </div>
+      <div class="char-card">
+        <div class="char-visual" style="background: linear-gradient(135deg, #2a1a0a, #201810);">
+          <canvas id="child-canvas-4" width="128" height="128"></canvas>
+        </div>
+        <div class="char-info">
+          <div class="char-name">街の子 (Social Child)</div>
+          <div class="char-form">街環境 + affectionate ≥ 0.5 で進化</div>
+          <span class="env-badge env-city">街</span>
+          <div class="trait-bars">
+            <div class="trait-bar"><span class="trait-label">Affection</span><div class="trait-track"><div class="trait-fill" style="width:65%;background:#ee6688;"></div></div><span class="trait-val">0.65</span></div>
+            <div class="trait-bar"><span class="trait-label">Bond</span><div class="trait-track"><div class="trait-fill" style="width:80%;background:#ffaa44;"></div></div><span class="trait-val">+0.1</span></div>
+          </div>
+          <div class="prompt-section">
+            <div class="prompt-label">Leonardo.ai Prompt</div>
+            <div class="prompt-text">Stylish 2D pixel art child-stage digital pet, social-themed creature with warm golden-brown fur, friendly big smile and heart-shaped tail tip, wearing a tiny scarf, cheerful waving pose, city background hints, clean 64x64 pixel art, adorable friendly aesthetic, warm golden palette, game-ready sprite, professional character design</div>
+            <button class="copy-btn" onclick="copyPrompt(this)">Copy Prompt</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- === TEEN === -->
+  <div class="stage-section" id="stage-teen">
+    <div class="stage-header">
+      <h2>Stage 3: Teen</h2>
+      <p class="stage-desc">性格が確立し、本格的な進化分岐。個性豊かな4つの道。</p>
+    </div>
+    <div class="char-grid">
+      <div class="char-card">
+        <div class="char-visual" style="background: linear-gradient(135deg, #2a0a0a, #201510);">
+          <canvas id="teen-canvas-1" width="128" height="128"></canvas>
+        </div>
+        <div class="char-info">
+          <div class="char-name">勇者の若者 (Warrior Teen)</div>
+          <div class="char-form">brave ≥ 0.7 + evolution_readiness ≥ 0.3</div>
+          <div class="prompt-section">
+            <div class="prompt-label">Leonardo.ai Prompt</div>
+            <div class="prompt-text">Stylish 2D pixel art teen-stage digital pet warrior, confident muscular creature with armor-like fur patterns, fierce determined eyes with inner fire, battle scars as honor marks, dynamic power stance, metallic red-orange palette with gold highlights, clean 64x64 pixel art, brave and loyal aesthetic, subtle flame particles, professional game character design, retro-modern fusion</div>
+            <button class="copy-btn" onclick="copyPrompt(this)">Copy Prompt</button>
+          </div>
+        </div>
+      </div>
+      <div class="char-card">
+        <div class="char-visual" style="background: linear-gradient(135deg, #0a1a2a, #101520);">
+          <canvas id="teen-canvas-2" width="128" height="128"></canvas>
+        </div>
+        <div class="char-info">
+          <div class="char-name">知恵の若者 (Scholar Teen)</div>
+          <div class="char-form">curious ≥ 0.7 + calm ≥ 0.5</div>
+          <div class="prompt-section">
+            <div class="prompt-label">Leonardo.ai Prompt</div>
+            <div class="prompt-text">Stylish 2D pixel art teen-stage digital pet scholar, wise creature with book-shaped markings, thoughtful intelligent eyes with spectacle-like fur patterns, carrying a tiny scroll, contemplative sitting pose, cool blue-teal palette with silver accents, clean 64x64 pixel art, intellectual yet adorable aesthetic, subtle knowledge glow, professional game character design</div>
+            <button class="copy-btn" onclick="copyPrompt(this)">Copy Prompt</button>
+          </div>
+        </div>
+      </div>
+      <div class="char-card">
+        <div class="char-visual" style="background: linear-gradient(135deg, #1a0a1a, #181018);">
+          <canvas id="teen-canvas-3" width="128" height="128"></canvas>
+        </div>
+        <div class="char-info">
+          <div class="char-name">癒しの若者 (Healer Teen)</div>
+          <div class="char-form">affectionate ≥ 0.7 + calm ≥ 0.5</div>
+          <div class="prompt-section">
+            <div class="prompt-label">Leonardo.ai Prompt</div>
+            <div class="prompt-text">Stylish 2D pixel art teen-stage digital pet healer, gentle creature with soft glowing fur, compassionate warm eyes, flower-like markings, gentle healing aura visible, nurturing open-arms pose, soft pink-lavender palette with white accents, clean 64x64 pixel art, caring and serene aesthetic, subtle healing particles, professional game character design</div>
+            <button class="copy-btn" onclick="copyPrompt(this)">Copy Prompt</button>
+          </div>
+        </div>
+      </div>
+      <div class="char-card">
+        <div class="char-visual" style="background: linear-gradient(135deg, #2a2a0a, #201a10);">
+          <canvas id="teen-canvas-4" width="128" height="128"></canvas>
+        </div>
+        <div class="char-info">
+          <div class="char-name">いたずらの若者 (Trickster Teen)</div>
+          <div class="char-form">playful ≥ 0.7 + curious ≥ 0.5</div>
+          <div class="prompt-section">
+            <div class="prompt-label">Leonardo.ai Prompt</div>
+            <div class="prompt-text">Stylish 2D pixel art teen-stage digital pet trickster, mischievous creature with zigzag fur patterns, playful winking eye with spark, jester-like ear tufts, dynamic mid-prank pose, bright yellow-green palette with electric accents, clean 64x64 pixel art, cheeky and energetic aesthetic, subtle spark particles, professional game character design</div>
+            <button class="copy-btn" onclick="copyPrompt(this)">Copy Prompt</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- === ADULT === -->
+  <div class="stage-section" id="stage-adult">
+    <div class="stage-header">
+      <h2>Stage 4: Adult</h2>
+      <p class="stage-desc">最も複合的な進化条件。環境・性格・絆が織り成す究極形態。</p>
+    </div>
+    <div class="char-grid">
+      <div class="char-card">
+        <div class="char-visual" style="background: linear-gradient(135deg, #1a0a0a, #281015);">
+          <canvas id="adult-canvas-1" width="128" height="128"></canvas>
+        </div>
+        <div class="char-info">
+          <div class="char-name">守護者 (Guardian)</div>
+          <div class="char-form">brave ≥ 0.8 + affectionate ≥ 0.6 + evo_readiness ≥ 0.5</div>
+          <div class="prompt-section">
+            <div class="prompt-label">Leonardo.ai Prompt</div>
+            <div class="prompt-text">Stylish 2D pixel art adult-stage digital pet guardian, majestic powerful creature with ornate armor-like fur, noble protective eyes with golden glow, shield-shaped chest marking, powerful guardian stance with spread arms, rich crimson-gold palette, clean 64x64 pixel art, noble and protective aesthetic, radiant aura particles, professional game character design, retro-modern masterpiece</div>
+            <button class="copy-btn" onclick="copyPrompt(this)">Copy Prompt</button>
+          </div>
+        </div>
+      </div>
+      <div class="char-card">
+        <div class="char-visual" style="background: linear-gradient(135deg, #0a0a2a, #101528);">
+          <canvas id="adult-canvas-2" width="128" height="128"></canvas>
+        </div>
+        <div class="char-info">
+          <div class="char-name">賢者 (Sage)</div>
+          <div class="char-form">calm ≥ 0.8 + curious ≥ 0.6</div>
+          <div class="prompt-section">
+            <div class="prompt-label">Leonardo.ai Prompt</div>
+            <div class="prompt-text">Stylish 2D pixel art adult-stage digital pet sage, ancient wise creature with star-map fur patterns, deep all-knowing eyes with constellation pupils, floating crystal orbs nearby, serene meditation pose, deep indigo-silver palette, clean 64x64 pixel art, transcendent wisdom aesthetic, cosmic particle effects, professional game character design, retro-modern masterpiece</div>
+            <button class="copy-btn" onclick="copyPrompt(this)">Copy Prompt</button>
+          </div>
+        </div>
+      </div>
+      <div class="char-card">
+        <div class="char-visual" style="background: linear-gradient(135deg, #1a0a2a, #200a28);">
+          <canvas id="adult-canvas-3" width="128" height="128"></canvas>
+        </div>
+        <div class="char-info">
+          <div class="char-name">神秘者 (Mystic)</div>
+          <div class="char-form">廃墟環境 + brave ≥ 0.6 + calm ≥ 0.6</div>
+          <span class="env-badge env-ruins">廃墟限定</span>
+          <div class="prompt-section">
+            <div class="prompt-label">Leonardo.ai Prompt</div>
+            <div class="prompt-text">Stylish 2D pixel art adult-stage digital pet mystic, ethereal shadow-light creature with ancient rune markings, glowing third eye on forehead, dark mist and light intertwining around body, mysterious floating pose, deep purple-black palette with ethereal white glow, clean 64x64 pixel art, otherworldly mystic aesthetic, dark fantasy particles, professional game character design</div>
+            <button class="copy-btn" onclick="copyPrompt(this)">Copy Prompt</button>
+          </div>
+        </div>
+      </div>
+      <div class="char-card">
+        <div class="char-visual" style="background: linear-gradient(135deg, #2a0a1a, #201018);">
+          <canvas id="adult-canvas-4" width="128" height="128"></canvas>
+        </div>
+        <div class="char-info">
+          <div class="char-name">絆の達人 (Bond Master)</div>
+          <div class="char-form">affectionate ≥ 0.8 + playful ≥ 0.5 + affection ≥ 0.7</div>
+          <div class="prompt-section">
+            <div class="prompt-label">Leonardo.ai Prompt</div>
+            <div class="prompt-text">Stylish 2D pixel art adult-stage digital pet bond master, warm radiant creature with heart-chain fur patterns, overflowing love in shining eyes, rainbow-tinted aura, joyful open embrace pose, warm pink-gold-rainbow palette, clean 64x64 pixel art, ultimate love and friendship aesthetic, heart-shaped particle shower, professional game character design, retro-modern masterpiece</div>
+            <button class="copy-btn" onclick="copyPrompt(this)">Copy Prompt</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- === ELDER === -->
+  <div class="stage-section" id="stage-elder">
+    <div class="stage-header">
+      <h2>Stage 5: Elder</h2>
+      <p class="stage-desc">知恵と経験の結晶。穏やかで深い存在感。死と隣り合わせだからこそ美しい。</p>
+    </div>
+    <div class="char-grid">
+      <div class="char-card">
+        <div class="char-visual" style="background: linear-gradient(135deg, #0a0a1a, #151520);">
+          <canvas id="elder-canvas-1" width="128" height="128"></canvas>
+        </div>
+        <div class="char-info">
+          <div class="char-name">太古の長老 (Ancient Elder)</div>
+          <div class="char-form">calm ≥ 0.8 + brave ≥ 0.6</div>
+          <div class="prompt-section">
+            <div class="prompt-label">Leonardo.ai Prompt</div>
+            <div class="prompt-text">Stylish 2D pixel art elder-stage digital pet ancient elder, weathered majestic creature with cracked-earth fur patterns showing inner golden light, wise half-closed eyes with centuries of knowledge, slow gentle movement lines, peaceful resting pose, muted earth-gold palette with warm inner glow, clean 64x64 pixel art, ancient wisdom aesthetic, soft dust-light particles, professional game character design</div>
+            <button class="copy-btn" onclick="copyPrompt(this)">Copy Prompt</button>
+          </div>
+        </div>
+      </div>
+      <div class="char-card">
+        <div class="char-visual" style="background: linear-gradient(135deg, #1a0a1a, #181020);">
+          <canvas id="elder-canvas-2" width="128" height="128"></canvas>
+        </div>
+        <div class="char-info">
+          <div class="char-name">永遠の長老 (Eternal Elder)</div>
+          <div class="char-form">affectionate ≥ 0.8 + affection ≥ 0.8</div>
+          <div class="prompt-section">
+            <div class="prompt-label">Leonardo.ai Prompt</div>
+            <div class="prompt-text">Stylish 2D pixel art elder-stage digital pet eternal elder, transcendent glowing creature with translucent crystalline fur, warm loving eyes that hold infinite memories, gentle smile, serene peaceful pose surrounded by soft light orbs, ethereal white-gold-lavender palette, clean 64x64 pixel art, eternal love and peace aesthetic, gentle floating light particles, professional game character design, masterpiece</div>
+            <button class="copy-btn" onclick="copyPrompt(this)">Copy Prompt</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// === Stage Navigation ===
+function showStage(stage) {
+  document.querySelectorAll('.stage-section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.stage-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('stage-' + stage).classList.add('active');
+  event.target.classList.add('active');
+}
+
+// === Copy Prompt ===
+function copyPrompt(btn) {
+  const text = btn.previousElementSibling.textContent;
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = 'Copy Prompt';
+      btn.classList.remove('copied');
+    }, 2000);
+  });
+}
+
+// === Pixel Art Generator ===
+function drawPixelPet(canvasId, config) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const size = 128;
+  const px = config.pixelSize || 8;
+  const cols = size / px;
+
+  ctx.clearRect(0, 0, size, size);
+
+  // Background glow
+  const grd = ctx.createRadialGradient(64, 64, 10, 64, 64, 60);
+  grd.addColorStop(0, config.glowColor || 'rgba(255,200,100,0.15)');
+  grd.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = grd;
+  ctx.fillRect(0, 0, size, size);
+
+  // Draw body
+  config.pixels.forEach(([x, y, color]) => {
+    ctx.fillStyle = color;
+    ctx.fillRect(x * px, y * px, px, px);
+  });
+}
+
+// Egg
+drawPixelPet('egg-canvas-1', {
+  pixelSize: 8,
+  glowColor: 'rgba(150,100,255,0.2)',
+  pixels: [
+    [6,5,'#665588'],[7,5,'#776699'],[8,5,'#776699'],[9,5,'#665588'],
+    [5,6,'#665588'],[6,6,'#8877bb'],[7,6,'#9988cc'],[8,6,'#9988cc'],[9,6,'#8877bb'],[10,6,'#665588'],
+    [5,7,'#776699'],[6,7,'#aa99dd'],[7,7,'#bbaaee'],[8,7,'#ffcc88'],[9,7,'#aa99dd'],[10,7,'#776699'],
+    [5,8,'#776699'],[6,8,'#bbaaee'],[7,8,'#ccbbff'],[8,8,'#ccbbff'],[9,8,'#bbaaee'],[10,8,'#776699'],
+    [5,9,'#776699'],[6,9,'#aa99dd'],[7,9,'#ffcc88'],[8,9,'#bbaaee'],[9,9,'#aa99dd'],[10,9,'#776699'],
+    [5,10,'#665588'],[6,10,'#8877bb'],[7,10,'#9988cc'],[8,10,'#9988cc'],[9,10,'#8877bb'],[10,10,'#665588'],
+    [6,11,'#665588'],[7,11,'#776699'],[8,11,'#776699'],[9,11,'#665588'],
+  ]
+});
+
+// Baby Mimi
+drawPixelPet('baby-canvas-1', {
+  pixelSize: 8,
+  glowColor: 'rgba(255,180,100,0.2)',
+  pixels: [
+    [5,3,'#cc8844'],[10,3,'#cc8844'],
+    [5,4,'#ddaa66'],[10,4,'#ddaa66'],
+    [6,5,'#ffcc88'],[7,5,'#ffcc88'],[8,5,'#ffcc88'],[9,5,'#ffcc88'],
+    [5,6,'#ffcc88'],[6,6,'#ffddaa'],[7,6,'#332211'],[8,6,'#ffddaa'],[9,6,'#332211'],[10,6,'#ffcc88'],
+    [5,7,'#ffcc88'],[6,7,'#ffddaa'],[7,7,'#ffddaa'],[8,7,'#ff8866'],[9,7,'#ffddaa'],[10,7,'#ffcc88'],
+    [5,8,'#ffcc88'],[6,8,'#ffddaa'],[7,8,'#ffddaa'],[8,8,'#ffddaa'],[9,8,'#ffddaa'],[10,8,'#ffcc88'],
+    [6,9,'#eebb77'],[7,9,'#ffcc88'],[8,9,'#ffcc88'],[9,9,'#eebb77'],
+    [7,10,'#ddaa66'],[8,10,'#ddaa66'],
+    [11,8,'#cc8844'],[11,9,'#ddaa66'],
+  ]
+});
+
+// Baby Kuro
+drawPixelPet('baby-canvas-2', {
+  pixelSize: 8,
+  glowColor: 'rgba(100,150,255,0.15)',
+  pixels: [
+    [5,3,'#334455'],[10,3,'#334455'],
+    [5,4,'#445566'],[10,4,'#445566'],
+    [6,5,'#556677'],[7,5,'#556677'],[8,5,'#556677'],[9,5,'#556677'],
+    [5,6,'#556677'],[6,6,'#667788'],[7,6,'#aaccff'],[8,6,'#667788'],[9,6,'#aaccff'],[10,6,'#556677'],
+    [5,7,'#556677'],[6,7,'#667788'],[7,7,'#667788'],[8,7,'#778899'],[9,7,'#667788'],[10,7,'#556677'],
+    [5,8,'#445566'],[6,8,'#667788'],[7,8,'#667788'],[8,8,'#667788'],[9,8,'#667788'],[10,8,'#445566'],
+    [6,9,'#445566'],[7,9,'#556677'],[8,9,'#556677'],[9,9,'#445566'],
+    [7,10,'#334455'],[8,10,'#334455'],
+    [11,8,'#445566'],[11,9,'#556677'],
+  ]
+});
+
+// Generate placeholder canvases for remaining stages
+const stages = {
+  'child-canvas-1': {color: '#44aa44', glow: 'rgba(100,200,100,0.2)'},
+  'child-canvas-2': {color: '#4488cc', glow: 'rgba(100,150,255,0.2)'},
+  'child-canvas-3': {color: '#8844aa', glow: 'rgba(150,100,200,0.2)'},
+  'child-canvas-4': {color: '#ccaa44', glow: 'rgba(200,180,100,0.2)'},
+  'teen-canvas-1': {color: '#cc4422', glow: 'rgba(255,100,50,0.2)'},
+  'teen-canvas-2': {color: '#4466cc', glow: 'rgba(100,130,255,0.2)'},
+  'teen-canvas-3': {color: '#cc66aa', glow: 'rgba(200,100,180,0.2)'},
+  'teen-canvas-4': {color: '#aacc22', glow: 'rgba(180,200,50,0.2)'},
+  'adult-canvas-1': {color: '#cc6622', glow: 'rgba(255,130,50,0.3)'},
+  'adult-canvas-2': {color: '#4444cc', glow: 'rgba(80,80,255,0.3)'},
+  'adult-canvas-3': {color: '#6622aa', glow: 'rgba(120,50,200,0.3)'},
+  'adult-canvas-4': {color: '#cc4488', glow: 'rgba(255,100,150,0.3)'},
+  'elder-canvas-1': {color: '#aa8844', glow: 'rgba(200,160,100,0.3)'},
+  'elder-canvas-2': {color: '#ccaaee', glow: 'rgba(200,180,240,0.3)'},
+};
+
+Object.entries(stages).forEach(([id, cfg]) => {
+  const canvas = document.getElementById(id);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const grd = ctx.createRadialGradient(64, 64, 10, 64, 64, 55);
+  grd.addColorStop(0, cfg.glow);
+  grd.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = grd;
+  ctx.fillRect(0, 0, 128, 128);
+
+  // Silhouette placeholder
+  ctx.fillStyle = cfg.color;
+  const bodyPx = [
+    [5,4],[6,4],[9,4],[10,4],
+    [5,5],[6,5],[7,5],[8,5],[9,5],[10,5],
+    [4,6],[5,6],[6,6],[7,6],[8,6],[9,6],[10,6],[11,6],
+    [4,7],[5,7],[6,7],[7,7],[8,7],[9,7],[10,7],[11,7],
+    [4,8],[5,8],[6,8],[7,8],[8,8],[9,8],[10,8],[11,8],
+    [5,9],[6,9],[7,9],[8,9],[9,9],[10,9],
+    [6,10],[7,10],[8,10],[9,10],
+  ];
+  bodyPx.forEach(([x,y]) => ctx.fillRect(x*8, y*8, 8, 8));
+
+  // Eyes
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(6*8, 6*8, 8, 8);
+  ctx.fillRect(9*8, 6*8, 8, 8);
+  ctx.fillStyle = '#111111';
+  ctx.fillRect(6*8+2, 6*8+2, 4, 4);
+  ctx.fillRect(9*8+2, 6*8+2, 4, 4);
+});
+</script>
+
+</body>
+</html>

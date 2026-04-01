@@ -1,0 +1,64 @@
+{
+  "form_id": "eternal_companion",
+  "sprite_size": 32,
+  "palette": {
+    "body": [
+      233,
+      30,
+      99
+    ],
+    "accent": [
+      252,
+      228,
+      236
+    ],
+    "eye": [
+      33,
+      33,
+      33
+    ]
+  },
+  "eye_sheet": "eternal_companion_eyes.png",
+  "eye_shapes": [
+    "NORMAL",
+    "HAPPY",
+    "EXCITED",
+    "SAD",
+    "ANGRY",
+    "SCARED",
+    "SLEEPY",
+    "LOVE",
+    "CURIOUS",
+    "CLOSED",
+    "DOT",
+    "SPARKLE"
+  ],
+  "eye_frame_width": 32,
+  "mouth_sheet": "eternal_companion_mouths.png",
+  "mouth_shapes": [
+    "NEUTRAL",
+    "SMILE",
+    "WIDE_SMILE",
+    "FROWN",
+    "OPEN",
+    "WAVY",
+    "CHOMP",
+    "POUT",
+    "WHISTLE",
+    "TINY_SMILE"
+  ],
+  "mouth_frame_width": 32,
+  "mouth_frame_height": 16,
+  "preset_sheet": "eternal_companion_presets.png",
+  "presets": [
+    "idle",
+    "happy",
+    "excited",
+    "sad",
+    "scared",
+    "love",
+    "sleepy",
+    "angry"
+  ],
+  "preset_frame_width": 32
+}
