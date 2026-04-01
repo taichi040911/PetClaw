@@ -12,10 +12,15 @@ extends Control
 @onready var feed_button: Button = $UIPanel/VBox/ActionButtons/FeedButton
 @onready var pet_button: Button = $UIPanel/VBox/ActionButtons/PetButton
 @onready var play_button: Button = $UIPanel/VBox/ActionButtons/PlayButton
+@onready var petbook_button: Button = $UIPanel/VBox/ActionButtons/PetBookButton
 
 # === Pet Reference ===
 var current_pet: PetEntity
 var pet_display_node: Node2D
+
+# === Screen Navigation ===
+var petbook_screen: PetBookScreen
+var _petbook_scene: PackedScene = preload("res://scenes/pet_book_screen.tscn")
 
 
 func _ready() -> void:
@@ -23,6 +28,7 @@ func _ready() -> void:
 	feed_button.pressed.connect(_on_feed_pressed)
 	pet_button.pressed.connect(_on_pet_pressed)
 	play_button.pressed.connect(_on_play_pressed)
+	petbook_button.pressed.connect(_on_petbook_pressed)
 
 	# GameManager の初期化完了を待つ
 	await get_tree().process_frame
@@ -172,3 +178,28 @@ func _on_stat_changed(stat_name: String, _old_value: float, new_value: float) ->
 			hunger_bar.value = new_value * 100.0
 		"health":
 			health_bar.value = new_value * 100.0
+
+
+# === Screen Navigation ===
+
+func _on_petbook_pressed() -> void:
+	if petbook_screen:
+		return  # 既に開いている
+
+	petbook_screen = _petbook_scene.instantiate() as PetBookScreen
+	petbook_screen.back_requested.connect(_on_petbook_back)
+	add_child(petbook_screen)
+
+	# メイン画面を隠す
+	$PetArea.visible = false
+	$UIPanel.visible = false
+
+
+func _on_petbook_back() -> void:
+	if petbook_screen:
+		petbook_screen.queue_free()
+		petbook_screen = null
+
+	# メイン画面を表示
+	$PetArea.visible = true
+	$UIPanel.visible = true
