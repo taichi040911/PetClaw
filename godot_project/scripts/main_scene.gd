@@ -30,8 +30,38 @@ var _is_first_launch: bool = false
 var _evolution_screen: EvolutionChoiceScreen
 var _conversation_bubble: ConversationBubble
 
+# === UI Theme Colors ===
+const UI_BG: Color = Color(0.08, 0.10, 0.18)
+const UI_PANEL_BG: Color = Color(0.12, 0.14, 0.22, 0.95)
+const UI_ACCENT: Color = Color(0.4, 0.75, 0.95)
+const UI_FEED_COLOR: Color = Color(0.35, 0.8, 0.45)
+const UI_PET_COLOR: Color = Color(0.9, 0.5, 0.65)
+const UI_PLAY_COLOR: Color = Color(0.95, 0.75, 0.2)
+const UI_BOOK_COLOR: Color = Color(0.5, 0.6, 0.9)
+
+const EMOTION_COLORS: Dictionary = {
+	"joy": Color(1.0, 0.92, 0.3),
+	"love": Color(1.0, 0.5, 0.6),
+	"excitement": Color(1.0, 0.7, 0.15),
+	"sadness": Color(0.5, 0.6, 0.85),
+	"fear": Color(0.65, 0.5, 0.8),
+	"neutral": Color(0.7, 0.75, 0.8),
+}
+
+const EMOTION_ICONS: Dictionary = {
+	"joy": "☀",
+	"love": "♥",
+	"excitement": "⚡",
+	"sadness": "💧",
+	"fear": "👁",
+	"neutral": "—",
+}
+
 
 func _ready() -> void:
+	# UIスタイリング
+	_apply_ui_theme()
+
 	# ボタン接続
 	feed_button.pressed.connect(_on_feed_pressed)
 	pet_button.pressed.connect(_on_pet_pressed)
@@ -164,11 +194,23 @@ func _update_ui() -> void:
 	if not current_pet:
 		return
 
-	hunger_bar.value = current_pet.stats.hunger * 100.0
-	health_bar.value = current_pet.stats.health * 100.0
+	# スタッツバーの更新（スムーズ補間）
+	hunger_bar.value = lerpf(hunger_bar.value, current_pet.stats.hunger * 100.0, 0.1)
+	health_bar.value = lerpf(health_bar.value, current_pet.stats.health * 100.0, 0.1)
 
+	# 空腹バーの色変化（低いと赤に）
+	var hunger_ratio: float = current_pet.stats.hunger
+	if hunger_ratio < 0.3:
+		hunger_bar.modulate = Color(1.0, 0.4, 0.4).lerp(Color.WHITE, hunger_ratio / 0.3)
+	else:
+		hunger_bar.modulate = Color.WHITE
+
+	# 感情表示（アイコン + 色付き）
 	var dominant_emotion: String = _get_dominant_emotion()
-	emotion_label.text = "Emotion: %s" % dominant_emotion
+	var emotion_icon: String = EMOTION_ICONS.get(dominant_emotion, "—")
+	var emotion_color: Color = EMOTION_COLORS.get(dominant_emotion, Color.WHITE)
+	emotion_label.text = "%s %s" % [emotion_icon, dominant_emotion.capitalize()]
+	emotion_label.add_theme_color_override("font_color", emotion_color)
 
 
 func _get_dominant_emotion() -> String:
@@ -194,6 +236,7 @@ func _get_dominant_emotion() -> String:
 func _on_feed_pressed() -> void:
 	if not current_pet or not current_pet.is_alive:
 		return
+	_animate_button(feed_button)
 	if GameManager.instance and GameManager.instance.care_system:
 		GameManager.instance.care_system.perform_action(current_pet, "feed")
 	else:
@@ -207,6 +250,7 @@ func _on_feed_pressed() -> void:
 func _on_pet_pressed() -> void:
 	if not current_pet or not current_pet.is_alive:
 		return
+	_animate_button(pet_button)
 	if GameManager.instance and GameManager.instance.care_system:
 		GameManager.instance.care_system.perform_action(current_pet, "pet")
 	else:
@@ -220,6 +264,7 @@ func _on_pet_pressed() -> void:
 func _on_play_pressed() -> void:
 	if not current_pet or not current_pet.is_alive:
 		return
+	_animate_button(play_button)
 	if GameManager.instance and GameManager.instance.care_system:
 		GameManager.instance.care_system.perform_action(current_pet, "play")
 	else:
@@ -234,7 +279,16 @@ func _on_play_pressed() -> void:
 # === Signal Handlers ===
 
 func _on_emotion_changed(emotion: String, intensity: float) -> void:
-	emotion_label.text = "Emotion: %s (%.0f%%)" % [emotion, intensity * 100.0]
+	var icon: String = EMOTION_ICONS.get(emotion, "—")
+	var color: Color = EMOTION_COLORS.get(emotion, Color.WHITE)
+	emotion_label.text = "%s %s (%.0f%%)" % [icon, emotion.capitalize(), intensity * 100.0]
+	emotion_label.add_theme_color_override("font_color", color)
+
+	# 感情変化時にラベルをパルスさせる
+	if intensity > 0.4:
+		var tween: Tween = create_tween()
+		tween.tween_property(emotion_label, "scale", Vector2(1.1, 1.1), 0.1)
+		tween.tween_property(emotion_label, "scale", Vector2(1.0, 1.0), 0.15)
 
 
 func _on_stat_changed(stat_name: String, _old_value: float, new_value: float) -> void:
@@ -337,49 +391,45 @@ func _show_tutorial() -> void:
 # === Settings Screen ===
 
 func _on_settings_pressed() -> void:
+	_animate_button(settings_button)
 	var settings: SettingsScreen = SettingsScreen.new()
 	settings.back_requested.connect(func() -> void:
 		settings.queue_free()
-		$PetArea.visible = true
-		$UIPanel.visible = true
+		_fade_in_main_ui()
 	)
+	await _fade_out_main_ui()
 	add_child(settings)
-	$PetArea.visible = false
-	$UIPanel.visible = false
 
 
 # === Pet List Screen ===
 
 func _on_pets_pressed() -> void:
+	_animate_button(pets_button)
 	var pet_list: PetListScreen = PetListScreen.new()
 	pet_list.back_requested.connect(func() -> void:
 		pet_list.queue_free()
-		$PetArea.visible = true
-		$UIPanel.visible = true
+		_fade_in_main_ui()
 	)
-	pet_list.pet_selected.connect(func(pet_id: int) -> void:
-		if GameManager.instance and GameManager.instance.pets.has(pet_id):
-			current_pet = GameManager.instance.pets[pet_id]
+	pet_list.pet_selected.connect(func(selected_pet_id: int) -> void:
+		if GameManager.instance and GameManager.instance.pets.has(selected_pet_id):
+			current_pet = GameManager.instance.pets[selected_pet_id]
 			pet_name_label.text = current_pet.pet_name
 		pet_list.queue_free()
-		$PetArea.visible = true
-		$UIPanel.visible = true
+		_fade_in_main_ui()
 	)
+	await _fade_out_main_ui()
 	add_child(pet_list)
-	$PetArea.visible = false
-	$UIPanel.visible = false
 
 
 func _on_petbook_pressed() -> void:
 	if petbook_screen:
 		return
+	_animate_button(petbook_button)
 
 	petbook_screen = _petbook_scene.instantiate() as PetBookScreen
 	petbook_screen.back_requested.connect(_on_petbook_back)
+	await _fade_out_main_ui()
 	add_child(petbook_screen)
-
-	$PetArea.visible = false
-	$UIPanel.visible = false
 
 
 func _on_petbook_back() -> void:
@@ -387,5 +437,149 @@ func _on_petbook_back() -> void:
 		petbook_screen.queue_free()
 		petbook_screen = null
 
+	_fade_in_main_ui()
+
+
+# ========================================================
+# UI Theme & Styling
+# ========================================================
+
+func _apply_ui_theme() -> void:
+	# 背景グラデーション色
+	var bg: ColorRect = $Background
+	bg.color = UI_BG
+
+	# パネルスタイル
+	var panel_style: StyleBoxFlat = StyleBoxFlat.new()
+	panel_style.bg_color = UI_PANEL_BG
+	panel_style.corner_radius_top_left = 24
+	panel_style.corner_radius_top_right = 24
+	panel_style.content_margin_left = 16
+	panel_style.content_margin_right = 16
+	panel_style.content_margin_top = 12
+	panel_style.content_margin_bottom = 8
+	$UIPanel.add_theme_stylebox_override("panel", panel_style)
+
+	# ボタンスタイリング
+	_style_action_button(feed_button, UI_FEED_COLOR, "🍖 Feed")
+	_style_action_button(pet_button, UI_PET_COLOR, "🤚 Pet")
+	_style_action_button(play_button, UI_PLAY_COLOR, "⚽ Play")
+	_style_action_button(petbook_button, UI_BOOK_COLOR, "📱 Book")
+
+	# ナビボタン
+	_style_nav_button(pets_button, "🐾 Pets")
+	_style_nav_button(settings_button, "⚙ Settings")
+
+	# ラベルスタイリング
+	emotion_label.add_theme_font_size_override("font_size", 20)
+	emotion_label.add_theme_color_override("font_color", Color(0.8, 0.85, 0.9))
+
+	pet_name_label.add_theme_font_size_override("font_size", 22)
+	pet_name_label.add_theme_color_override("font_color", Color(0.95, 0.95, 1.0))
+
+	# スタッツバーのスタイル
+	_style_progress_bar(hunger_bar, Color(0.35, 0.8, 0.45))
+	_style_progress_bar(health_bar, Color(0.9, 0.35, 0.35))
+
+
+func _style_action_button(btn: Button, color: Color, label_text: String) -> void:
+	btn.text = label_text
+
+	var normal_style: StyleBoxFlat = StyleBoxFlat.new()
+	normal_style.bg_color = color.darkened(0.3)
+	normal_style.corner_radius_top_left = 12
+	normal_style.corner_radius_top_right = 12
+	normal_style.corner_radius_bottom_left = 12
+	normal_style.corner_radius_bottom_right = 12
+	normal_style.content_margin_left = 8
+	normal_style.content_margin_right = 8
+	normal_style.content_margin_top = 8
+	normal_style.content_margin_bottom = 8
+	btn.add_theme_stylebox_override("normal", normal_style)
+
+	var hover_style: StyleBoxFlat = normal_style.duplicate()
+	hover_style.bg_color = color.darkened(0.1)
+	btn.add_theme_stylebox_override("hover", hover_style)
+
+	var pressed_style: StyleBoxFlat = normal_style.duplicate()
+	pressed_style.bg_color = color
+	btn.add_theme_stylebox_override("pressed", pressed_style)
+
+	btn.add_theme_color_override("font_color", Color.WHITE)
+	btn.add_theme_color_override("font_hover_color", Color.WHITE)
+	btn.add_theme_color_override("font_pressed_color", Color.WHITE)
+	btn.add_theme_font_size_override("font_size", 16)
+
+
+func _style_nav_button(btn: Button, label_text: String) -> void:
+	btn.text = label_text
+
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.bg_color = Color(0.2, 0.22, 0.32)
+	style.corner_radius_top_left = 8
+	style.corner_radius_top_right = 8
+	style.corner_radius_bottom_left = 8
+	style.corner_radius_bottom_right = 8
+	btn.add_theme_stylebox_override("normal", style)
+
+	var hover_style: StyleBoxFlat = style.duplicate()
+	hover_style.bg_color = Color(0.3, 0.32, 0.42)
+	btn.add_theme_stylebox_override("hover", hover_style)
+
+	btn.add_theme_color_override("font_color", Color(0.7, 0.75, 0.85))
+	btn.add_theme_color_override("font_hover_color", Color.WHITE)
+	btn.add_theme_font_size_override("font_size", 14)
+
+
+func _style_progress_bar(bar: ProgressBar, fill_color: Color) -> void:
+	var bg_style: StyleBoxFlat = StyleBoxFlat.new()
+	bg_style.bg_color = Color(0.15, 0.17, 0.25)
+	bg_style.corner_radius_top_left = 6
+	bg_style.corner_radius_top_right = 6
+	bg_style.corner_radius_bottom_left = 6
+	bg_style.corner_radius_bottom_right = 6
+	bar.add_theme_stylebox_override("background", bg_style)
+
+	var fill_style: StyleBoxFlat = StyleBoxFlat.new()
+	fill_style.bg_color = fill_color
+	fill_style.corner_radius_top_left = 6
+	fill_style.corner_radius_top_right = 6
+	fill_style.corner_radius_bottom_left = 6
+	fill_style.corner_radius_bottom_right = 6
+	bar.add_theme_stylebox_override("fill", fill_style)
+
+
+# ========================================================
+# Button Animation
+# ========================================================
+
+func _animate_button(btn: Button) -> void:
+	var tween: Tween = create_tween()
+	tween.tween_property(btn, "scale", Vector2(0.9, 0.9), 0.05)
+	tween.tween_property(btn, "scale", Vector2(1.05, 1.05), 0.1).set_trans(Tween.TRANS_BACK)
+	tween.tween_property(btn, "scale", Vector2(1.0, 1.0), 0.1)
+
+
+# ========================================================
+# Screen Transitions
+# ========================================================
+
+func _fade_out_main_ui() -> void:
+	var tween: Tween = create_tween().set_parallel(true)
+	tween.tween_property($PetArea, "modulate:a", 0.0, 0.2)
+	tween.tween_property($UIPanel, "modulate:a", 0.0, 0.2)
+	await tween.finished
+	$PetArea.visible = false
+	$UIPanel.visible = false
+	$PetArea.modulate.a = 1.0
+	$UIPanel.modulate.a = 1.0
+
+
+func _fade_in_main_ui() -> void:
 	$PetArea.visible = true
 	$UIPanel.visible = true
+	$PetArea.modulate.a = 0.0
+	$UIPanel.modulate.a = 0.0
+	var tween: Tween = create_tween().set_parallel(true)
+	tween.tween_property($PetArea, "modulate:a", 1.0, 0.25)
+	tween.tween_property($UIPanel, "modulate:a", 1.0, 0.25)
