@@ -30,6 +30,7 @@ var _is_first_launch: bool = false
 var _evolution_screen: EvolutionChoiceScreen
 var _conversation_bubble: ConversationBubble
 var _sfx: SfxManager
+var _day_night: DayNightCycle
 
 # === UI Theme Colors ===
 const UI_BG: Color = Color(0.08, 0.10, 0.18)
@@ -63,6 +64,11 @@ func _ready() -> void:
 	# SFXマネージャー初期化
 	_sfx = SfxManager.new()
 	add_child(_sfx)
+
+	# 昼夜サイクル初期化
+	_day_night = DayNightCycle.new()
+	add_child(_day_night)
+	_day_night.setup($Background, $PetArea)
 
 	# UIスタイリング
 	_apply_ui_theme()
@@ -249,22 +255,29 @@ func _update_status_warnings() -> void:
 		health_icon.modulate = Color.WHITE
 		health_icon.add_theme_font_size_override("font_size", 18)
 
-	# 背景色のムード反映
-	var bg: ColorRect = $Background
+	# 背景色のムード反映 — 昼夜ベースカラーに感情色をブレンド
+	var base_bg: Color = _day_night.get_bg_color() if _day_night else UI_BG
 	var dominant: String = _get_dominant_emotion()
-	var mood_color: Color = UI_BG
+	var mood_offset: Color = Color.BLACK
 	match dominant:
 		"joy":
-			mood_color = UI_BG.lerp(Color(0.12, 0.12, 0.06), 0.3)
+			mood_offset = Color(0.04, 0.04, -0.02)
 		"love":
-			mood_color = UI_BG.lerp(Color(0.14, 0.08, 0.10), 0.3)
+			mood_offset = Color(0.04, -0.02, 0.0)
 		"sadness":
-			mood_color = UI_BG.lerp(Color(0.06, 0.07, 0.14), 0.3)
+			mood_offset = Color(-0.02, 0.0, 0.04)
 		"fear":
-			mood_color = UI_BG.lerp(Color(0.10, 0.06, 0.12), 0.3)
+			mood_offset = Color(0.02, -0.02, 0.02)
 		"excitement":
-			mood_color = UI_BG.lerp(Color(0.14, 0.10, 0.04), 0.3)
-	bg.color = bg.color.lerp(mood_color, 0.02)
+			mood_offset = Color(0.04, 0.02, -0.04)
+	# DayNightCycle handles the main bg lerp; we just nudge it slightly
+	if _day_night and _day_night._bg_node:
+		var target: Color = Color(
+			clampf(base_bg.r + mood_offset.r, 0.0, 0.2),
+			clampf(base_bg.g + mood_offset.g, 0.0, 0.2),
+			clampf(base_bg.b + mood_offset.b, 0.0, 0.25),
+		)
+		_day_night._bg_node.color = _day_night._bg_node.color.lerp(target, 0.01)
 
 
 func _get_dominant_emotion() -> String:
