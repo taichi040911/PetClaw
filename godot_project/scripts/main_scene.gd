@@ -31,6 +31,7 @@ var _evolution_screen: EvolutionChoiceScreen
 var _conversation_bubble: ConversationBubble
 var _sfx: SfxManager
 var _day_night: DayNightCycle
+var _bgm: AmbientBGM
 
 # === UI Theme Colors ===
 const UI_BG: Color = Color(0.08, 0.10, 0.18)
@@ -69,6 +70,11 @@ func _ready() -> void:
 	_day_night = DayNightCycle.new()
 	add_child(_day_night)
 	_day_night.setup($Background, $PetArea)
+
+	# BGM初期化・開始
+	_bgm = AmbientBGM.new()
+	add_child(_bgm)
+	_bgm.start()
 
 	# UIスタイリング
 	_apply_ui_theme()
@@ -220,8 +226,12 @@ func _update_ui() -> void:
 	else:
 		hunger_bar.modulate = Color.WHITE
 
-	# 感情表示（アイコン + 色付き）
+	# BGMのムード更新
 	var dominant_emotion: String = _get_dominant_emotion()
+	if _bgm:
+		_bgm.set_mood(dominant_emotion)
+
+	# 感情表示（アイコン + 色付き）
 	var emotion_icon: String = EMOTION_ICONS.get(dominant_emotion, "—")
 	var emotion_color: Color = EMOTION_COLORS.get(dominant_emotion, Color.WHITE)
 	emotion_label.text = "%s %s" % [emotion_icon, dominant_emotion.capitalize()]

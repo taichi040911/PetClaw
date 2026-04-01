@@ -50,9 +50,9 @@ func _build_ui() -> void:
 	# === 音量設定 ===
 	_add_section_label("Audio")
 
-	_add_slider_row("BGM Volume", 0.7, func(value: float) -> void:
-		if SfxManager.instance:
-			SfxManager.instance.bgm_volume = value
+	_add_slider_row("BGM Volume", AmbientBGM.instance._volume if AmbientBGM.instance else 0.7, func(value: float) -> void:
+		if AmbientBGM.instance:
+			AmbientBGM.instance.set_volume(value)
 	)
 
 	_add_slider_row("SFX Volume", SfxManager.instance.sfx_volume if SfxManager.instance else 0.8, func(value: float) -> void:
