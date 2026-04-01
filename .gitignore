@@ -15,5 +15,8 @@ __pycache__/
 *.swp
 *.swo
 
+# Exports (built artifacts)
+exports/
+
 # Secrets
 .env
