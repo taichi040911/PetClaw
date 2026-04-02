@@ -181,13 +181,64 @@ func _try_auto_conversation() -> void:
 	if _get_emotion_intensity(pet1) < MIN_EMOTION_FOR_SPONTANEOUS:
 		return
 
+	# トピック自動選択（時間帯・感情・状況に基づく）
+	var trigger: String = _select_conversation_topic(pet1, pet2)
+
 	# バジェットチェック — 超過時はテンプレートフォールバック
 	if not _check_budget():
 		print("[AtoA] Budget exhausted — falling back to template conversation")
-		_run_template_conversation(pet1, pet2, "spontaneous")
+		_run_template_conversation(pet1, pet2, trigger)
 		return
 
-	await start_conversation(pet1, pet2, "spontaneous")
+	await start_conversation(pet1, pet2, trigger)
+
+
+func _select_conversation_topic(pet1: PetEntity, pet2: PetEntity) -> String:
+	## 時間帯・感情・状況に基づいてトピックを自動選択
+	var hour: int = Time.get_datetime_dict_from_system()["hour"]
+	var emotion1: String = _get_dominant_emotion(pet1)
+	var emotion2: String = _get_dominant_emotion(pet2)
+
+	# 時間帯ベースの候補
+	var candidates: Array[String] = ["spontaneous"]
+	if hour >= 21 or hour < 5:
+		candidates.append("night")
+		candidates.append("dream")
+	elif hour >= 6 and hour < 10:
+		candidates.append("greeting")
+	elif hour >= 12 and hour < 14:
+		candidates.append("food")
+
+	# 感情ベースの候補
+	if emotion1 == "sadness" or emotion2 == "sadness":
+		candidates.append("comfort")
+		candidates.append("comfort")  # 重み付け
+	elif emotion1 == "joy" or emotion2 == "joy":
+		candidates.append("play")
+		candidates.append("food")
+	elif emotion1 == "excitement" or emotion2 == "excitement":
+		candidates.append("curiosity")
+		candidates.append("play")
+	elif emotion1 == "love" or emotion2 == "love":
+		candidates.append("memory")
+		candidates.append("comfort")
+
+	# 言語ステージが高いほど「言語」トピックの確率UP
+	if GameManager.instance and GameManager.instance.original_language:
+		var stage: int = GameManager.instance.original_language.get_language_stage().get("stage", 0)
+		if stage >= 2:
+			candidates.append("language")
+		if stage >= 3:
+			candidates.append("language")
+			candidates.append("memory")
+
+	# 天候イベント
+	if GameManager.ecosystem:
+		var topics: Array = GameManager.ecosystem.get_a2a_topics()
+		if not topics.is_empty():
+			candidates.append("weather")
+
+	return candidates[randi() % candidates.size()]
 
 
 func _get_emotion_intensity(pet: PetEntity) -> float:
