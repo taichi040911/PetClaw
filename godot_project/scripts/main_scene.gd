@@ -377,17 +377,47 @@ func _on_play_pressed() -> void:
 	if _pet_sleeping:
 		_spawn_floating_text("Zzz... (sleeping)", Color(0.5, 0.5, 0.7))
 		return
-	_spawn_floating_text("⚡ +Fun!", UI_PLAY_COLOR)
-	_screen_shake(3.0, 0.12)
+
+	# ミニゲーム起動
+	var mini_game: MiniGameScreen = MiniGameScreen.new()
+	mini_game.game_finished.connect(func(score: int, max_score: int) -> void:
+		_on_mini_game_finished(score, max_score)
+		_fade_in_main_ui()
+	)
+	await _fade_out_main_ui()
+	add_child(mini_game)
+
+
+func _on_mini_game_finished(score: int, max_score: int) -> void:
+	if not current_pet:
+		return
+	# スコアに応じた報酬
+	var ratio: float = float(score) / maxf(float(max_score), 1.0)
+	var mood_boost: float = ratio * 0.3
+	var excitement: float = ratio * 0.5
+
+	current_pet.stats.modify("energy", -0.1)
+	current_pet.stats.modify("mood", mood_boost)
+
 	if GameManager.instance and GameManager.instance.care_system:
 		GameManager.instance.care_system.perform_action(current_pet, "play")
-	else:
-		current_pet.stats.modify("energy", -0.1)
-		current_pet.stats.modify("mood", 0.2)
-		if GameManager.instance and GameManager.instance.emotion_system:
+
+	if GameManager.instance and GameManager.instance.emotion_system:
+		GameManager.instance.emotion_system.stimulate(
+			current_pet.pet_id, "excitement", excitement
+		)
+		if ratio >= 0.8:
 			GameManager.instance.emotion_system.stimulate(
-				current_pet.pet_id, "excitement", 0.5
+				current_pet.pet_id, "joy", 0.3
 			)
+
+	# フィードバック
+	if ratio >= 0.8:
+		_spawn_floating_text("⭐ Great play! +Joy!", EMOTION_COLORS.get("joy", Color.WHITE))
+	elif ratio >= 0.5:
+		_spawn_floating_text("⚡ +Fun!", UI_PLAY_COLOR)
+	else:
+		_spawn_floating_text("Good try!", Color(0.6, 0.65, 0.7))
 
 
 # === Signal Handlers ===
