@@ -18,6 +18,7 @@ extends Control
 @onready var play_button: Button = $UIPanel/VBox/ActionButtons/PlayButton
 @onready var petbook_button: Button = $UIPanel/VBox/ActionButtons/PetBookButton
 @onready var condition_label: Label = $UIPanel/VBox/ConditionLabel
+@onready var env_button: Button = $UIPanel/VBox/NavButtons/EnvButton
 @onready var pets_button: Button = $UIPanel/VBox/NavButtons/PetsButton
 @onready var mute_button: Button = $UIPanel/VBox/NavButtons/MuteButton
 @onready var settings_button: Button = $UIPanel/VBox/NavButtons/SettingsButton
@@ -109,6 +110,7 @@ func _ready() -> void:
 	pet_button.pressed.connect(_on_pet_pressed)
 	play_button.pressed.connect(_on_play_pressed)
 	petbook_button.pressed.connect(_on_petbook_pressed)
+	env_button.pressed.connect(_on_env_pressed)
 	pets_button.pressed.connect(_on_pets_pressed)
 	mute_button.pressed.connect(_on_mute_pressed)
 	settings_button.pressed.connect(_on_settings_pressed)
@@ -666,6 +668,35 @@ func _on_pets_pressed() -> void:
 	)
 	await _fade_out_main_ui()
 	add_child(pet_list)
+
+
+func _on_env_pressed() -> void:
+	_animate_button(env_button)
+	if _sfx:
+		_sfx.play(SfxManager.SfxType.UI_OPEN)
+	var env_sel: EnvironmentSelector = EnvironmentSelector.new()
+	env_sel.back_requested.connect(func() -> void:
+		env_sel.queue_free()
+		_fade_in_main_ui()
+	)
+	env_sel.environment_changed.connect(func(env_name: String) -> void:
+		if current_pet:
+			current_pet.current_environment = env_name
+		# 背景色を環境に合わせて変更
+		var env_colors: Dictionary = {
+			"forest": Color(0.06, 0.12, 0.06),
+			"sea": Color(0.05, 0.08, 0.16),
+			"city": Color(0.10, 0.09, 0.08),
+			"ruins": Color(0.09, 0.06, 0.12),
+			"sky": Color(0.08, 0.12, 0.18),
+		}
+		var bg: ColorRect = $Background
+		var target_color: Color = env_colors.get(env_name, UI_BG)
+		var tween: Tween = create_tween()
+		tween.tween_property(bg, "color", target_color, 0.5)
+	)
+	await _fade_out_main_ui()
+	add_child(env_sel)
 
 
 func _on_petbook_pressed() -> void:
