@@ -123,6 +123,42 @@ func _build_ui() -> void:
 	save_info.add_theme_color_override("font_color", Color(0.5, 0.5, 0.6))
 	save_row.add_child(save_info)
 
+	# === デモモード ===
+	_add_section_label("AtoA Demo")
+
+	var demo_row: HBoxContainer = HBoxContainer.new()
+	demo_row.add_theme_constant_override("separation", 12)
+	_vbox.add_child(demo_row)
+
+	var demo_btn: Button = Button.new()
+	demo_btn.text = "⚡ Enable Demo Mode"
+	demo_btn.custom_minimum_size = Vector2(200, 40)
+	demo_btn.pressed.connect(func() -> void:
+		_enable_demo_mode()
+		demo_btn.text = "✅ Demo Mode Active"
+		demo_btn.disabled = true
+	)
+	demo_row.add_child(demo_btn)
+
+	var demo_info: Label = Label.new()
+	demo_info.text = "Conversations every 30s\nBoosted emotions for demo"
+	demo_info.add_theme_font_size_override("font_size", 11)
+	demo_info.add_theme_color_override("font_color", Color(0.5, 0.55, 0.7))
+	demo_row.add_child(demo_info)
+
+	# AtoA システム統計表示
+	if GameManager.instance and GameManager.instance.a2a_system:
+		var stats_label: Label = Label.new()
+		var status: Dictionary = GameManager.instance.a2a_system.get_conversation_status()
+		stats_label.text = "Conversations: %d | Budget: $%.2f | Compliance: %.0f%%" % [
+			status["total_conversations"],
+			status["budget_remaining"],
+			status.get("avg_compliance", 0.0) * 100.0,
+		]
+		stats_label.add_theme_font_size_override("font_size", 11)
+		stats_label.add_theme_color_override("font_color", Color(0.45, 0.5, 0.65))
+		_vbox.add_child(stats_label)
+
 	# === バージョン情報 ===
 	_add_section_label("About")
 
@@ -142,6 +178,33 @@ func _add_section_label(text: String) -> void:
 
 	var sep: HSeparator = HSeparator.new()
 	_vbox.add_child(sep)
+
+
+func _enable_demo_mode() -> void:
+	## デモモード: 会話間隔を短縮し、感情をブースト
+	if GameManager.instance and GameManager.instance.a2a_system:
+		# 会話タイマーをリセットして即座にトリガー可能に
+		GameManager.instance.a2a_system.conversation_timer = 150.0  # すぐに会話が始まる
+		# 注: AUTO_CONVERSATION_INTERVAL は const なので変更不可
+		# 代わりにタイマーを進める
+
+	# 全ペットの感情をブースト
+	if GameManager.instance:
+		for pet_id: int in GameManager.instance.pets:
+			var pet: Variant = GameManager.instance.pets[pet_id]
+			if pet is PetEntity and pet.is_alive:
+				# 感情をランダムにブースト（会話を誘発）
+				var boost_emotions: Array = ["joy", "love", "excitement", "curiosity"]
+				var chosen: String = boost_emotions[randi() % boost_emotions.size()]
+				if pet.emotions.has(chosen):
+					pet.emotions[chosen] = maxf(pet.emotions[chosen], 0.6)
+				elif GameManager.emotion_system:
+					GameManager.emotion_system.stimulate(pet, chosen, 0.5, "demo_mode")
+				# 空腹を少し減らして健全な状態に
+				pet.stats.modify("hunger", 0.3)
+				pet.stats.modify("energy", 0.3)
+
+	print("[Settings] Demo mode enabled: timer advanced, emotions boosted")
 
 
 func _add_slider_row(label_text: String, default_value: float, callback: Callable) -> void:
