@@ -1195,8 +1195,85 @@ func _finalize_conversation(pet1: PetEntity, pet2: PetEntity, trigger: String,
 		for post in posts:
 			GameManager.instance.queue_petbook_posts(post)
 
+	# 傍観者リアクション（3匹以上いる場合）
+	_trigger_observer_reactions(pet1, pet2, dominant_emotion, current_conversation)
+
 	conversation_ended.emit([pet1.pet_id, pet2.pet_id], summary)
 	current_conversation = []
+
+
+func _trigger_observer_reactions(pet1: PetEntity, pet2: PetEntity,
+		dominant_emotion: String, conversation: Array[Dictionary]) -> void:
+	## 会話に参加しなかったペットが傍観者として反応
+	var all_pets: Array = GameManager.get_all_pets()
+	var observers: Array[PetEntity] = []
+	for pet: Variant in all_pets:
+		if pet is PetEntity and pet.is_alive:
+			if pet.pet_id != pet1.pet_id and pet.pet_id != pet2.pet_id:
+				observers.append(pet)
+
+	if observers.is_empty():
+		return
+
+	# 各傍観者に感情的影響を与える（間接的な感情伝染）
+	for observer: PetEntity in observers:
+		# 会話の感情が傍観者にも伝わる（弱い伝染）
+		var contagion: float = 0.1
+		if dominant_emotion != "neutral":
+			GameManager.emotion_system.stimulate(observer, dominant_emotion, contagion, "observed_conversation")
+
+		# 20%の確率で傍観者がテンプレートリアクションを生成
+		if randf() < 0.2 and conversation.size() >= 2:
+			var reaction: String = _generate_observer_reaction(observer, pet1, pet2, dominant_emotion)
+			if not reaction.is_empty():
+				var msg: Dictionary = {
+					"pet_id": observer.pet_id,
+					"pet_name": observer.pet_name,
+					"message": reaction,
+					"emotion": _get_dominant_emotion(observer),
+					"is_template": true,
+					"is_observer": true,
+				}
+				conversation_log.append(msg)
+				conversation_message.emit(observer.pet_id, reaction, msg)
+
+
+func _generate_observer_reaction(observer: PetEntity, pet1: PetEntity, pet2: PetEntity,
+		emotion: String) -> String:
+	## 傍観者のリアクションテンプレート
+	var suffix: String = "-mii"
+	if GameManager.language_evolution:
+		var grammar: Dictionary = GameManager.language_evolution.get_current_grammar()
+		var suffixes: Variant = grammar.get("suffixes", [])
+		if suffixes is Array and not suffixes.is_empty():
+			suffix = str(suffixes[randi() % suffixes.size()])
+		elif suffixes is Dictionary and not suffixes.is_empty():
+			suffix = str(suffixes.values()[randi() % suffixes.size()])
+
+	var templates: Array[String] = []
+	match emotion:
+		"joy":
+			templates = [
+				"*%s watches %s and %s laughing%s* So happy%s!" % [observer.pet_name, pet1.pet_name, pet2.pet_name, suffix, suffix],
+				"*%s joins in the laughter from afar%s*" % [observer.pet_name, suffix],
+			]
+		"sadness":
+			templates = [
+				"*%s overhears%s* ...are they okay%s?" % [observer.pet_name, suffix, suffix],
+				"*%s sighs quietly%s watching from a distance%s*" % [observer.pet_name, suffix, suffix],
+			]
+		"love":
+			templates = [
+				"*%s smiles seeing %s and %s together%s*" % [observer.pet_name, pet1.pet_name, pet2.pet_name, suffix],
+			]
+		_:
+			templates = [
+				"*%s glances over curiously%s* Hmm%s..." % [observer.pet_name, suffix, suffix],
+			]
+
+	if templates.is_empty():
+		return ""
+	return templates[randi() % templates.size()]
 
 
 func _get_dominant_emotion(pet: PetEntity) -> String:
