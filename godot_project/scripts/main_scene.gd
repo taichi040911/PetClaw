@@ -508,13 +508,45 @@ func _on_conversation_message(pet_id: int, message: String, metadata: Dictionary
 # === Pet Death ===
 
 func _on_pet_died(pet_id: int) -> void:
-	if _sfx:
-		_sfx.play(SfxManager.SfxType.DEATH)
 	if current_pet and current_pet.pet_id == pet_id:
-		emotion_label.text = "Your pet has passed away..."
 		feed_button.disabled = true
 		pet_button.disabled = true
 		play_button.disabled = true
+
+		# 追悼画面を表示
+		var memorial: DeathMemorialScreen = DeathMemorialScreen.new()
+		memorial.setup(
+			current_pet.pet_name,
+			current_pet.age,
+			"natural causes"
+		)
+		memorial.new_egg_requested.connect(func() -> void:
+			# ボタンを再有効化して卵孵化画面へ
+			feed_button.disabled = false
+			pet_button.disabled = false
+			play_button.disabled = false
+			_show_egg_hatch()
+		)
+		memorial.back_to_main.connect(func() -> void:
+			# 他のペットがいればそちらに切り替え
+			var found_pet: bool = false
+			if GameManager.instance:
+				for pid: int in GameManager.instance.pets:
+					var p: Node = GameManager.instance.pets[pid]
+					if p.is_alive and pid != pet_id:
+						current_pet = p
+						pet_name_label.text = current_pet.pet_name
+						feed_button.disabled = false
+						pet_button.disabled = false
+						play_button.disabled = false
+						found_pet = true
+						break
+			if not found_pet:
+				emotion_label.text = "No pets remaining..."
+			_fade_in_main_ui()
+		)
+		await _fade_out_main_ui()
+		add_child(memorial)
 
 
 # === Screen Navigation ===
