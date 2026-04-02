@@ -421,7 +421,7 @@ func _on_feed_pressed() -> void:
 		current_pet.stats.modify("hunger", 0.2)
 		if GameManager.instance and GameManager.instance.emotion_system:
 			GameManager.instance.emotion_system.stimulate(
-				current_pet.pet_id, "joy", 0.3
+				current_pet, "joy", 0.3, "manual_feed"
 			)
 
 
@@ -443,7 +443,7 @@ func _on_pet_pressed() -> void:
 		current_pet.stats.modify("affection", 0.15)
 		if GameManager.instance and GameManager.instance.emotion_system:
 			GameManager.instance.emotion_system.stimulate(
-				current_pet.pet_id, "love", 0.4
+				current_pet, "love", 0.4, "manual_pet"
 			)
 
 
@@ -485,11 +485,11 @@ func _on_mini_game_finished(score: int, max_score: int) -> void:
 
 	if GameManager.instance and GameManager.instance.emotion_system:
 		GameManager.instance.emotion_system.stimulate(
-			current_pet.pet_id, "excitement", excitement
+			current_pet, "excitement", excitement, "manual_play"
 		)
 		if ratio >= 0.8:
 			GameManager.instance.emotion_system.stimulate(
-				current_pet.pet_id, "joy", 0.3
+				current_pet, "joy", 0.3, "manual_play"
 			)
 
 	# フィードバック
