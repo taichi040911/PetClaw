@@ -34,6 +34,7 @@ var _sfx: SfxManager
 var _day_night: DayNightCycle
 var _bgm: AmbientBGM
 var _notifications: CareNotification
+var _touch_handler: PetTouchHandler
 
 # === UI Theme Colors ===
 const UI_BG: Color = Color(0.08, 0.10, 0.18)
@@ -81,6 +82,11 @@ func _ready() -> void:
 	# ケア通知初期化
 	_notifications = CareNotification.new()
 	add_child(_notifications)
+
+	# タッチ/ドラッグなでなでハンドラー
+	_touch_handler = PetTouchHandler.new()
+	_touch_handler.pet_stroked.connect(_on_pet_stroked)
+	add_child(_touch_handler)
 
 	# UIスタイリング
 	_apply_ui_theme()
@@ -196,6 +202,9 @@ func _on_hatch_completed(pet: PetEntity) -> void:
 
 	pet_name_label.text = current_pet.pet_name
 
+	# タッチハンドラーにVisualBridgeのwiggle参照を設定
+	_setup_touch_wiggle()
+
 	# シグナル接続
 	if not current_pet.emotion_changed.is_connected(_on_emotion_changed):
 		current_pet.emotion_changed.connect(_on_emotion_changed)
@@ -230,6 +239,7 @@ func _setup_pet_display() -> void:
 			GameManager.instance.register_pet(current_pet)
 		current_pet.emotion_changed.connect(_on_emotion_changed)
 		current_pet.stat_changed.connect(_on_stat_changed)
+		_setup_touch_wiggle()
 
 
 func _update_ui() -> void:
@@ -902,6 +912,50 @@ func _screen_shake(intensity: float = 4.0, duration: float = 0.15) -> void:
 		)
 		tween.tween_property(pet_area, "position", pet_area.position + offset, duration / 8.0)
 		tween.tween_property(pet_area, "position", pet_area.position, duration / 8.0)
+
+
+# ========================================================
+# Touch/Drag Petting
+# ========================================================
+
+func _setup_touch_wiggle() -> void:
+	if not _touch_handler or not pet_display_node:
+		return
+	var visual_bridge: Node2D = pet_display_node.get_node_or_null("PetEntity/VisualBridge")
+	_touch_handler.setup(Vector2(360, 400), visual_bridge)
+
+
+func _on_pet_stroked(stroke_quality: float) -> void:
+	if not current_pet or not current_pet.is_alive:
+		return
+	if _pet_sleeping:
+		_spawn_floating_text("Zzz... (sleeping)", Color(0.5, 0.5, 0.7))
+		return
+
+	# SFX
+	if _sfx:
+		_sfx.play(SfxManager.SfxType.PET)
+
+	# 品質に応じたステータス反映
+	var affection_boost: float = stroke_quality * 0.08  # 最大+0.08
+	var love_boost: float = stroke_quality * 0.15       # 最大+0.15
+
+	current_pet.stats.modify("affection", affection_boost)
+
+	if GameManager.instance and GameManager.instance.emotion_system:
+		GameManager.instance.emotion_system.stimulate(
+			current_pet.pet_id, "love", love_boost
+		)
+	elif GameManager.instance and GameManager.instance.care_system:
+		GameManager.instance.care_system.perform_action(current_pet, "pet")
+
+	# フィードバックテキスト
+	if stroke_quality > 0.8:
+		_spawn_floating_text("💕 Love it!", Color(1.0, 0.5, 0.65))
+	elif stroke_quality > 0.5:
+		_spawn_floating_text("♥ Nice pet!", UI_PET_COLOR)
+	else:
+		_spawn_floating_text("♥", Color(1.0, 0.7, 0.8, 0.7))
 
 
 # ========================================================
