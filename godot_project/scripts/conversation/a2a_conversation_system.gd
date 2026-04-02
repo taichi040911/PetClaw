@@ -651,6 +651,7 @@ func start_group_conversation(pets: Array[PetEntity], trigger: String) -> void:
 			"word_order": grammar["word_order"],
 			"trigger": context.get("trigger", ""),
 			"is_group": true,
+			"environment_snapshot": _get_environment_context(current_pet),
 		}
 		# 性格方言フィルター
 		response = _apply_personality_dialect(response, current_pet)
