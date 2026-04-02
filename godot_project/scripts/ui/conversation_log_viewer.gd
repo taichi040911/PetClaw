@@ -11,6 +11,8 @@ var _scroll: ScrollContainer
 var _trigger_button: Button
 var _status_label: Label
 var _refresh_timer: float = 0.0
+var _relationships_container: VBoxContainer
+var _last_displayed_pet_name: String = ""
 
 
 func _ready() -> void:
@@ -77,6 +79,12 @@ func _build_ui() -> void:
 	# 言語進化ライブパネル（リアルタイム更新）
 	var lang_panel: LanguageEvolutionPanel = LanguageEvolutionPanel.new()
 	_vbox.add_child(lang_panel)
+
+	# 関係性セクション（LanguageEvolutionPanelの後、コントロールの前）
+	_relationships_container = VBoxContainer.new()
+	_relationships_container.add_theme_constant_override("separation", 4)
+	_vbox.add_child(_relationships_container)
+	_rebuild_relationships()
 
 	# 会話トリガーボタン + ステータス
 	_add_conversation_controls()
@@ -182,20 +190,28 @@ func _update_status() -> void:
 
 
 func _rebuild_log() -> void:
-	## 会話ログ部分のみ再構築（言語カードは維持）
+	## 会話ログ部分のみ再構築（言語カード・関係性・コントロールは維持）
 	# _vboxの子を逆順にチェックし、会話ログ部分を削除
 	var children: Array[Node] = []
 	for child: Node in _vbox.get_children():
 		children.append(child)
 
-	# 最初の3つ（言語カード、コントロール、ログタイトル以降）を残し、ログ部分を削除
-	var remove_start: int = 3  # language card + controls + (log section starts)
+	# 最初の4つ（言語カード、関係性、コントロール、ログセクション以降）を残し、ログ部分を削除
+	var remove_start: int = 4  # language card + relationships + controls + (log section starts)
 	for i: int in range(remove_start, children.size()):
 		children[i].queue_free()
+
+	# 関係性セクションも更新
+	_rebuild_relationships()
 
 	# 少し待ってからログを再追加
 	await get_tree().process_frame
 	_add_conversation_log()
+
+	# 自動スクロール: 新しい会話が追加された後に最下部へ
+	await get_tree().process_frame
+	if _scroll:
+		_scroll.scroll_vertical = int(_scroll.get_v_scroll_bar().max_value)
 
 
 func _add_conversation_log() -> void:
@@ -229,10 +245,14 @@ func _add_conversation_log() -> void:
 	var display_log: Array = log.slice(-20)
 	display_log.reverse()
 
+	_last_displayed_pet_name = ""
 	for msg: Variant in display_log:
 		if not msg is Dictionary:
 			continue
 		_add_message_bubble(msg as Dictionary)
+
+	# 会話統計サマリー
+	_add_conversation_stats(log)
 
 
 func _add_message_bubble(msg: Dictionary) -> void:
@@ -240,6 +260,13 @@ func _add_message_bubble(msg: Dictionary) -> void:
 	var text: String = msg.get("message", "...")
 	var emotion: String = msg.get("emotion", "neutral")
 	var is_template: bool = msg.get("is_template", false)
+
+	# 連続メッセージ間の関係性インジケーター（異なるペット同士）
+	if not _last_displayed_pet_name.is_empty() and _last_displayed_pet_name != pet_name:
+		var rel_indicator: Label = _build_relationship_indicator(_last_displayed_pet_name, pet_name)
+		if rel_indicator:
+			_vbox.add_child(rel_indicator)
+	_last_displayed_pet_name = pet_name
 
 	var bubble: PanelContainer = PanelContainer.new()
 	var bubble_style: StyleBoxFlat = StyleBoxFlat.new()
@@ -274,20 +301,26 @@ func _add_message_bubble(msg: Dictionary) -> void:
 	content.add_theme_constant_override("separation", 2)
 	bubble.add_child(content)
 
-	# ペット名 + 感情
+	# ペット名 + 感情 + 創造語インジケーター
 	var emotion_icons: Dictionary = {
 		"joy": "☀", "love": "♥", "excitement": "⚡",
 		"sadness": "💧", "fear": "👁", "neutral": "·",
 	}
 	var header: Label = Label.new()
 	var tag: String = ""
+	var compliance: Dictionary = msg.get("language_compliance", {})
+	var has_invented_words: bool = false
 	if is_template:
 		tag = " [T]"
 	else:
-		var compliance: Dictionary = msg.get("language_compliance", {})
 		var score: float = compliance.get("score", -1.0)
 		if score >= 0.0:
 			tag = " [%.0f%%]" % (score * 100.0)
+	# 独自語彙が使われていればヘッダーに表示
+	var checks: Dictionary = compliance.get("checks", {})
+	if checks.get("uses_vocabulary", false):
+		has_invented_words = true
+		tag += " ✨"
 	header.text = "%s %s%s" % [emotion_icons.get(emotion, "·"), pet_name, tag]
 	header.add_theme_font_size_override("font_size", 11)
 	header.add_theme_color_override("font_color", Color(0.6, 0.65, 0.8))
@@ -302,10 +335,251 @@ func _add_message_bubble(msg: Dictionary) -> void:
 		summary_label.add_theme_color_override("font_color", Color(0.45, 0.5, 0.65))
 		content.add_child(summary_label)
 
-	# メッセージ本文
+	# メッセージ本文（独自語彙使用時はプレフィックス付き）
 	var body: Label = Label.new()
-	body.text = text
+	if has_invented_words:
+		body.text = "✨ %s" % text
+	else:
+		body.text = text
 	body.add_theme_font_size_override("font_size", 13)
 	body.add_theme_color_override("font_color", Color(0.85, 0.85, 0.9))
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD
 	content.add_child(body)
+
+
+func _build_relationship_indicator(name_a: String, name_b: String) -> Label:
+	## 連続メッセージ間の関係性を小さなテキストで表示
+	if not GameManager.instance or not GameManager.instance.a2a_system:
+		return null
+
+	var relationships: Dictionary = GameManager.instance.a2a_system.pet_relationships
+	if relationships.is_empty():
+		return null
+
+	# ペア名でキーを探す（sorted IDs で格納されているが、名前ベースで検索）
+	var rel_type: String = "strangers"
+	for key: String in relationships:
+		var rel: Dictionary = relationships[key]
+		var r_type: String = rel.get("relationship_type", "strangers")
+		# キーからは名前が取れないのでpet_namesフィールドを確認
+		var r_names: Array = rel.get("pet_names", [])
+		if r_names.size() == 2:
+			if (name_a in r_names and name_b in r_names):
+				rel_type = r_type
+				break
+
+	var rel_icons: Dictionary = {
+		"strangers": "⚪",
+		"acquaintances": "🔵",
+		"friends": "💚",
+		"close_friends": "💛",
+		"rivals": "🔴",
+	}
+	var icon: String = rel_icons.get(rel_type, "⚪")
+
+	var indicator: Label = Label.new()
+	indicator.text = "%s %s" % [icon, rel_type]
+	indicator.add_theme_font_size_override("font_size", 9)
+	indicator.add_theme_color_override("font_color", Color(0.4, 0.45, 0.55))
+	indicator.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	return indicator
+
+
+func _rebuild_relationships() -> void:
+	## 関係性セクションを構築/再構築
+	# 既存の子を削除
+	for child: Node in _relationships_container.get_children():
+		child.queue_free()
+
+	if not GameManager.instance or not GameManager.instance.a2a_system:
+		return
+
+	var relationships: Dictionary = GameManager.instance.a2a_system.pet_relationships
+	if relationships.is_empty():
+		return
+
+	# セクションヘッダー
+	var rel_title: Label = Label.new()
+	rel_title.text = "🤝 Relationships"
+	rel_title.add_theme_font_size_override("font_size", 13)
+	rel_title.add_theme_color_override("font_color", Color(0.7, 0.7, 0.85))
+	_relationships_container.add_child(rel_title)
+
+	# 各関係性ペアを表示
+	var rel_type_colors: Dictionary = {
+		"strangers": Color(0.45, 0.45, 0.5),
+		"acquaintances": Color(0.35, 0.5, 0.8),
+		"friends": Color(0.35, 0.7, 0.4),
+		"close_friends": Color(0.85, 0.75, 0.2),
+		"rivals": Color(0.8, 0.3, 0.3),
+	}
+
+	for key: String in relationships:
+		var rel: Dictionary = relationships[key]
+		var rel_type: String = rel.get("relationship_type", "strangers")
+		var affinity_val: float = clampf(rel.get("affinity", 0.0), 0.0, 1.0)
+		var pet_names: Array = rel.get("pet_names", [])
+
+		# ペア名を取得（pet_namesフィールドがなければキーから推定）
+		var pair_label_text: String = ""
+		if pet_names.size() == 2:
+			pair_label_text = "%s & %s" % [str(pet_names[0]), str(pet_names[1])]
+		else:
+			pair_label_text = key
+
+		# 行コンテナ
+		var row: HBoxContainer = HBoxContainer.new()
+		row.add_theme_constant_override("separation", 6)
+		_relationships_container.add_child(row)
+
+		# ペア名
+		var names_label: Label = Label.new()
+		names_label.text = pair_label_text
+		names_label.add_theme_font_size_override("font_size", 11)
+		names_label.add_theme_color_override("font_color", Color(0.65, 0.7, 0.8))
+		names_label.custom_minimum_size = Vector2(120, 0)
+		row.add_child(names_label)
+
+		# 関係タイプバッジ
+		var badge: PanelContainer = PanelContainer.new()
+		var badge_style: StyleBoxFlat = StyleBoxFlat.new()
+		var badge_color: Color = rel_type_colors.get(rel_type, Color(0.45, 0.45, 0.5))
+		badge_style.bg_color = Color(badge_color.r, badge_color.g, badge_color.b, 0.25)
+		badge_style.corner_radius_top_left = 6
+		badge_style.corner_radius_top_right = 6
+		badge_style.corner_radius_bottom_left = 6
+		badge_style.corner_radius_bottom_right = 6
+		badge_style.content_margin_left = 6
+		badge_style.content_margin_right = 6
+		badge_style.content_margin_top = 1
+		badge_style.content_margin_bottom = 1
+		badge.add_theme_stylebox_override("panel", badge_style)
+		row.add_child(badge)
+
+		var badge_label: Label = Label.new()
+		badge_label.text = rel_type
+		badge_label.add_theme_font_size_override("font_size", 10)
+		badge_label.add_theme_color_override("font_color", badge_color)
+		badge.add_child(badge_label)
+
+		# 親密度ProgressBar
+		var affinity_bar: ProgressBar = ProgressBar.new()
+		affinity_bar.min_value = 0.0
+		affinity_bar.max_value = 100.0
+		affinity_bar.value = affinity_val * 100.0
+		affinity_bar.custom_minimum_size = Vector2(80, 12)
+		affinity_bar.show_percentage = false
+		var bar_bg: StyleBoxFlat = StyleBoxFlat.new()
+		bar_bg.bg_color = Color(0.1, 0.1, 0.15)
+		bar_bg.corner_radius_top_left = 4
+		bar_bg.corner_radius_top_right = 4
+		bar_bg.corner_radius_bottom_left = 4
+		bar_bg.corner_radius_bottom_right = 4
+		affinity_bar.add_theme_stylebox_override("background", bar_bg)
+		var bar_fill: StyleBoxFlat = StyleBoxFlat.new()
+		bar_fill.bg_color = badge_color
+		bar_fill.corner_radius_top_left = 4
+		bar_fill.corner_radius_top_right = 4
+		bar_fill.corner_radius_bottom_left = 4
+		bar_fill.corner_radius_bottom_right = 4
+		affinity_bar.add_theme_stylebox_override("fill", bar_fill)
+		row.add_child(affinity_bar)
+
+		# パーセント表示
+		var pct_label: Label = Label.new()
+		pct_label.text = "%.0f%%" % (affinity_val * 100.0)
+		pct_label.add_theme_font_size_override("font_size", 10)
+		pct_label.add_theme_color_override("font_color", Color(0.5, 0.55, 0.65))
+		row.add_child(pct_label)
+
+
+func _add_conversation_stats(log: Array) -> void:
+	## 会話統計サマリーを最下部に追加
+	if log.is_empty():
+		return
+
+	var stats_panel: PanelContainer = PanelContainer.new()
+	var stats_style: StyleBoxFlat = StyleBoxFlat.new()
+	stats_style.bg_color = Color(0.07, 0.08, 0.12)
+	stats_style.corner_radius_top_left = 8
+	stats_style.corner_radius_top_right = 8
+	stats_style.corner_radius_bottom_left = 8
+	stats_style.corner_radius_bottom_right = 8
+	stats_style.content_margin_left = 10
+	stats_style.content_margin_right = 10
+	stats_style.content_margin_top = 6
+	stats_style.content_margin_bottom = 6
+	stats_style.border_width_top = 1
+	stats_style.border_color = Color(0.2, 0.22, 0.3, 0.4)
+	stats_panel.add_theme_stylebox_override("panel", stats_style)
+	_vbox.add_child(stats_panel)
+
+	var stats_vbox: VBoxContainer = VBoxContainer.new()
+	stats_vbox.add_theme_constant_override("separation", 2)
+	stats_panel.add_child(stats_vbox)
+
+	# 統計を計算
+	var total_conversations: int = log.size()
+	var total_vocab_uses: int = 0
+	var pet_message_counts: Dictionary = {}
+	var strongest_pair_key: String = ""
+	var strongest_affinity: float = 0.0
+
+	for entry: Variant in log:
+		if not entry is Dictionary:
+			continue
+		var d: Dictionary = entry as Dictionary
+		var pname: String = d.get("pet_name", "")
+		if not pname.is_empty():
+			pet_message_counts[pname] = pet_message_counts.get(pname, 0) + 1
+		var comp: Dictionary = d.get("language_compliance", {})
+		var comp_checks: Dictionary = comp.get("checks", {})
+		if comp_checks.get("uses_vocabulary", false):
+			total_vocab_uses += 1
+
+	# 最もおしゃべりなペット
+	var most_talkative: String = ""
+	var max_messages: int = 0
+	for pname: String in pet_message_counts:
+		var count: int = pet_message_counts[pname]
+		if count > max_messages:
+			max_messages = count
+			most_talkative = pname
+
+	# 最強の関係性ペア
+	if GameManager.instance and GameManager.instance.a2a_system:
+		var relationships: Dictionary = GameManager.instance.a2a_system.pet_relationships
+		for key: String in relationships:
+			var rel: Dictionary = relationships[key]
+			var aff: float = rel.get("affinity", 0.0)
+			if aff > strongest_affinity:
+				strongest_affinity = aff
+				var names: Array = rel.get("pet_names", [])
+				if names.size() == 2:
+					strongest_pair_key = "%s & %s" % [str(names[0]), str(names[1])]
+				else:
+					strongest_pair_key = key
+
+	# タイトル
+	var stats_title: Label = Label.new()
+	stats_title.text = "📊 Conversation Stats"
+	stats_title.add_theme_font_size_override("font_size", 11)
+	stats_title.add_theme_color_override("font_color", Color(0.6, 0.6, 0.75))
+	stats_vbox.add_child(stats_title)
+
+	# 統計テキスト
+	var stats_lines: Array[String] = []
+	stats_lines.append("Total messages: %d" % total_conversations)
+	if total_vocab_uses > 0:
+		stats_lines.append("Invented word uses: %d" % total_vocab_uses)
+	if not most_talkative.is_empty():
+		stats_lines.append("Most talkative: %s (%d msgs)" % [most_talkative, max_messages])
+	if not strongest_pair_key.is_empty() and strongest_affinity > 0.0:
+		stats_lines.append("Strongest bond: %s (%.0f%%)" % [strongest_pair_key, strongest_affinity * 100.0])
+
+	var stats_body: Label = Label.new()
+	stats_body.text = " | ".join(stats_lines)
+	stats_body.add_theme_font_size_override("font_size", 10)
+	stats_body.add_theme_color_override("font_color", Color(0.45, 0.5, 0.6))
+	stats_body.autowrap_mode = TextServer.AUTOWRAP_WORD
+	stats_vbox.add_child(stats_body)
