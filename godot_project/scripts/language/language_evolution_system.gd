@@ -408,6 +408,34 @@ func get_current_grammar() -> Dictionary:
 	}
 
 
+func record_suffix_usage(suffix: String) -> void:
+	## 接尾辞の使用を記録し、Hebbian的に強化
+	## 使用頻度が高い接尾辞は進化の基盤になる
+	if suffix in suffixes:
+		# 既知の接尾辞 — 使用カウントを記録（進化トリガー判定に使う）
+		if not suffix_usage_counts.has(suffix):
+			suffix_usage_counts[suffix] = 0
+		suffix_usage_counts[suffix] += 1
+
+		# 相互連結強化: 語順と接尾辞の組み合わせ
+		_strengthen_order_suffix_link(suffix)
+
+
+var suffix_usage_counts: Dictionary = {}  # suffix → usage_count
+
+
+func _strengthen_order_suffix_link(suffix: String) -> void:
+	## 現在の語順で使われた接尾辞の組み合わせを強化
+	## SOV + "-spark" が多く使われると、その組み合わせが定着する
+	var key: String = "%s_%s" % [WORD_ORDER_NAMES[current_word_order], suffix]
+	if not _order_suffix_links.has(key):
+		_order_suffix_links[key] = 0.0
+	_order_suffix_links[key] = minf(_order_suffix_links[key] + 0.1, 1.0)
+
+
+var _order_suffix_links: Dictionary = {}  # "SOV_-spark" → 0.0-1.0
+
+
 func _get_recent_history(count: int) -> Array:
 	var start := maxi(0, evolution_history.size() - count)
 	return evolution_history.slice(start)
@@ -425,6 +453,8 @@ func to_dict() -> Dictionary:
 		"evolution_history": evolution_history.duplicate(true),
 		"total_evolutions": total_evolutions,
 		"conversation_count": conversation_count_since_last_evolution,
+		"suffix_usage_counts": suffix_usage_counts.duplicate(),
+		"order_suffix_links": _order_suffix_links.duplicate(),
 	}
 
 
@@ -435,3 +465,5 @@ func from_dict(data: Dictionary) -> void:
 	evolution_history = data.get("evolution_history", [])
 	total_evolutions = data.get("total_evolutions", 0)
 	conversation_count_since_last_evolution = data.get("conversation_count", 0)
+	suffix_usage_counts = data.get("suffix_usage_counts", {})
+	_order_suffix_links = data.get("order_suffix_links", {})

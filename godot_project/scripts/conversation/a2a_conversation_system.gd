@@ -113,11 +113,6 @@ func _process(delta: float) -> void:
 
 # === 自動会話トリガー ===
 func _try_auto_conversation() -> void:
-	# バジェットチェック
-	if not _check_budget():
-		print("[AtoA] Daily conversation budget exhausted, using templates")
-		return
-
 	var pets := GameManager.get_all_pets()
 	var alive_pets: Array[PetEntity] = []
 	for pet in pets:
@@ -128,15 +123,23 @@ func _try_auto_conversation() -> void:
 		return
 
 	# 最も感情的な2匹を選択
-	alive_pets.sort_custom(func(a, b):
+	alive_pets.sort_custom(func(a: Variant, b: Variant) -> bool:
 		return _get_emotion_intensity(a) > _get_emotion_intensity(b)
 	)
 
-	var pet1 := alive_pets[0]
-	var pet2 := alive_pets[1]
+	var pet1: PetEntity = alive_pets[0]
+	var pet2: PetEntity = alive_pets[1]
 
-	if _get_emotion_intensity(pet1) >= MIN_EMOTION_FOR_SPONTANEOUS:
-		await start_conversation(pet1, pet2, "spontaneous")
+	if _get_emotion_intensity(pet1) < MIN_EMOTION_FOR_SPONTANEOUS:
+		return
+
+	# バジェットチェック — 超過時はテンプレートフォールバック
+	if not _check_budget():
+		print("[AtoA] Budget exhausted — falling back to template conversation")
+		_run_template_conversation(pet1, pet2, "spontaneous")
+		return
+
+	await start_conversation(pet1, pet2, "spontaneous")
 
 
 func _get_emotion_intensity(pet: PetEntity) -> float:
@@ -230,19 +233,51 @@ func trigger_reaction_conversation(
 
 # === プロンプト構築 ===
 func _build_system_prompt(grammar: Dictionary) -> String:
+	# 独自語彙を取得（OriginalLanguageEngine）
+	var vocab_section: String = ""
+	if GameManager.instance and GameManager.instance.original_language:
+		var lang_stage: Dictionary = GameManager.instance.original_language.get_language_stage()
+		var vocab_summary: String = GameManager.instance.original_language.get_vocabulary_summary()
+		if lang_stage["vocabulary_size"] > 0:
+			vocab_section = """
+- Language stage: %s (Stage %d)
+- Private vocabulary: %s
+- RULE: Use these invented words naturally. When you feel a strong emotion, prefer the private term over the human word.""" % [
+				lang_stage["name"], lang_stage["stage"] + 1, vocab_summary]
+
+	# 接尾辞使用統計から最も定着した接尾辞を推奨
+	var top_suffixes: String = ""
+	if GameManager.language_evolution and GameManager.language_evolution.suffix_usage_counts.size() > 0:
+		var sorted_suffixes: Array = []
+		for s: String in GameManager.language_evolution.suffix_usage_counts:
+			sorted_suffixes.append({"suffix": s, "count": GameManager.language_evolution.suffix_usage_counts[s]})
+		sorted_suffixes.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a["count"] > b["count"])
+		var top_3: Array = sorted_suffixes.slice(0, 3)
+		if top_3.size() > 0:
+			var names: Array = []
+			for item: Dictionary in top_3:
+				names.append(str(item["suffix"]))
+			top_suffixes = "\n- Most used suffixes (prefer these): %s" % ", ".join(names)
+
 	return """You are an AI pet in a world where pets develop their own language.
 Current language rules:
 - Word order: %s
 - Available suffixes: %s
-- Available prepositions: %s
+- Available prepositions: %s%s%s
 
-IMPORTANT: Use the current word order and suffixes naturally in your speech.
-Mix your pet language with emotional expressions.
-Keep responses short (1-3 sentences), expressive, and in-character.
-Your language should feel natural and evolving, not forced.""" % [
+CRITICAL RULES:
+1. Use the current word order pattern (%s) in your sentences
+2. End phrases or key words with one of the available suffixes
+3. Actions in *asterisks* (e.g., *bounces excitedly*)
+4. Keep responses short (1-3 sentences), expressive, and in-character
+5. Your language should feel natural and evolving — mix pet-speak with emotion
+6. If private vocabulary exists, USE those words instead of human equivalents""" % [
 		grammar["word_order"],
 		str(grammar["suffixes"]),
 		str(grammar["prepositions"]),
+		vocab_section,
+		top_suffixes,
+		grammar["word_order"],
 	]
 
 
@@ -432,35 +467,6 @@ func _format_pet_profile(context: Dictionary, pet_key: String) -> String:
 			dom_emotion = emo
 
 	return "%s: Personality %s, currently feeling %s" % [name, str(personality), dom_emotion]
-
-
-# === 言語進化処理 ===
-func _process_language_evolution(conversation: Array[Dictionary]) -> void:
-	## 会話終了後の言語進化処理
-	## 1. 新表現・複合語を抽出
-	## 2. 接尾辞使用頻度を追跡
-	## 3. 閾値到達時にLanguageEvolutionSystemに登録
-	## 4. 会話ハイライトを生物模倣記憶に登録
-	## 5. PetBookAutoPublisherにシグナル送信
-
-	if conversation.is_empty():
-		return
-
-	# 出現した接尾辞を集計
-	var suffix_usage: Dictionary = {}
-	for msg in conversation:
-		var text: String = msg.get("message", "")
-		# 簡易パター: "-xxx"を抽出
-		var regex := RegEx.new()
-		regex.compile("-[a-z]+")
-		var matches := regex.search_all(text)
-		for m in matches:
-			var suffix = m.get_string()
-			suffix_usage[suffix] = suffix_usage.get(suffix, 0) + 1
-
-	# 言語進化システムに通知
-	if GameManager.language_evolution and not suffix_usage.is_empty():
-		GameManager.language_evolution.record_suffix_usage(suffix_usage)
 
 
 func _register_conversation_memory(pet: PetEntity, conversation: Array[Dictionary], partner_name: String) -> void:
@@ -670,6 +676,109 @@ func _generate_template_conversation(pet1: PetEntity, pet2: PetEntity, trigger: 
 		is_pet1_turn = not is_pet1_turn
 		turn += 1
 
+	return result
+
+
+# === テンプレート会話実行（フォールバック経路） ===
+func _run_template_conversation(pet1: PetEntity, pet2: PetEntity, trigger: String) -> void:
+	## 予算切れ時にテンプレートで会話を生成・再生する
+	is_conversation_active = true
+	current_conversation = []
+
+	# テンプレート会話を生成
+	var template_messages: Array[Dictionary] = _generate_template_conversation(pet1, pet2, trigger)
+
+	# メッセージを順次送信（UIに表示）
+	for msg: Dictionary in template_messages:
+		current_conversation.append(msg)
+		conversation_message.emit(msg["pet_id"], msg["message"], msg)
+
+		# 感情反応（テンプレートでも感情は動く）
+		var speaker: PetEntity = pet1 if msg["pet_id"] == pet1.pet_id else pet2
+		var listener: PetEntity = pet2 if msg["pet_id"] == pet1.pet_id else pet1
+		_process_conversation_emotion(speaker, listener, msg["message"])
+
+	# 完了処理（テンプレートでも言語進化に寄与）
+	_finalize_conversation(pet1, pet2, trigger)
+	print("[AtoA] Template conversation completed (%d turns)" % template_messages.size())
+
+
+# === 会話レスポンスの言語進化処理 ===
+func _process_language_evolution(messages: Array[Dictionary]) -> void:
+	## 会話レスポンスから接尾辞使用を検出し、言語進化にフィードバック
+	if not GameManager.instance:
+		return
+
+	# OriginalLanguageEngine: 語彙の使用検出とHebbian強化
+	if GameManager.instance.original_language:
+		for msg: Dictionary in messages:
+			var text: String = msg.get("message", "")
+			GameManager.instance.original_language.process_conversation_output(
+				text, _get_participants_from_messages(messages)
+			)
+
+			# 接尾辞パターンを検出して語彙発明のきっかけにする
+			_detect_and_invent_words(text, msg)
+
+	# LanguageEvolutionSystem: 接尾辞使用をカウント
+	if GameManager.instance.has_node("LanguageEvolution") or GameManager.language_evolution:
+		var grammar: Dictionary = GameManager.language_evolution.get_current_grammar()
+		var suffixes: Array = grammar.get("suffixes", [])
+		for msg: Dictionary in messages:
+			var text: String = msg.get("message", "")
+			for suffix: Variant in suffixes:
+				if text.contains(str(suffix)):
+					# 使用された接尾辞を強化（Hebbian）
+					GameManager.language_evolution.record_suffix_usage(str(suffix))
+
+
+func _detect_and_invent_words(text: String, msg: Dictionary) -> void:
+	## 会話テキストからキーワードを抽出し、独自語の発明を試みる
+	if not GameManager.instance or not GameManager.instance.original_language:
+		return
+
+	# 感情表現を語彙化するチャンス
+	var emotion: String = msg.get("emotion", "neutral")
+	if emotion != "neutral" and randf() < 0.25:
+		var emotion_words: Dictionary = {
+			"joy": "happy", "love": "dear", "excitement": "thrill",
+			"sadness": "sorrow", "fear": "dread",
+		}
+		var word: String = emotion_words.get(emotion, "")
+		if not word.is_empty():
+			GameManager.instance.original_language.invent_word(word, {
+				"emotion": emotion,
+				"environment": msg.get("environment", "forest"),
+				"pet_id": msg.get("pet_id", 0),
+				"situation": "a2a_conversation",
+			})
+
+	# アクション表現（*action*パターン）を検出して語彙化
+	var action_regex: RegEx = RegEx.new()
+	action_regex.compile("\\*([a-z ]+)\\*")
+	var matches: Array[RegExMatch] = action_regex.search_all(text)
+	for m: RegExMatch in matches:
+		var action: String = m.get_string(1).strip_edges()
+		if action.length() >= 3 and action.length() <= 20 and randf() < 0.15:
+			GameManager.instance.original_language.invent_word(action, {
+				"emotion": emotion,
+				"pet_id": msg.get("pet_id", 0),
+				"situation": "action_expression",
+			})
+
+
+func _get_participants_from_messages(messages: Array[Dictionary]) -> Array[PetEntity]:
+	## メッセージリストから参加ペットを取得
+	var result: Array[PetEntity] = []
+	var seen_ids: Dictionary = {}
+	for msg: Dictionary in messages:
+		var pid: int = msg.get("pet_id", -1)
+		if pid >= 0 and not seen_ids.has(pid):
+			seen_ids[pid] = true
+			if GameManager.instance and GameManager.instance.pets.has(pid):
+				var pet: Node = GameManager.instance.pets[pid]
+				if pet is PetEntity:
+					result.append(pet)
 	return result
 
 
