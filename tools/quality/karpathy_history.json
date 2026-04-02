@@ -1,0 +1,289 @@
+{
+  "version": 1,
+  "last_updated": "2026-04-03T05:48:33.176434",
+  "iterations": [
+    {
+      "iteration": 0,
+      "timestamp": "2026-04-03T05:48:33.176404",
+      "metrics": {
+        "timestamp": "2026-04-03T05:48:33.119069",
+        "iteration": 0,
+        "code": {
+          "total_files": 63,
+          "test_files": 8,
+          "total_lines": 29547,
+          "total_functions": 1092,
+          "total_signals": 130,
+          "total_classes": 62,
+          "total_consts": 354,
+          "total_enums": 14,
+          "avg_lines_per_file": 469.0,
+          "avg_functions_per_file": 17.3,
+          "type_annotation_coverage_pct": 336.4
+        },
+        "atoa": {
+          "available": true,
+          "template_count": 1040,
+          "template_categories": [
+            "evolution",
+            "birth",
+            "death_nearby",
+            "first_word",
+            "milestone",
+            "player_achievement",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "entries",
+            "entries",
+            "entries",
+            "entries",
+            "context_tags",
+            "playful",
+            "serious",
+            "nostalgic",
+            "competitive",
+            "supportive",
+            "curious",
+            "reactions",
+            "reactions",
+            "joy",
+            "love",
+            "excitement",
+            "sadness",
+            "fear",
+            "topics_discussed",
+            "mood_history",
+            "invented_words_used",
+            "topics_discussed",
+            "mood_history",
+            "invented_words_used",
+            "taught_words",
+            "participants",
+            "shared_words"
+          ],
+          "template_category_count": 27,
+          "placeholder_types": [
+            "compound_word",
+            "count",
+            "emotion",
+            "greeting",
+            "name",
+            "partner",
+            "pet1",
+            "pet2",
+            "pet3",
+            "pet_name",
+            "quote",
+            "reply",
+            "reply_word",
+            "response_word",
+            "suffix",
+            "topic"
+          ],
+          "prompt_chars_estimate": 91706,
+          "prompt_token_estimate": 22926,
+          "daily_budget_usd": 0.5,
+          "cost_per_turn_usd": 0.002,
+          "max_daily_conversations": 25,
+          "max_turns_per_conversation": 6
+        },
+        "language": {
+          "available": true,
+          "syllable_pool_size": 83,
+          "language_stages": 5,
+          "word_order_types": 7,
+          "suffix_context_count": 47,
+          "hebbian_parameters": {
+            "STRENGTH_ON_SUCCESS": 0.15,
+            "DAILY_DECAY": 0.01,
+            "ARCHIVE_THRESHOLD": 0.1,
+            "PROPAGATION_THRESHOLD": 0.8,
+            "NEOLOGISM_TRIGGER_COUNT": 20.0,
+            "GRAMMAR_TRIGGER_COUNT": 50.0
+          }
+        },
+        "battle": {
+          "available": true,
+          "score_categories": {
+            "vocabulary": 30.0,
+            "grammar": 25.0,
+            "creativity": 25.0,
+            "emotion": 20.0,
+            "round": 100.0
+          },
+          "total_max_score": 200.0,
+          "score_variance": 910.0,
+          "round_themes": [
+            "GREETING",
+            "ARGUMENT",
+            "STORYTELLING"
+          ],
+          "templates_per_theme": {
+            "GREETING": 4,
+            "ARGUMENT": 4,
+            "STORYTELLING": 46
+          },
+          "total_battle_templates": 54,
+          "reward_constants": {
+            "WINNER_AFFINITY_BOOST": 0.1,
+            "WINNER_PERSONALITY_BOOST": 0.02,
+            "LOSER_DETERMINATION_BOOST": 0.15
+          }
+        },
+        "cost": {
+          "available": true,
+          "cost_per_turn_usd": 0.002,
+          "max_turns_per_conversation": 6,
+          "max_daily_conversations": 25,
+          "daily_budget_usd": 0.5,
+          "worst_case_daily_cost_usd": 0.3,
+          "budget_headroom_usd": 0.2,
+          "template_ratio_estimate_pct": 100.0,
+          "api_call_references": 0,
+          "template_references": 145
+        },
+        "top_files_by_lines": [
+          {
+            "path": "godot_project/scripts/conversation/a2a_conversation_system.gd",
+            "lines": 3292,
+            "functions": 71
+          },
+          {
+            "path": "godot_project/scripts/main_scene.gd",
+            "lines": 1382,
+            "functions": 61
+          },
+          {
+            "path": "godot_project/scripts/ui/conversation_log_viewer.gd",
+            "lines": 1137,
+            "functions": 19
+          },
+          {
+            "path": "godot_project/scripts/ui/pet_book_ui.gd",
+            "lines": 1021,
+            "functions": 41
+          },
+          {
+            "path": "godot_project/scripts/social/pet_book_core.gd",
+            "lines": 950,
+            "functions": 41
+          },
+          {
+            "path": "godot_project/scripts/ui/pet_book_post_card.gd",
+            "lines": 797,
+            "functions": 37
+          },
+          {
+            "path": "godot_project/scripts/visual/sprite_placeholder_generator.gd",
+            "lines": 719,
+            "functions": 12
+          },
+          {
+            "path": "godot_project/scripts/ui/battle_screen.gd",
+            "lines": 699,
+            "functions": 21
+          },
+          {
+            "path": "godot_project/scripts/visual/pet_visual_bridge.gd",
+            "lines": 687,
+            "functions": 22
+          },
+          {
+            "path": "godot_project/scripts/ui/pet_book_particles.gd",
+            "lines": 675,
+            "functions": 16
+          }
+        ]
+      },
+      "evaluation": {
+        "code_quality": {
+          "score": 78.5,
+          "notes": [
+            "Avg funcs/file: 17.3 (sweet spot: 5-15)",
+            "Avg lines/file: 469 (sweet spot: 100-400)"
+          ]
+        },
+        "atoa_quality": {
+          "score": 80.0,
+          "notes": [
+            "Prompt bloat: ~22926 tokens"
+          ]
+        },
+        "language_diversity": {
+          "score": 100.0,
+          "notes": []
+        },
+        "battle_balance": {
+          "score": 47.2,
+          "notes": [
+            "High score variance: 910.0",
+            "Uneven template distribution: {'GREETING': 4, 'ARGUMENT': 4, 'STORYTELLING': 46}"
+          ]
+        },
+        "cost_efficiency": {
+          "score": 79.0,
+          "notes": []
+        },
+        "overall": 76.9
+      },
+      "analysis": [
+        "[LOW] battle_balance at 47/100. High score variance: 910.0",
+        "  -> code_quality: Avg funcs/file: 17.3 (sweet spot: 5-15)",
+        "  -> code_quality: Avg lines/file: 469 (sweet spot: 100-400)",
+        "  -> atoa_quality: Prompt bloat: ~22926 tokens",
+        "  -> battle_balance: Uneven template distribution: {'GREETING': 4, 'ARGUMENT': 4, 'STORYTELLING': 46}"
+      ],
+      "improvements": [
+        {
+          "description": "[LOW] battle_balance at 47/100. High score variance: 910.0",
+          "priority": "high",
+          "change_type": "balance_tuning",
+          "file": "godot_project/scripts/battle/language_battle_system.gd",
+          "function": "Adjust MAX_*_SCORE constants for more even distribution"
+        },
+        {
+          "description": "  -> code_quality: Avg funcs/file: 17.3 (sweet spot: 5-15)",
+          "priority": "medium",
+          "change_type": "investigate",
+          "file": null,
+          "function": null
+        },
+        {
+          "description": "  -> code_quality: Avg lines/file: 469 (sweet spot: 100-400)",
+          "priority": "medium",
+          "change_type": "investigate",
+          "file": null,
+          "function": null
+        },
+        {
+          "description": "  -> atoa_quality: Prompt bloat: ~22926 tokens",
+          "priority": "medium",
+          "change_type": "reduce_tokens",
+          "file": "godot_project/scripts/conversation/a2a_conversation_system.gd",
+          "function": "Shorten system prompts and remove redundant context"
+        },
+        {
+          "description": "  -> battle_balance: Uneven template distribution: {'GREETING': 4, 'ARGUMENT': 4, 'STORYTELLING': 46}",
+          "priority": "medium",
+          "change_type": "add_templates",
+          "file": "godot_project/scripts/battle/language_battle_system.gd",
+          "function": "Add battle template strings to BATTLE_TEMPLATES"
+        }
+      ]
+    }
+  ]
+}
