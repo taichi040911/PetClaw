@@ -4,7 +4,7 @@
 # First time: run "butler login" in terminal first!
 set -e
 
-VERSION="${1:-0.5.1}"
+VERSION="${1:-0.6.0}"
 BUTLER=~/bin/butler
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 EXPORT_DIR="$PROJECT_DIR/godot_project/export/web"
