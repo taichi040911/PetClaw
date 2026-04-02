@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "last_updated": "2026-04-03T08:09:39.723626",
+  "last_updated": "2026-04-03T08:50:59.804432",
   "iterations": [
     {
       "iteration": 0,
@@ -3092,6 +3092,1483 @@
           "change_type": "investigate",
           "file": null,
           "function": null
+        }
+      ]
+    },
+    {
+      "iteration": 10,
+      "timestamp": "2026-04-03T08:42:42.909828",
+      "metrics": {
+        "timestamp": "2026-04-03T08:42:42.848108",
+        "iteration": 10,
+        "code": {
+          "total_files": 69,
+          "test_files": 8,
+          "total_lines": 32390,
+          "total_functions": 1214,
+          "total_signals": 145,
+          "total_classes": 68,
+          "total_consts": 417,
+          "total_enums": 16,
+          "avg_lines_per_file": 469.4,
+          "avg_functions_per_file": 17.6,
+          "type_annotation_coverage_pct": 339.8
+        },
+        "atoa": {
+          "available": true,
+          "template_count": 1034,
+          "template_categories": [
+            "evolution",
+            "birth",
+            "death_nearby",
+            "first_word",
+            "milestone",
+            "player_achievement",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "entries",
+            "entries",
+            "entries",
+            "entries",
+            "context_tags",
+            "playful",
+            "serious",
+            "nostalgic",
+            "competitive",
+            "supportive",
+            "curious",
+            "reactions",
+            "reactions",
+            "joy",
+            "love",
+            "excitement",
+            "sadness",
+            "fear",
+            "topics_discussed",
+            "mood_history",
+            "invented_words_used",
+            "topics_discussed",
+            "mood_history",
+            "invented_words_used",
+            "taught_words",
+            "participants",
+            "shared_words"
+          ],
+          "template_category_count": 27,
+          "placeholder_types": [
+            "compound_word",
+            "count",
+            "emotion",
+            "greeting",
+            "name",
+            "partner",
+            "pet1",
+            "pet2",
+            "pet3",
+            "pet_name",
+            "quote",
+            "reply",
+            "reply_word",
+            "response_word",
+            "suffix",
+            "topic"
+          ],
+          "prompt_chars_estimate": 6784,
+          "prompt_token_estimate": 1696,
+          "daily_budget_usd": 0.5,
+          "cost_per_turn_usd": 0.002,
+          "max_daily_conversations": 25,
+          "max_turns_per_conversation": 6
+        },
+        "language": {
+          "available": true,
+          "syllable_pool_size": 83,
+          "language_stages": 5,
+          "word_order_types": 7,
+          "suffix_context_count": 47,
+          "hebbian_parameters": {
+            "STRENGTH_ON_SUCCESS": 0.15,
+            "DAILY_DECAY": 0.01,
+            "ARCHIVE_THRESHOLD": 0.1,
+            "PROPAGATION_THRESHOLD": 0.8,
+            "NEOLOGISM_TRIGGER_COUNT": 20.0,
+            "GRAMMAR_TRIGGER_COUNT": 50.0
+          }
+        },
+        "battle": {
+          "available": true,
+          "score_categories": {
+            "vocabulary": 30.0,
+            "grammar": 25.0,
+            "creativity": 25.0,
+            "emotion": 20.0
+          },
+          "total_max_score": 100.0,
+          "score_variance": 12.5,
+          "round_themes": [
+            "GREETING",
+            "ARGUMENT",
+            "STORYTELLING"
+          ],
+          "templates_per_theme": {
+            "GREETING": 12,
+            "ARGUMENT": 12,
+            "STORYTELLING": 12
+          },
+          "total_battle_templates": 36,
+          "reward_constants": {
+            "WINNER_AFFINITY_BOOST": 0.1,
+            "WINNER_PERSONALITY_BOOST": 0.02,
+            "LOSER_DETERMINATION_BOOST": 0.15
+          }
+        },
+        "cost": {
+          "available": true,
+          "cost_per_turn_usd": 0.002,
+          "max_turns_per_conversation": 6,
+          "max_daily_conversations": 25,
+          "daily_budget_usd": 0.5,
+          "worst_case_daily_cost_usd": 0.3,
+          "budget_headroom_usd": 0.2,
+          "template_ratio_estimate_pct": 100.0,
+          "api_call_references": 0,
+          "template_references": 149
+        },
+        "top_files_by_lines": [
+          {
+            "path": "godot_project/scripts/conversation/a2a_conversation_system.gd",
+            "lines": 3244,
+            "functions": 71
+          },
+          {
+            "path": "godot_project/scripts/main_scene.gd",
+            "lines": 1437,
+            "functions": 64
+          },
+          {
+            "path": "godot_project/scripts/ui/conversation_log_viewer.gd",
+            "lines": 1137,
+            "functions": 19
+          },
+          {
+            "path": "godot_project/scripts/ui/pet_book_ui.gd",
+            "lines": 1021,
+            "functions": 41
+          },
+          {
+            "path": "godot_project/scripts/social/pet_book_core.gd",
+            "lines": 950,
+            "functions": 41
+          },
+          {
+            "path": "godot_project/scripts/battle/language_battle_system.gd",
+            "lines": 898,
+            "functions": 31
+          },
+          {
+            "path": "godot_project/scripts/ui/pet_book_post_card.gd",
+            "lines": 797,
+            "functions": 37
+          },
+          {
+            "path": "godot_project/scripts/core/game_manager.gd",
+            "lines": 793,
+            "functions": 60
+          },
+          {
+            "path": "godot_project/scripts/visual/sprite_placeholder_generator.gd",
+            "lines": 719,
+            "functions": 12
+          },
+          {
+            "path": "godot_project/scripts/ui/battle_screen.gd",
+            "lines": 699,
+            "functions": 21
+          }
+        ]
+      },
+      "evaluation": {
+        "code_quality": {
+          "score": 77.7,
+          "notes": [
+            "Avg funcs/file: 17.6 (sweet spot: 5-15)",
+            "Avg lines/file: 469 (sweet spot: 100-400)"
+          ]
+        },
+        "atoa_quality": {
+          "score": 100.0,
+          "notes": []
+        },
+        "language_diversity": {
+          "score": 100.0,
+          "notes": []
+        },
+        "battle_balance": {
+          "score": 90.0,
+          "notes": []
+        },
+        "cost_efficiency": {
+          "score": 79.0,
+          "notes": []
+        },
+        "overall": 89.3
+      },
+      "analysis": [
+        "[STAGNANT] code_quality: no progress at 78",
+        "  -> code_quality: Avg funcs/file: 17.6 (sweet spot: 5-15)",
+        "  -> code_quality: Avg lines/file: 469 (sweet spot: 100-400)",
+        "[STAGNANT] atoa_quality: no progress at 100",
+        "[STAGNANT] language_diversity: no progress at 100",
+        "[STAGNANT] battle_balance: no progress at 90",
+        "[STAGNANT] cost_efficiency: no progress at 79"
+      ],
+      "improvements": [
+        {
+          "description": "[STAGNANT] code_quality: no progress at 78",
+          "priority": "medium",
+          "change_type": "investigate",
+          "file": null,
+          "function": null
+        },
+        {
+          "description": "  -> code_quality: Avg funcs/file: 17.6 (sweet spot: 5-15)",
+          "priority": "medium",
+          "change_type": "investigate",
+          "file": null,
+          "function": null
+        },
+        {
+          "description": "  -> code_quality: Avg lines/file: 469 (sweet spot: 100-400)",
+          "priority": "medium",
+          "change_type": "investigate",
+          "file": null,
+          "function": null
+        },
+        {
+          "description": "[STAGNANT] atoa_quality: no progress at 100",
+          "priority": "medium",
+          "change_type": "investigate",
+          "file": null,
+          "function": null
+        },
+        {
+          "description": "[STAGNANT] language_diversity: no progress at 100",
+          "priority": "medium",
+          "change_type": "investigate",
+          "file": null,
+          "function": null
+        },
+        {
+          "description": "[STAGNANT] battle_balance: no progress at 90",
+          "priority": "medium",
+          "change_type": "investigate",
+          "file": null,
+          "function": null
+        },
+        {
+          "description": "[STAGNANT] cost_efficiency: no progress at 79",
+          "priority": "medium",
+          "change_type": "cost_optimization",
+          "file": "godot_project/scripts/conversation/a2a_conversation_system.gd",
+          "function": "Review API call paths and increase template fallback coverage"
+        }
+      ]
+    },
+    {
+      "iteration": 11,
+      "timestamp": "2026-04-03T08:50:49.311791",
+      "metrics": {
+        "timestamp": "2026-04-03T08:50:49.250303",
+        "iteration": 11,
+        "code": {
+          "total_files": 69,
+          "test_files": 11,
+          "total_lines": 32390,
+          "total_functions": 1214,
+          "total_signals": 145,
+          "total_classes": 68,
+          "total_consts": 417,
+          "total_enums": 16,
+          "avg_lines_per_file": 469.4,
+          "avg_functions_per_file": 17.6,
+          "type_annotation_coverage_pct": 339.8
+        },
+        "atoa": {
+          "available": true,
+          "template_count": 1034,
+          "template_categories": [
+            "evolution",
+            "birth",
+            "death_nearby",
+            "first_word",
+            "milestone",
+            "player_achievement",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "entries",
+            "entries",
+            "entries",
+            "entries",
+            "context_tags",
+            "playful",
+            "serious",
+            "nostalgic",
+            "competitive",
+            "supportive",
+            "curious",
+            "reactions",
+            "reactions",
+            "joy",
+            "love",
+            "excitement",
+            "sadness",
+            "fear",
+            "topics_discussed",
+            "mood_history",
+            "invented_words_used",
+            "topics_discussed",
+            "mood_history",
+            "invented_words_used",
+            "taught_words",
+            "participants",
+            "shared_words"
+          ],
+          "template_category_count": 27,
+          "placeholder_types": [
+            "compound_word",
+            "count",
+            "emotion",
+            "greeting",
+            "name",
+            "partner",
+            "pet1",
+            "pet2",
+            "pet3",
+            "pet_name",
+            "quote",
+            "reply",
+            "reply_word",
+            "response_word",
+            "suffix",
+            "topic"
+          ],
+          "prompt_chars_estimate": 6784,
+          "prompt_token_estimate": 1696,
+          "daily_budget_usd": 0.5,
+          "cost_per_turn_usd": 0.0015,
+          "max_daily_conversations": 20,
+          "max_turns_per_conversation": 6
+        },
+        "language": {
+          "available": true,
+          "syllable_pool_size": 83,
+          "language_stages": 5,
+          "word_order_types": 7,
+          "suffix_context_count": 47,
+          "hebbian_parameters": {
+            "STRENGTH_ON_SUCCESS": 0.15,
+            "DAILY_DECAY": 0.01,
+            "ARCHIVE_THRESHOLD": 0.1,
+            "PROPAGATION_THRESHOLD": 0.8,
+            "NEOLOGISM_TRIGGER_COUNT": 20.0,
+            "GRAMMAR_TRIGGER_COUNT": 50.0
+          }
+        },
+        "battle": {
+          "available": true,
+          "score_categories": {
+            "vocabulary": 30.0,
+            "grammar": 25.0,
+            "creativity": 25.0,
+            "emotion": 20.0
+          },
+          "total_max_score": 100.0,
+          "score_variance": 12.5,
+          "round_themes": [
+            "GREETING",
+            "ARGUMENT",
+            "STORYTELLING"
+          ],
+          "templates_per_theme": {
+            "GREETING": 12,
+            "ARGUMENT": 12,
+            "STORYTELLING": 12
+          },
+          "total_battle_templates": 36,
+          "reward_constants": {
+            "WINNER_AFFINITY_BOOST": 0.1,
+            "WINNER_PERSONALITY_BOOST": 0.02,
+            "LOSER_DETERMINATION_BOOST": 0.15
+          }
+        },
+        "cost": {
+          "available": true,
+          "cost_per_turn_usd": 0.0015,
+          "max_turns_per_conversation": 6,
+          "max_daily_conversations": 20,
+          "daily_budget_usd": 0.5,
+          "worst_case_daily_cost_usd": 0.18,
+          "budget_headroom_usd": 0.32,
+          "template_ratio_estimate_pct": 100.0,
+          "api_call_references": 0,
+          "template_references": 149
+        },
+        "top_files_by_lines": [
+          {
+            "path": "godot_project/scripts/conversation/a2a_conversation_system.gd",
+            "lines": 3244,
+            "functions": 71
+          },
+          {
+            "path": "godot_project/scripts/main_scene.gd",
+            "lines": 1437,
+            "functions": 64
+          },
+          {
+            "path": "godot_project/scripts/ui/conversation_log_viewer.gd",
+            "lines": 1137,
+            "functions": 19
+          },
+          {
+            "path": "godot_project/scripts/ui/pet_book_ui.gd",
+            "lines": 1021,
+            "functions": 41
+          },
+          {
+            "path": "godot_project/scripts/social/pet_book_core.gd",
+            "lines": 950,
+            "functions": 41
+          },
+          {
+            "path": "godot_project/scripts/battle/language_battle_system.gd",
+            "lines": 898,
+            "functions": 31
+          },
+          {
+            "path": "godot_project/scripts/ui/pet_book_post_card.gd",
+            "lines": 797,
+            "functions": 37
+          },
+          {
+            "path": "godot_project/scripts/core/game_manager.gd",
+            "lines": 793,
+            "functions": 60
+          },
+          {
+            "path": "godot_project/scripts/visual/sprite_placeholder_generator.gd",
+            "lines": 719,
+            "functions": 12
+          },
+          {
+            "path": "godot_project/scripts/ui/battle_screen.gd",
+            "lines": 699,
+            "functions": 21
+          }
+        ]
+      },
+      "evaluation": {
+        "code_quality": {
+          "score": 81.0,
+          "notes": [
+            "Avg funcs/file: 17.6 (sweet spot: 5-15)",
+            "Avg lines/file: 469 (sweet spot: 100-400)"
+          ]
+        },
+        "atoa_quality": {
+          "score": 100.0,
+          "notes": []
+        },
+        "language_diversity": {
+          "score": 100.0,
+          "notes": []
+        },
+        "battle_balance": {
+          "score": 90.0,
+          "notes": []
+        },
+        "cost_efficiency": {
+          "score": 87.4,
+          "notes": []
+        },
+        "overall": 91.7
+      },
+      "analysis": [
+        "  -> code_quality: Avg funcs/file: 17.6 (sweet spot: 5-15)",
+        "  -> code_quality: Avg lines/file: 469 (sweet spot: 100-400)",
+        "[STAGNANT] atoa_quality: no progress at 100",
+        "[STAGNANT] language_diversity: no progress at 100",
+        "[STAGNANT] battle_balance: no progress at 90",
+        "[IMPROVED] cost_efficiency: 79 -> 87 (+8.4). Good progress."
+      ],
+      "improvements": [
+        {
+          "description": "  -> code_quality: Avg funcs/file: 17.6 (sweet spot: 5-15)",
+          "priority": "medium",
+          "change_type": "investigate",
+          "file": null,
+          "function": null
+        },
+        {
+          "description": "  -> code_quality: Avg lines/file: 469 (sweet spot: 100-400)",
+          "priority": "medium",
+          "change_type": "investigate",
+          "file": null,
+          "function": null
+        },
+        {
+          "description": "[STAGNANT] atoa_quality: no progress at 100",
+          "priority": "medium",
+          "change_type": "investigate",
+          "file": null,
+          "function": null
+        },
+        {
+          "description": "[STAGNANT] language_diversity: no progress at 100",
+          "priority": "medium",
+          "change_type": "investigate",
+          "file": null,
+          "function": null
+        },
+        {
+          "description": "[STAGNANT] battle_balance: no progress at 90",
+          "priority": "medium",
+          "change_type": "investigate",
+          "file": null,
+          "function": null
+        },
+        {
+          "description": "[IMPROVED] cost_efficiency: 79 -> 87 (+8.4). Good progress.",
+          "priority": "low",
+          "change_type": "cost_optimization",
+          "file": "godot_project/scripts/conversation/a2a_conversation_system.gd",
+          "function": "Review API call paths and increase template fallback coverage"
+        }
+      ]
+    },
+    {
+      "iteration": 12,
+      "timestamp": "2026-04-03T08:50:52.887239",
+      "metrics": {
+        "timestamp": "2026-04-03T08:50:52.826922",
+        "iteration": 12,
+        "code": {
+          "total_files": 69,
+          "test_files": 11,
+          "total_lines": 32390,
+          "total_functions": 1214,
+          "total_signals": 145,
+          "total_classes": 68,
+          "total_consts": 417,
+          "total_enums": 16,
+          "avg_lines_per_file": 469.4,
+          "avg_functions_per_file": 17.6,
+          "type_annotation_coverage_pct": 339.8
+        },
+        "atoa": {
+          "available": true,
+          "template_count": 1034,
+          "template_categories": [
+            "evolution",
+            "birth",
+            "death_nearby",
+            "first_word",
+            "milestone",
+            "player_achievement",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "entries",
+            "entries",
+            "entries",
+            "entries",
+            "context_tags",
+            "playful",
+            "serious",
+            "nostalgic",
+            "competitive",
+            "supportive",
+            "curious",
+            "reactions",
+            "reactions",
+            "joy",
+            "love",
+            "excitement",
+            "sadness",
+            "fear",
+            "topics_discussed",
+            "mood_history",
+            "invented_words_used",
+            "topics_discussed",
+            "mood_history",
+            "invented_words_used",
+            "taught_words",
+            "participants",
+            "shared_words"
+          ],
+          "template_category_count": 27,
+          "placeholder_types": [
+            "compound_word",
+            "count",
+            "emotion",
+            "greeting",
+            "name",
+            "partner",
+            "pet1",
+            "pet2",
+            "pet3",
+            "pet_name",
+            "quote",
+            "reply",
+            "reply_word",
+            "response_word",
+            "suffix",
+            "topic"
+          ],
+          "prompt_chars_estimate": 6784,
+          "prompt_token_estimate": 1696,
+          "daily_budget_usd": 0.5,
+          "cost_per_turn_usd": 0.0015,
+          "max_daily_conversations": 20,
+          "max_turns_per_conversation": 6
+        },
+        "language": {
+          "available": true,
+          "syllable_pool_size": 83,
+          "language_stages": 5,
+          "word_order_types": 7,
+          "suffix_context_count": 47,
+          "hebbian_parameters": {
+            "STRENGTH_ON_SUCCESS": 0.15,
+            "DAILY_DECAY": 0.01,
+            "ARCHIVE_THRESHOLD": 0.1,
+            "PROPAGATION_THRESHOLD": 0.8,
+            "NEOLOGISM_TRIGGER_COUNT": 20.0,
+            "GRAMMAR_TRIGGER_COUNT": 50.0
+          }
+        },
+        "battle": {
+          "available": true,
+          "score_categories": {
+            "vocabulary": 30.0,
+            "grammar": 25.0,
+            "creativity": 25.0,
+            "emotion": 20.0
+          },
+          "total_max_score": 100.0,
+          "score_variance": 12.5,
+          "round_themes": [
+            "GREETING",
+            "ARGUMENT",
+            "STORYTELLING"
+          ],
+          "templates_per_theme": {
+            "GREETING": 12,
+            "ARGUMENT": 12,
+            "STORYTELLING": 12
+          },
+          "total_battle_templates": 36,
+          "reward_constants": {
+            "WINNER_AFFINITY_BOOST": 0.1,
+            "WINNER_PERSONALITY_BOOST": 0.02,
+            "LOSER_DETERMINATION_BOOST": 0.15
+          }
+        },
+        "cost": {
+          "available": true,
+          "cost_per_turn_usd": 0.0015,
+          "max_turns_per_conversation": 6,
+          "max_daily_conversations": 20,
+          "daily_budget_usd": 0.5,
+          "worst_case_daily_cost_usd": 0.18,
+          "budget_headroom_usd": 0.32,
+          "template_ratio_estimate_pct": 100.0,
+          "api_call_references": 0,
+          "template_references": 149
+        },
+        "top_files_by_lines": [
+          {
+            "path": "godot_project/scripts/conversation/a2a_conversation_system.gd",
+            "lines": 3244,
+            "functions": 71
+          },
+          {
+            "path": "godot_project/scripts/main_scene.gd",
+            "lines": 1437,
+            "functions": 64
+          },
+          {
+            "path": "godot_project/scripts/ui/conversation_log_viewer.gd",
+            "lines": 1137,
+            "functions": 19
+          },
+          {
+            "path": "godot_project/scripts/ui/pet_book_ui.gd",
+            "lines": 1021,
+            "functions": 41
+          },
+          {
+            "path": "godot_project/scripts/social/pet_book_core.gd",
+            "lines": 950,
+            "functions": 41
+          },
+          {
+            "path": "godot_project/scripts/battle/language_battle_system.gd",
+            "lines": 898,
+            "functions": 31
+          },
+          {
+            "path": "godot_project/scripts/ui/pet_book_post_card.gd",
+            "lines": 797,
+            "functions": 37
+          },
+          {
+            "path": "godot_project/scripts/core/game_manager.gd",
+            "lines": 793,
+            "functions": 60
+          },
+          {
+            "path": "godot_project/scripts/visual/sprite_placeholder_generator.gd",
+            "lines": 719,
+            "functions": 12
+          },
+          {
+            "path": "godot_project/scripts/ui/battle_screen.gd",
+            "lines": 699,
+            "functions": 21
+          }
+        ]
+      },
+      "evaluation": {
+        "code_quality": {
+          "score": 81.0,
+          "notes": [
+            "Avg funcs/file: 17.6 (sweet spot: 5-15)",
+            "Avg lines/file: 469 (sweet spot: 100-400)"
+          ]
+        },
+        "atoa_quality": {
+          "score": 100.0,
+          "notes": []
+        },
+        "language_diversity": {
+          "score": 100.0,
+          "notes": []
+        },
+        "battle_balance": {
+          "score": 90.0,
+          "notes": []
+        },
+        "cost_efficiency": {
+          "score": 87.4,
+          "notes": []
+        },
+        "overall": 91.7
+      },
+      "analysis": [
+        "[STAGNANT] code_quality: no progress at 81",
+        "  -> code_quality: Avg funcs/file: 17.6 (sweet spot: 5-15)",
+        "  -> code_quality: Avg lines/file: 469 (sweet spot: 100-400)",
+        "[STAGNANT] atoa_quality: no progress at 100",
+        "[STAGNANT] language_diversity: no progress at 100",
+        "[STAGNANT] battle_balance: no progress at 90",
+        "[STAGNANT] cost_efficiency: no progress at 87"
+      ],
+      "improvements": [
+        {
+          "description": "[STAGNANT] code_quality: no progress at 81",
+          "priority": "medium",
+          "change_type": "investigate",
+          "file": null,
+          "function": null
+        },
+        {
+          "description": "  -> code_quality: Avg funcs/file: 17.6 (sweet spot: 5-15)",
+          "priority": "medium",
+          "change_type": "investigate",
+          "file": null,
+          "function": null
+        },
+        {
+          "description": "  -> code_quality: Avg lines/file: 469 (sweet spot: 100-400)",
+          "priority": "medium",
+          "change_type": "investigate",
+          "file": null,
+          "function": null
+        },
+        {
+          "description": "[STAGNANT] atoa_quality: no progress at 100",
+          "priority": "medium",
+          "change_type": "investigate",
+          "file": null,
+          "function": null
+        },
+        {
+          "description": "[STAGNANT] language_diversity: no progress at 100",
+          "priority": "medium",
+          "change_type": "investigate",
+          "file": null,
+          "function": null
+        },
+        {
+          "description": "[STAGNANT] battle_balance: no progress at 90",
+          "priority": "medium",
+          "change_type": "investigate",
+          "file": null,
+          "function": null
+        },
+        {
+          "description": "[STAGNANT] cost_efficiency: no progress at 87",
+          "priority": "medium",
+          "change_type": "cost_optimization",
+          "file": "godot_project/scripts/conversation/a2a_conversation_system.gd",
+          "function": "Review API call paths and increase template fallback coverage"
+        }
+      ]
+    },
+    {
+      "iteration": 13,
+      "timestamp": "2026-04-03T08:50:56.141269",
+      "metrics": {
+        "timestamp": "2026-04-03T08:50:56.080793",
+        "iteration": 13,
+        "code": {
+          "total_files": 69,
+          "test_files": 11,
+          "total_lines": 32390,
+          "total_functions": 1214,
+          "total_signals": 145,
+          "total_classes": 68,
+          "total_consts": 417,
+          "total_enums": 16,
+          "avg_lines_per_file": 469.4,
+          "avg_functions_per_file": 17.6,
+          "type_annotation_coverage_pct": 339.8
+        },
+        "atoa": {
+          "available": true,
+          "template_count": 1034,
+          "template_categories": [
+            "evolution",
+            "birth",
+            "death_nearby",
+            "first_word",
+            "milestone",
+            "player_achievement",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "entries",
+            "entries",
+            "entries",
+            "entries",
+            "context_tags",
+            "playful",
+            "serious",
+            "nostalgic",
+            "competitive",
+            "supportive",
+            "curious",
+            "reactions",
+            "reactions",
+            "joy",
+            "love",
+            "excitement",
+            "sadness",
+            "fear",
+            "topics_discussed",
+            "mood_history",
+            "invented_words_used",
+            "topics_discussed",
+            "mood_history",
+            "invented_words_used",
+            "taught_words",
+            "participants",
+            "shared_words"
+          ],
+          "template_category_count": 27,
+          "placeholder_types": [
+            "compound_word",
+            "count",
+            "emotion",
+            "greeting",
+            "name",
+            "partner",
+            "pet1",
+            "pet2",
+            "pet3",
+            "pet_name",
+            "quote",
+            "reply",
+            "reply_word",
+            "response_word",
+            "suffix",
+            "topic"
+          ],
+          "prompt_chars_estimate": 6784,
+          "prompt_token_estimate": 1696,
+          "daily_budget_usd": 0.5,
+          "cost_per_turn_usd": 0.0015,
+          "max_daily_conversations": 20,
+          "max_turns_per_conversation": 6
+        },
+        "language": {
+          "available": true,
+          "syllable_pool_size": 83,
+          "language_stages": 5,
+          "word_order_types": 7,
+          "suffix_context_count": 47,
+          "hebbian_parameters": {
+            "STRENGTH_ON_SUCCESS": 0.15,
+            "DAILY_DECAY": 0.01,
+            "ARCHIVE_THRESHOLD": 0.1,
+            "PROPAGATION_THRESHOLD": 0.8,
+            "NEOLOGISM_TRIGGER_COUNT": 20.0,
+            "GRAMMAR_TRIGGER_COUNT": 50.0
+          }
+        },
+        "battle": {
+          "available": true,
+          "score_categories": {
+            "vocabulary": 30.0,
+            "grammar": 25.0,
+            "creativity": 25.0,
+            "emotion": 20.0
+          },
+          "total_max_score": 100.0,
+          "score_variance": 12.5,
+          "round_themes": [
+            "GREETING",
+            "ARGUMENT",
+            "STORYTELLING"
+          ],
+          "templates_per_theme": {
+            "GREETING": 12,
+            "ARGUMENT": 12,
+            "STORYTELLING": 12
+          },
+          "total_battle_templates": 36,
+          "reward_constants": {
+            "WINNER_AFFINITY_BOOST": 0.1,
+            "WINNER_PERSONALITY_BOOST": 0.02,
+            "LOSER_DETERMINATION_BOOST": 0.15
+          }
+        },
+        "cost": {
+          "available": true,
+          "cost_per_turn_usd": 0.0015,
+          "max_turns_per_conversation": 6,
+          "max_daily_conversations": 20,
+          "daily_budget_usd": 0.5,
+          "worst_case_daily_cost_usd": 0.18,
+          "budget_headroom_usd": 0.32,
+          "template_ratio_estimate_pct": 100.0,
+          "api_call_references": 0,
+          "template_references": 149
+        },
+        "top_files_by_lines": [
+          {
+            "path": "godot_project/scripts/conversation/a2a_conversation_system.gd",
+            "lines": 3244,
+            "functions": 71
+          },
+          {
+            "path": "godot_project/scripts/main_scene.gd",
+            "lines": 1437,
+            "functions": 64
+          },
+          {
+            "path": "godot_project/scripts/ui/conversation_log_viewer.gd",
+            "lines": 1137,
+            "functions": 19
+          },
+          {
+            "path": "godot_project/scripts/ui/pet_book_ui.gd",
+            "lines": 1021,
+            "functions": 41
+          },
+          {
+            "path": "godot_project/scripts/social/pet_book_core.gd",
+            "lines": 950,
+            "functions": 41
+          },
+          {
+            "path": "godot_project/scripts/battle/language_battle_system.gd",
+            "lines": 898,
+            "functions": 31
+          },
+          {
+            "path": "godot_project/scripts/ui/pet_book_post_card.gd",
+            "lines": 797,
+            "functions": 37
+          },
+          {
+            "path": "godot_project/scripts/core/game_manager.gd",
+            "lines": 793,
+            "functions": 60
+          },
+          {
+            "path": "godot_project/scripts/visual/sprite_placeholder_generator.gd",
+            "lines": 719,
+            "functions": 12
+          },
+          {
+            "path": "godot_project/scripts/ui/battle_screen.gd",
+            "lines": 699,
+            "functions": 21
+          }
+        ]
+      },
+      "evaluation": {
+        "code_quality": {
+          "score": 81.0,
+          "notes": [
+            "Avg funcs/file: 17.6 (sweet spot: 5-15)",
+            "Avg lines/file: 469 (sweet spot: 100-400)"
+          ]
+        },
+        "atoa_quality": {
+          "score": 100.0,
+          "notes": []
+        },
+        "language_diversity": {
+          "score": 100.0,
+          "notes": []
+        },
+        "battle_balance": {
+          "score": 90.0,
+          "notes": []
+        },
+        "cost_efficiency": {
+          "score": 87.4,
+          "notes": []
+        },
+        "overall": 91.7
+      },
+      "analysis": [
+        "[STAGNANT] code_quality: no progress at 81",
+        "  -> code_quality: Avg funcs/file: 17.6 (sweet spot: 5-15)",
+        "  -> code_quality: Avg lines/file: 469 (sweet spot: 100-400)",
+        "[STAGNANT] atoa_quality: no progress at 100",
+        "[STAGNANT] language_diversity: no progress at 100",
+        "[STAGNANT] battle_balance: no progress at 90",
+        "[STAGNANT] cost_efficiency: no progress at 87"
+      ],
+      "improvements": [
+        {
+          "description": "[STAGNANT] code_quality: no progress at 81",
+          "priority": "medium",
+          "change_type": "investigate",
+          "file": null,
+          "function": null
+        },
+        {
+          "description": "  -> code_quality: Avg funcs/file: 17.6 (sweet spot: 5-15)",
+          "priority": "medium",
+          "change_type": "investigate",
+          "file": null,
+          "function": null
+        },
+        {
+          "description": "  -> code_quality: Avg lines/file: 469 (sweet spot: 100-400)",
+          "priority": "medium",
+          "change_type": "investigate",
+          "file": null,
+          "function": null
+        },
+        {
+          "description": "[STAGNANT] atoa_quality: no progress at 100",
+          "priority": "medium",
+          "change_type": "investigate",
+          "file": null,
+          "function": null
+        },
+        {
+          "description": "[STAGNANT] language_diversity: no progress at 100",
+          "priority": "medium",
+          "change_type": "investigate",
+          "file": null,
+          "function": null
+        },
+        {
+          "description": "[STAGNANT] battle_balance: no progress at 90",
+          "priority": "medium",
+          "change_type": "investigate",
+          "file": null,
+          "function": null
+        },
+        {
+          "description": "[STAGNANT] cost_efficiency: no progress at 87",
+          "priority": "medium",
+          "change_type": "cost_optimization",
+          "file": "godot_project/scripts/conversation/a2a_conversation_system.gd",
+          "function": "Review API call paths and increase template fallback coverage"
+        }
+      ]
+    },
+    {
+      "iteration": 14,
+      "timestamp": "2026-04-03T08:50:59.804389",
+      "metrics": {
+        "timestamp": "2026-04-03T08:50:59.745070",
+        "iteration": 14,
+        "code": {
+          "total_files": 69,
+          "test_files": 11,
+          "total_lines": 32390,
+          "total_functions": 1214,
+          "total_signals": 145,
+          "total_classes": 68,
+          "total_consts": 417,
+          "total_enums": 16,
+          "avg_lines_per_file": 469.4,
+          "avg_functions_per_file": 17.6,
+          "type_annotation_coverage_pct": 339.8
+        },
+        "atoa": {
+          "available": true,
+          "template_count": 1034,
+          "template_categories": [
+            "evolution",
+            "birth",
+            "death_nearby",
+            "first_word",
+            "milestone",
+            "player_achievement",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "templates",
+            "entries",
+            "entries",
+            "entries",
+            "entries",
+            "context_tags",
+            "playful",
+            "serious",
+            "nostalgic",
+            "competitive",
+            "supportive",
+            "curious",
+            "reactions",
+            "reactions",
+            "joy",
+            "love",
+            "excitement",
+            "sadness",
+            "fear",
+            "topics_discussed",
+            "mood_history",
+            "invented_words_used",
+            "topics_discussed",
+            "mood_history",
+            "invented_words_used",
+            "taught_words",
+            "participants",
+            "shared_words"
+          ],
+          "template_category_count": 27,
+          "placeholder_types": [
+            "compound_word",
+            "count",
+            "emotion",
+            "greeting",
+            "name",
+            "partner",
+            "pet1",
+            "pet2",
+            "pet3",
+            "pet_name",
+            "quote",
+            "reply",
+            "reply_word",
+            "response_word",
+            "suffix",
+            "topic"
+          ],
+          "prompt_chars_estimate": 6784,
+          "prompt_token_estimate": 1696,
+          "daily_budget_usd": 0.5,
+          "cost_per_turn_usd": 0.0015,
+          "max_daily_conversations": 20,
+          "max_turns_per_conversation": 6
+        },
+        "language": {
+          "available": true,
+          "syllable_pool_size": 83,
+          "language_stages": 5,
+          "word_order_types": 7,
+          "suffix_context_count": 47,
+          "hebbian_parameters": {
+            "STRENGTH_ON_SUCCESS": 0.15,
+            "DAILY_DECAY": 0.01,
+            "ARCHIVE_THRESHOLD": 0.1,
+            "PROPAGATION_THRESHOLD": 0.8,
+            "NEOLOGISM_TRIGGER_COUNT": 20.0,
+            "GRAMMAR_TRIGGER_COUNT": 50.0
+          }
+        },
+        "battle": {
+          "available": true,
+          "score_categories": {
+            "vocabulary": 30.0,
+            "grammar": 25.0,
+            "creativity": 25.0,
+            "emotion": 20.0
+          },
+          "total_max_score": 100.0,
+          "score_variance": 12.5,
+          "round_themes": [
+            "GREETING",
+            "ARGUMENT",
+            "STORYTELLING"
+          ],
+          "templates_per_theme": {
+            "GREETING": 12,
+            "ARGUMENT": 12,
+            "STORYTELLING": 12
+          },
+          "total_battle_templates": 36,
+          "reward_constants": {
+            "WINNER_AFFINITY_BOOST": 0.1,
+            "WINNER_PERSONALITY_BOOST": 0.02,
+            "LOSER_DETERMINATION_BOOST": 0.15
+          }
+        },
+        "cost": {
+          "available": true,
+          "cost_per_turn_usd": 0.0015,
+          "max_turns_per_conversation": 6,
+          "max_daily_conversations": 20,
+          "daily_budget_usd": 0.5,
+          "worst_case_daily_cost_usd": 0.18,
+          "budget_headroom_usd": 0.32,
+          "template_ratio_estimate_pct": 100.0,
+          "api_call_references": 0,
+          "template_references": 149
+        },
+        "top_files_by_lines": [
+          {
+            "path": "godot_project/scripts/conversation/a2a_conversation_system.gd",
+            "lines": 3244,
+            "functions": 71
+          },
+          {
+            "path": "godot_project/scripts/main_scene.gd",
+            "lines": 1437,
+            "functions": 64
+          },
+          {
+            "path": "godot_project/scripts/ui/conversation_log_viewer.gd",
+            "lines": 1137,
+            "functions": 19
+          },
+          {
+            "path": "godot_project/scripts/ui/pet_book_ui.gd",
+            "lines": 1021,
+            "functions": 41
+          },
+          {
+            "path": "godot_project/scripts/social/pet_book_core.gd",
+            "lines": 950,
+            "functions": 41
+          },
+          {
+            "path": "godot_project/scripts/battle/language_battle_system.gd",
+            "lines": 898,
+            "functions": 31
+          },
+          {
+            "path": "godot_project/scripts/ui/pet_book_post_card.gd",
+            "lines": 797,
+            "functions": 37
+          },
+          {
+            "path": "godot_project/scripts/core/game_manager.gd",
+            "lines": 793,
+            "functions": 60
+          },
+          {
+            "path": "godot_project/scripts/visual/sprite_placeholder_generator.gd",
+            "lines": 719,
+            "functions": 12
+          },
+          {
+            "path": "godot_project/scripts/ui/battle_screen.gd",
+            "lines": 699,
+            "functions": 21
+          }
+        ]
+      },
+      "evaluation": {
+        "code_quality": {
+          "score": 81.0,
+          "notes": [
+            "Avg funcs/file: 17.6 (sweet spot: 5-15)",
+            "Avg lines/file: 469 (sweet spot: 100-400)"
+          ]
+        },
+        "atoa_quality": {
+          "score": 100.0,
+          "notes": []
+        },
+        "language_diversity": {
+          "score": 100.0,
+          "notes": []
+        },
+        "battle_balance": {
+          "score": 90.0,
+          "notes": []
+        },
+        "cost_efficiency": {
+          "score": 87.4,
+          "notes": []
+        },
+        "overall": 91.7
+      },
+      "analysis": [
+        "[STAGNANT] code_quality: no progress at 81",
+        "  -> code_quality: Avg funcs/file: 17.6 (sweet spot: 5-15)",
+        "  -> code_quality: Avg lines/file: 469 (sweet spot: 100-400)",
+        "[STAGNANT] atoa_quality: no progress at 100",
+        "[STAGNANT] language_diversity: no progress at 100",
+        "[STAGNANT] battle_balance: no progress at 90",
+        "[STAGNANT] cost_efficiency: no progress at 87"
+      ],
+      "improvements": [
+        {
+          "description": "[STAGNANT] code_quality: no progress at 81",
+          "priority": "medium",
+          "change_type": "investigate",
+          "file": null,
+          "function": null
+        },
+        {
+          "description": "  -> code_quality: Avg funcs/file: 17.6 (sweet spot: 5-15)",
+          "priority": "medium",
+          "change_type": "investigate",
+          "file": null,
+          "function": null
+        },
+        {
+          "description": "  -> code_quality: Avg lines/file: 469 (sweet spot: 100-400)",
+          "priority": "medium",
+          "change_type": "investigate",
+          "file": null,
+          "function": null
+        },
+        {
+          "description": "[STAGNANT] atoa_quality: no progress at 100",
+          "priority": "medium",
+          "change_type": "investigate",
+          "file": null,
+          "function": null
+        },
+        {
+          "description": "[STAGNANT] language_diversity: no progress at 100",
+          "priority": "medium",
+          "change_type": "investigate",
+          "file": null,
+          "function": null
+        },
+        {
+          "description": "[STAGNANT] battle_balance: no progress at 90",
+          "priority": "medium",
+          "change_type": "investigate",
+          "file": null,
+          "function": null
+        },
+        {
+          "description": "[STAGNANT] cost_efficiency: no progress at 87",
+          "priority": "medium",
+          "change_type": "cost_optimization",
+          "file": "godot_project/scripts/conversation/a2a_conversation_system.gd",
+          "function": "Review API call paths and increase template fallback coverage"
         }
       ]
     }

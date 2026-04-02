@@ -21,10 +21,10 @@ const MIN_EMOTION_FOR_SPONTANEOUS: float = 0.4     # 自発的会話の最低感
 
 # === コスト管理（P2原則） ===
 const DAILY_CONVERSATION_BUDGET: float = 0.50      # 1日の会話予算（ドル）
-const COST_PER_TURN: float = 0.002                 # 1ターンあたりの概算コスト
+const COST_PER_TURN: float = 0.0015                 # 1ターンあたりの概算コスト
 var daily_conversation_cost: float = 0.0
 var daily_conversation_count: int = 0
-const MAX_DAILY_CONVERSATIONS: int = 25            # 1日の最大会話数（50ペット÷2≈25）
+const MAX_DAILY_CONVERSATIONS: int = 20            # 1日の最大会話数（50ペット÷2≈25）
 
 # === イベント会話管理 ===
 const MAX_DAILY_EVENT_CONVERSATIONS: int = 3       # 1日のイベント会話上限
