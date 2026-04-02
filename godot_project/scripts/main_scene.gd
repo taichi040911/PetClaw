@@ -27,6 +27,7 @@ extends Control
 @onready var settings_button: Button = $UIPanel/VBox/NavButtons/SettingsButton
 @onready var save_indicator: Label = $UIPanel/VBox/NavButtons/SaveIndicator
 var battle_button: Button  # Created programmatically in NavButtons
+var network_button: Button  # Created programmatically in NavButtons
 
 # === Pet Reference ===
 var current_pet: PetEntity
@@ -128,6 +129,13 @@ func _ready() -> void:
 	nav_buttons.add_child(battle_button)
 	nav_buttons.move_child(battle_button, save_indicator.get_index())
 	battle_button.pressed.connect(_on_battle_pressed)
+	# Network button (programmatic, inserted before SaveIndicator in NavButtons)
+	network_button = Button.new()
+	network_button.custom_minimum_size = Vector2(80, 36)
+	network_button.text = "Network"
+	nav_buttons.add_child(network_button)
+	nav_buttons.move_child(network_button, save_indicator.get_index())
+	network_button.pressed.connect(_on_network_pressed)
 	pet_name_label.gui_input.connect(_on_pet_name_tapped)
 	pet_name_label.mouse_filter = Control.MOUSE_FILTER_STOP
 
@@ -800,6 +808,19 @@ func _on_dict_pressed() -> void:
 	)
 	await _fade_out_main_ui()
 	add_child(dict_screen)
+
+
+func _on_network_pressed() -> void:
+	_animate_button(network_button)
+	if _sfx:
+		_sfx.play(SfxManager.SfxType.UI_OPEN)
+	var net_screen: LanguageNetworkScreen = LanguageNetworkScreen.new()
+	net_screen.back_requested.connect(func() -> void:
+		net_screen.queue_free()
+		_fade_in_main_ui()
+	)
+	await _fade_out_main_ui()
+	add_child(net_screen)
 
 
 func _on_settings_pressed() -> void:
