@@ -12,7 +12,8 @@ extends Control
 @onready var health_bar: ProgressBar = $UIPanel/VBox/StatsBar/HealthBar
 @onready var energy_bar: ProgressBar = $UIPanel/VBox/StatsBar2/EnergyBar
 @onready var affection_bar: ProgressBar = $UIPanel/VBox/StatsBar2/AffectionBar
-@onready var pet_name_label: Label = $UIPanel/VBox/PetNameLabel
+@onready var pet_name_label: Label = $UIPanel/VBox/TopRow/PetNameLabel
+@onready var clock_label: Label = $UIPanel/VBox/TopRow/ClockLabel
 @onready var feed_button: Button = $UIPanel/VBox/ActionButtons/FeedButton
 @onready var pet_button: Button = $UIPanel/VBox/ActionButtons/PetButton
 @onready var play_button: Button = $UIPanel/VBox/ActionButtons/PlayButton
@@ -295,6 +296,9 @@ func _update_ui() -> void:
 	else:
 		energy_bar.modulate = Color.WHITE
 
+	# 時計表示
+	_update_clock()
+
 	# ステージ・年齢表示
 	_update_stage_display()
 
@@ -395,6 +399,10 @@ func _on_feed_pressed() -> void:
 		return
 	_spawn_floating_text("🍖 +Hunger!", UI_FEED_COLOR)
 	_screen_shake(2.0, 0.1)
+	# 給餌アニメーション
+	var feed_anim: FeedingAnimation = FeedingAnimation.new()
+	add_child(feed_anim)
+	feed_anim.play_feed(Vector2(360, 500), current_pet.stats.hunger)
 	if GameManager.instance and GameManager.instance.care_system:
 		GameManager.instance.care_system.perform_action(current_pet, "feed")
 	else:
@@ -757,6 +765,7 @@ func _apply_ui_theme() -> void:
 
 	pet_name_label.add_theme_font_size_override("font_size", 22)
 	pet_name_label.add_theme_color_override("font_color", Color(0.95, 0.95, 1.0))
+	pet_name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 	# スタッツバーのスタイル
 	_style_progress_bar(hunger_bar, Color(0.35, 0.8, 0.45))
@@ -1053,6 +1062,29 @@ func _update_condition_label() -> void:
 	condition_label.add_theme_color_override("font_color", config["color"])
 	condition_label.add_theme_font_size_override("font_size", 12)
 	condition_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+
+# ========================================================
+# Clock Display (Round 45)
+# ========================================================
+
+func _update_clock() -> void:
+	if not clock_label:
+		return
+	var dt: Dictionary = Time.get_datetime_dict_from_system()
+	var hour: int = dt.get("hour", 0)
+	var minute: int = dt.get("minute", 0)
+
+	# 昼夜アイコン
+	var time_icon: String = "☀" if hour >= 6 and hour < 18 else "🌙"
+	clock_label.text = "%s %02d:%02d" % [time_icon, hour, minute]
+	clock_label.add_theme_font_size_override("font_size", 12)
+
+	# 夜は暗い色
+	if hour >= 20 or hour < 6:
+		clock_label.add_theme_color_override("font_color", Color(0.5, 0.5, 0.7))
+	else:
+		clock_label.add_theme_color_override("font_color", Color(0.7, 0.7, 0.8))
 
 
 # ========================================================

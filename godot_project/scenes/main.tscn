@@ -52,10 +52,19 @@ grow_vertical = 2
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="PetNameLabel" type="Label" parent="UIPanel/VBox"]
+[node name="TopRow" type="HBoxContainer" parent="UIPanel/VBox"]
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 8
+
+[node name="PetNameLabel" type="Label" parent="UIPanel/VBox/TopRow"]
 layout_mode = 2
 text = "Mimi"
-horizontal_alignment = 1
+
+[node name="ClockLabel" type="Label" parent="UIPanel/VBox/TopRow"]
+layout_mode = 2
+text = "12:00"
+horizontal_alignment = 2
 
 [node name="StageLabel" type="Label" parent="UIPanel/VBox"]
 layout_mode = 2
