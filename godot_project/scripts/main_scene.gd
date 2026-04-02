@@ -29,6 +29,7 @@ extends Control
 var battle_button: Button  # Created programmatically in NavButtons
 var network_button: Button  # Created programmatically in NavButtons
 var achievement_button: Button  # Created programmatically in NavButtons
+var culture_button: Button  # Created programmatically in NavButtons
 
 # === Pet Reference ===
 var current_pet: PetEntity
@@ -144,6 +145,13 @@ func _ready() -> void:
 	nav_buttons.add_child(achievement_button)
 	nav_buttons.move_child(achievement_button, save_indicator.get_index())
 	achievement_button.pressed.connect(_on_achievement_pressed)
+	# Cultural Dashboard button (v1.1.0)
+	culture_button = Button.new()
+	culture_button.custom_minimum_size = Vector2(80, 36)
+	culture_button.text = "Culture"
+	nav_buttons.add_child(culture_button)
+	nav_buttons.move_child(culture_button, save_indicator.get_index())
+	culture_button.pressed.connect(_on_culture_pressed)
 	pet_name_label.gui_input.connect(_on_pet_name_tapped)
 	pet_name_label.mouse_filter = Control.MOUSE_FILTER_STOP
 
@@ -865,6 +873,21 @@ func _on_battle_pressed() -> void:
 	add_child(battle_screen)
 
 
+# === Cultural Dashboard Screen ===
+
+func _on_culture_pressed() -> void:
+	_animate_button(culture_button)
+	if _sfx:
+		_sfx.play(SfxManager.SfxType.UI_OPEN)
+	var culture_screen: CulturalDashboardScreen = CulturalDashboardScreen.new()
+	culture_screen.back_requested.connect(func() -> void:
+		culture_screen.queue_free()
+		_fade_in_main_ui()
+	)
+	await _fade_out_main_ui()
+	add_child(culture_screen)
+
+
 # === Achievement Screen ===
 
 func _on_achievement_pressed() -> void:
@@ -1001,6 +1024,7 @@ func _apply_ui_theme() -> void:
 	_style_nav_button(pets_button, "🐾 Pets")
 	_style_nav_button(battle_button, "⚔ Battle")
 	_style_nav_button(settings_button, "⚙ Settings")
+	_style_nav_button(culture_button, "🎉 Culture")
 	_style_mute_button()
 
 	# ラベルスタイリング
