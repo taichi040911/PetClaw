@@ -860,34 +860,72 @@ func _detect_and_invent_words(text: String, msg: Dictionary) -> void:
 	if not GameManager.instance or not GameManager.instance.original_language:
 		return
 
-	# 感情表現を語彙化するチャンス
 	var emotion: String = msg.get("emotion", "neutral")
-	if emotion != "neutral" and randf() < 0.25:
+	var pet_id: int = msg.get("pet_id", 0)
+	var environment: String = msg.get("environment", "forest")
+
+	# 1. 感情表現を語彙化（拡張された感情→単語マッピング）
+	if emotion != "neutral" and randf() < 0.35:
 		var emotion_words: Dictionary = {
-			"joy": "happy", "love": "dear", "excitement": "thrill",
-			"sadness": "sorrow", "fear": "dread",
+			"joy": ["happy", "wonderful", "bright", "warm"],
+			"love": ["dear", "cherish", "heart", "together"],
+			"excitement": ["thrill", "amazing", "wow", "spark"],
+			"sadness": ["sorrow", "lonely", "miss", "tear"],
+			"fear": ["dread", "shadow", "cold", "hide"],
 		}
-		var word: String = emotion_words.get(emotion, "")
-		if not word.is_empty():
+		var word_choices: Array = emotion_words.get(emotion, [])
+		if not word_choices.is_empty():
+			var word: String = word_choices[randi() % word_choices.size()]
 			GameManager.instance.original_language.invent_word(word, {
 				"emotion": emotion,
-				"environment": msg.get("environment", "forest"),
-				"pet_id": msg.get("pet_id", 0),
+				"environment": environment,
+				"pet_id": pet_id,
 				"situation": "a2a_conversation",
 			})
 
-	# アクション表現（*action*パターン）を検出して語彙化
+	# 2. アクション表現（*action*パターン）を検出して語彙化
 	var action_regex: RegEx = RegEx.new()
 	action_regex.compile("\\*([a-z ]+)\\*")
 	var matches: Array[RegExMatch] = action_regex.search_all(text)
 	for m: RegExMatch in matches:
 		var action: String = m.get_string(1).strip_edges()
-		if action.length() >= 3 and action.length() <= 20 and randf() < 0.15:
+		if action.length() >= 3 and action.length() <= 20 and randf() < 0.25:
 			GameManager.instance.original_language.invent_word(action, {
 				"emotion": emotion,
-				"pet_id": msg.get("pet_id", 0),
+				"pet_id": pet_id,
 				"situation": "action_expression",
 			})
+
+	# 3. 環境関連の語彙を発明（環境名自体を語彙化）
+	if randf() < 0.15 and not environment.is_empty():
+		GameManager.instance.original_language.invent_word(environment, {
+			"emotion": "neutral",
+			"environment": environment,
+			"pet_id": pet_id,
+			"situation": "environment_naming",
+		})
+
+	# 4. 関係性の語彙（会話相手に対する呼称）
+	if randf() < 0.1:
+		var relationship_words: Array = ["friend", "companion", "buddy", "pal"]
+		var rel_word: String = relationship_words[randi() % relationship_words.size()]
+		GameManager.instance.original_language.invent_word(rel_word, {
+			"emotion": emotion,
+			"pet_id": pet_id,
+			"situation": "relationship_term",
+		})
+
+	# 5. テキスト中の重要単語を検出して語彙化チャンス
+	var important_words: Array = ["play", "eat", "sleep", "run", "dance", "sing",
+		"dream", "wish", "hope", "remember", "forget", "discover"]
+	for iw: String in important_words:
+		if text.containsn(iw) and randf() < 0.08:
+			GameManager.instance.original_language.invent_word(iw, {
+				"emotion": emotion,
+				"pet_id": pet_id,
+				"situation": "common_verb",
+			})
+			break  # 1メッセージにつき1つまで
 
 
 func _get_participants_from_messages(messages: Array[Dictionary]) -> Array[PetEntity]:
