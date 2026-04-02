@@ -14,6 +14,7 @@ var _status_label: Label
 var _export_toast: Label
 var _refresh_timer: float = 0.0
 var _relationships_container: VBoxContainer
+var _highlights_container: VBoxContainer
 var _last_displayed_pet_name: String = ""
 
 
@@ -87,6 +88,12 @@ func _build_ui() -> void:
 	_relationships_container.add_theme_constant_override("separation", 4)
 	_vbox.add_child(_relationships_container)
 	_rebuild_relationships()
+
+	# ハイライトセクション（関係性の後、コントロールの前）
+	_highlights_container = VBoxContainer.new()
+	_highlights_container.add_theme_constant_override("separation", 6)
+	_vbox.add_child(_highlights_container)
+	_rebuild_highlights()
 
 	# 会話トリガーボタン + ステータス
 	_add_conversation_controls()
@@ -220,13 +227,14 @@ func _rebuild_log() -> void:
 	for child: Node in _vbox.get_children():
 		children.append(child)
 
-	# 最初の4つ（言語カード、関係性、コントロール、ログセクション以降）を残し、ログ部分を削除
-	var remove_start: int = 4  # language card + relationships + controls + (log section starts)
+	# 最初の5つ（言語カード、関係性、ハイライト、コントロール、ログセクション以降）を残し、ログ部分を削除
+	var remove_start: int = 5  # language card + relationships + highlights + controls + (log section starts)
 	for i: int in range(remove_start, children.size()):
 		children[i].queue_free()
 
-	# 関係性セクションも更新
+	# 関係性セクション・ハイライトセクションも更新
 	_rebuild_relationships()
+	_rebuild_highlights()
 
 	# 少し待ってからログを再追加
 	await get_tree().process_frame
@@ -434,6 +442,132 @@ func _build_relationship_indicator(name_a: String, name_b: String) -> Label:
 	indicator.add_theme_color_override("font_color", Color(0.4, 0.45, 0.55))
 	indicator.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	return indicator
+
+
+func _rebuild_highlights() -> void:
+	## ハイライトセクションを構築/再構築（最大3件の注目会話を表示）
+	for child: Node in _highlights_container.get_children():
+		child.queue_free()
+
+	if not GameManager.instance or not GameManager.instance.a2a_system:
+		return
+
+	var a2a_system: AtoAConversationSystem = GameManager.instance.a2a_system
+	if not a2a_system.has_method("get_conversation_highlights"):
+		return
+
+	var highlights: Array = a2a_system.get_conversation_highlights(3)
+	if highlights.is_empty():
+		return
+
+	# セクションヘッダー
+	var hl_title: Label = Label.new()
+	hl_title.text = "⭐ Highlights"
+	hl_title.add_theme_font_size_override("font_size", 13)
+	hl_title.add_theme_color_override("font_color", Color(0.85, 0.8, 0.5))
+	_highlights_container.add_child(hl_title)
+
+	for highlight: Variant in highlights:
+		if not highlight is Dictionary:
+			continue
+		var hl: Dictionary = highlight as Dictionary
+		_add_highlight_card(hl)
+
+
+func _add_highlight_card(hl: Dictionary) -> void:
+	## 個別ハイライトカードを作成
+	var tier: String = hl.get("tier", "notable")
+	var score: float = hl.get("score", 0.0)
+	var participants: Array = hl.get("participants", [])
+	var reason: String = hl.get("highlight_reason", "")
+	var messages: Array = hl.get("messages", [])
+
+	# ボーダー色: landmark=ゴールド, notable=シルバー
+	var border_color: Color = Color(0.85, 0.75, 0.25) if tier == "landmark" else Color(0.6, 0.62, 0.7)
+
+	var card: PanelContainer = PanelContainer.new()
+	var card_style: StyleBoxFlat = StyleBoxFlat.new()
+	card_style.bg_color = Color(0.08, 0.09, 0.14)
+	card_style.corner_radius_top_left = 8
+	card_style.corner_radius_top_right = 8
+	card_style.corner_radius_bottom_left = 8
+	card_style.corner_radius_bottom_right = 8
+	card_style.border_width_left = 3
+	card_style.border_width_top = 1
+	card_style.border_width_right = 1
+	card_style.border_width_bottom = 1
+	card_style.border_color = border_color
+	card_style.content_margin_left = 8
+	card_style.content_margin_right = 8
+	card_style.content_margin_top = 5
+	card_style.content_margin_bottom = 5
+	card.add_theme_stylebox_override("panel", card_style)
+	_highlights_container.add_child(card)
+
+	var card_vbox: VBoxContainer = VBoxContainer.new()
+	card_vbox.add_theme_constant_override("separation", 2)
+	card.add_child(card_vbox)
+
+	# スコアバッジ + 参加者行
+	var header_row: HBoxContainer = HBoxContainer.new()
+	header_row.add_theme_constant_override("separation", 6)
+	card_vbox.add_child(header_row)
+
+	# スコアバッジ
+	var score_badge: PanelContainer = PanelContainer.new()
+	var badge_style: StyleBoxFlat = StyleBoxFlat.new()
+	badge_style.bg_color = Color(border_color.r, border_color.g, border_color.b, 0.2)
+	badge_style.corner_radius_top_left = 4
+	badge_style.corner_radius_top_right = 4
+	badge_style.corner_radius_bottom_left = 4
+	badge_style.corner_radius_bottom_right = 4
+	badge_style.content_margin_left = 5
+	badge_style.content_margin_right = 5
+	badge_style.content_margin_top = 1
+	badge_style.content_margin_bottom = 1
+	score_badge.add_theme_stylebox_override("panel", badge_style)
+	header_row.add_child(score_badge)
+
+	var score_label: Label = Label.new()
+	score_label.text = "%.0f" % (score * 100.0)
+	score_label.add_theme_font_size_override("font_size", 10)
+	score_label.add_theme_color_override("font_color", border_color)
+	score_badge.add_child(score_label)
+
+	# 参加者名
+	var participants_text: String = ", ".join(participants) if not participants.is_empty() else "Unknown"
+	var participants_label: Label = Label.new()
+	participants_label.text = participants_text
+	participants_label.add_theme_font_size_override("font_size", 11)
+	participants_label.add_theme_color_override("font_color", Color(0.7, 0.72, 0.85))
+	header_row.add_child(participants_label)
+
+	# ハイライト理由
+	if not reason.is_empty():
+		var reason_label: Label = Label.new()
+		reason_label.text = reason
+		reason_label.add_theme_font_size_override("font_size", 10)
+		reason_label.add_theme_color_override("font_color", Color(0.55, 0.58, 0.7))
+		reason_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+		card_vbox.add_child(reason_label)
+
+	# 最初のメッセージプレビュー（60文字に切り詰め）
+	if not messages.is_empty():
+		var first_msg: Variant = messages[0]
+		var preview_text: String = ""
+		if first_msg is Dictionary:
+			preview_text = (first_msg as Dictionary).get("message", "")
+		elif first_msg is String:
+			preview_text = first_msg as String
+		if not preview_text.is_empty():
+			if preview_text.length() > 60:
+				preview_text = preview_text.substr(0, 60) + "..."
+			var preview_label: Label = Label.new()
+			preview_label.text = "\"%s\"" % preview_text
+			preview_label.add_theme_font_size_override("font_size", 10)
+			preview_label.add_theme_color_override("font_color", Color(0.45, 0.48, 0.6))
+			preview_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+			card_vbox.add_child(preview_label)
 
 
 func _rebuild_relationships() -> void:
