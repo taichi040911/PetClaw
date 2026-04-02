@@ -74,8 +74,9 @@ func _build_ui() -> void:
 	_vbox.add_theme_constant_override("separation", 12)
 	_scroll.add_child(_vbox)
 
-	# 言語進化ステータスカード
-	_add_language_status_card()
+	# 言語進化ライブパネル（リアルタイム更新）
+	var lang_panel: LanguageEvolutionPanel = LanguageEvolutionPanel.new()
+	_vbox.add_child(lang_panel)
 
 	# 会話トリガーボタン + ステータス
 	_add_conversation_controls()
@@ -190,80 +191,6 @@ func _rebuild_log() -> void:
 	# 少し待ってからログを再追加
 	await get_tree().process_frame
 	_add_conversation_log()
-
-
-func _add_language_status_card() -> void:
-	var card: PanelContainer = PanelContainer.new()
-	var card_style: StyleBoxFlat = StyleBoxFlat.new()
-	card_style.bg_color = Color(0.1, 0.12, 0.2, 0.8)
-	card_style.corner_radius_top_left = 12
-	card_style.corner_radius_top_right = 12
-	card_style.corner_radius_bottom_left = 12
-	card_style.corner_radius_bottom_right = 12
-	card_style.border_width_left = 1
-	card_style.border_width_right = 1
-	card_style.border_width_top = 1
-	card_style.border_width_bottom = 1
-	card_style.border_color = Color(0.3, 0.35, 0.5, 0.4)
-	card_style.content_margin_left = 12
-	card_style.content_margin_right = 12
-	card_style.content_margin_top = 8
-	card_style.content_margin_bottom = 8
-	card.add_theme_stylebox_override("panel", card_style)
-	_vbox.add_child(card)
-
-	var card_vbox: VBoxContainer = VBoxContainer.new()
-	card_vbox.add_theme_constant_override("separation", 4)
-	card.add_child(card_vbox)
-
-	# タイトル
-	var card_title: Label = Label.new()
-	card_title.text = "🧬 Language Evolution"
-	card_title.add_theme_font_size_override("font_size", 14)
-	card_title.add_theme_color_override("font_color", Color(0.6, 0.8, 1.0))
-	card_vbox.add_child(card_title)
-
-	# 言語ステージ
-	if GameManager.instance and GameManager.instance.original_language:
-		var stage_info: Dictionary = GameManager.instance.original_language.get_language_stage()
-		var stage_label: Label = Label.new()
-		stage_label.text = "Stage %d: %s  |  %d words invented" % [
-			stage_info["stage"] + 1, stage_info["name"], stage_info["vocabulary_size"]
-		]
-		stage_label.add_theme_font_size_override("font_size", 12)
-		stage_label.add_theme_color_override("font_color", Color(0.7, 0.75, 0.85))
-		card_vbox.add_child(stage_label)
-
-	# 文法情報
-	if GameManager.language_evolution:
-		var grammar: Dictionary = GameManager.language_evolution.get_current_grammar()
-		var grammar_label: Label = Label.new()
-		grammar_label.text = "Word order: %s  |  Suffixes: %d  |  Prepositions: %d" % [
-			grammar["word_order"],
-			grammar["suffixes"].size(),
-			grammar["prepositions"].size(),
-		]
-		grammar_label.add_theme_font_size_override("font_size", 11)
-		grammar_label.add_theme_color_override("font_color", Color(0.55, 0.6, 0.75))
-		card_vbox.add_child(grammar_label)
-
-		# 接尾辞一覧
-		var suffix_text: String = "Suffixes: " + ", ".join(grammar["suffixes"])
-		var suffix_label: Label = Label.new()
-		suffix_label.text = suffix_text
-		suffix_label.add_theme_font_size_override("font_size", 10)
-		suffix_label.add_theme_color_override("font_color", Color(0.5, 0.55, 0.7))
-		suffix_label.autowrap_mode = TextServer.AUTOWRAP_WORD
-		card_vbox.add_child(suffix_label)
-
-	# 語彙サマリー
-	if GameManager.instance and GameManager.instance.original_language:
-		var vocab_label: Label = Label.new()
-		vocab_label.text = GameManager.instance.original_language.get_vocabulary_summary()
-		vocab_label.add_theme_font_size_override("font_size", 10)
-		vocab_label.add_theme_color_override("font_color", Color(0.5, 0.7, 0.5))
-		vocab_label.autowrap_mode = TextServer.AUTOWRAP_WORD
-		card_vbox.add_child(vocab_label)
 
 
 func _add_conversation_log() -> void:
