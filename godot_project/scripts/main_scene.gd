@@ -37,6 +37,7 @@ var _day_night: DayNightCycle
 var _bgm: AmbientBGM
 var _notifications: CareNotification
 var _touch_handler: PetTouchHandler
+var _personality_badge: PersonalityBadge
 
 # === UI Theme Colors ===
 const UI_BG: Color = Color(0.08, 0.10, 0.18)
@@ -89,6 +90,13 @@ func _ready() -> void:
 	_touch_handler = PetTouchHandler.new()
 	_touch_handler.pet_stroked.connect(_on_pet_stroked)
 	add_child(_touch_handler)
+
+	# 性格バッジ（EmotionLabelの下に挿入）
+	_personality_badge = PersonalityBadge.new()
+	var vbox: VBoxContainer = $UIPanel/VBox
+	var emotion_idx: int = emotion_label.get_index()
+	vbox.add_child(_personality_badge)
+	vbox.move_child(_personality_badge, emotion_idx + 1)
 
 	# UIスタイリング
 	_apply_ui_theme()
@@ -207,6 +215,10 @@ func _on_hatch_completed(pet: PetEntity) -> void:
 	# タッチハンドラーにVisualBridgeのwiggle参照を設定
 	_setup_touch_wiggle()
 
+	# 性格バッジ更新
+	if _personality_badge:
+		_personality_badge.set_pet(current_pet)
+
 	# シグナル接続
 	if not current_pet.emotion_changed.is_connected(_on_emotion_changed):
 		current_pet.emotion_changed.connect(_on_emotion_changed)
@@ -242,6 +254,8 @@ func _setup_pet_display() -> void:
 		current_pet.emotion_changed.connect(_on_emotion_changed)
 		current_pet.stat_changed.connect(_on_stat_changed)
 		_setup_touch_wiggle()
+		if _personality_badge:
+			_personality_badge.set_pet(current_pet)
 
 
 func _update_ui() -> void:
