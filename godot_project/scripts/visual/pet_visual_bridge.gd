@@ -88,6 +88,12 @@ func _ready() -> void:
 var _status_label: Label  # 状態テキスト（Zzz, !, 💧）
 var _zzz_timer: float = 0.0
 
+# === Happiness Indicators ===
+var _happiness_timer: float = 0.0
+var _happiness_interval: float = 1.5  # パーティクル生成間隔
+var _sparkle_pool: Array[Label] = []
+const MAX_SPARKLES: int = 6
+
 func _process(delta: float) -> void:
 	if not pet_entity:
 		return
@@ -103,6 +109,7 @@ func _process(delta: float) -> void:
 	_update_emotion_visuals()
 	_update_blink(delta)
 	_update_status_visuals(delta)
+	_update_happiness_indicators(delta)
 
 	# フォーム変更チェック
 	var form_id: String = pet_entity.get("current_form") if pet_entity.get("current_form") else "blob"
@@ -366,6 +373,115 @@ func _show_effect_label(emotion: String, intensity: float) -> void:
 	fade_tween.tween_property(label, "position:y", label.position.y - 30, 0.8)
 	fade_tween.parallel().tween_property(label, "modulate:a", 0.0, 0.8)
 	fade_tween.tween_callback(label.queue_free)
+
+
+# ========================================================
+# Happiness Indicators（幸福度パーティクル）
+# ========================================================
+
+func _update_happiness_indicators(delta: float) -> void:
+	if not pet_entity:
+		return
+
+	# 幸福度の計算（joy + love + excitement の複合）
+	var joy: float = pet_entity.emotions.get("joy", 0.0)
+	var love: float = pet_entity.emotions.get("love", 0.0)
+	var excitement: float = pet_entity.emotions.get("excitement", 0.0)
+	var sadness: float = pet_entity.emotions.get("sadness", 0.0)
+	var fear: float = pet_entity.emotions.get("fear", 0.0)
+
+	var happiness: float = (joy * 0.4 + love * 0.35 + excitement * 0.25) - (sadness * 0.3 + fear * 0.2)
+	happiness = clampf(happiness, 0.0, 1.0)
+
+	# 幸福度が低い場合はスキップ
+	if happiness < 0.3:
+		_happiness_timer = 0.0
+		return
+
+	# 幸福度に応じて生成間隔を調整（高いほど頻繁）
+	_happiness_interval = lerpf(2.0, 0.4, (happiness - 0.3) / 0.7)
+
+	_happiness_timer += delta
+	if _happiness_timer < _happiness_interval:
+		return
+
+	_happiness_timer = 0.0
+
+	# 古いスパークルを掃除
+	_sparkle_pool = _sparkle_pool.filter(func(s: Label) -> bool: return is_instance_valid(s))
+	if _sparkle_pool.size() >= MAX_SPARKLES:
+		return
+
+	# パーティクルの種類を幸福度と感情で決定
+	_spawn_happiness_particle(happiness, joy, love, excitement)
+
+
+func _spawn_happiness_particle(happiness: float, joy: float, love: float, excitement: float) -> void:
+	var particle: Label = Label.new()
+
+	# 支配的な正の感情に応じたパーティクル
+	var max_positive: String = "joy"
+	var max_val: float = joy
+	if love > max_val:
+		max_positive = "love"
+		max_val = love
+	if excitement > max_val:
+		max_positive = "excitement"
+
+	# パーティクル文字と色
+	var chars: Array = []
+	var color: Color = Color.WHITE
+	match max_positive:
+		"joy":
+			chars = ["✨", "☆", "★", "✦", "·"]
+			color = Color(1.0, 0.95, 0.4, 0.8)
+		"love":
+			chars = ["♥", "♡", "💕", "·", "♥"]
+			color = Color(1.0, 0.55, 0.65, 0.85)
+		"excitement":
+			chars = ["⚡", "!", "★", "✦", "·"]
+			color = Color(1.0, 0.8, 0.2, 0.8)
+
+	particle.text = chars[randi() % chars.size()]
+
+	# サイズは幸福度に応じる
+	var size: int = int(10 + happiness * 14)
+	particle.add_theme_font_size_override("font_size", size)
+	particle.add_theme_color_override("font_color", color)
+
+	# ペットの周囲にランダム配置
+	var angle: float = randf() * TAU
+	var radius: float = randf_range(25, 60)
+	particle.position = Vector2(
+		cos(angle) * radius,
+		sin(angle) * radius - 30  # ペットの少し上寄り
+	)
+	particle.z_index = 8
+	add_child(particle)
+	_sparkle_pool.append(particle)
+
+	# アニメーション: 浮遊 + フェードアウト + 回転
+	var duration: float = randf_range(0.8, 1.5)
+	var float_y: float = particle.position.y - randf_range(40, 80)
+	var sway_x: float = particle.position.x + randf_range(-25, 25)
+
+	particle.scale = Vector2(0.3, 0.3)
+	particle.modulate.a = 0.0
+
+	var tween: Tween = create_tween()
+	tween.set_parallel(true)
+	# フェードイン
+	tween.tween_property(particle, "modulate:a", 1.0, 0.15)
+	# スケールアップ
+	tween.tween_property(particle, "scale", Vector2(1.0, 1.0), 0.2).set_ease(Tween.EASE_OUT)
+	# 浮遊
+	tween.tween_property(particle, "position:y", float_y, duration).set_ease(Tween.EASE_OUT)
+	tween.tween_property(particle, "position:x", sway_x, duration).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+	# フェードアウト
+	tween.tween_property(particle, "modulate:a", 0.0, duration * 0.4).set_delay(duration * 0.6)
+	# 回転（スパークル感）
+	tween.tween_property(particle, "rotation", randf_range(-0.5, 0.5), duration)
+	tween.chain().tween_callback(particle.queue_free)
 
 
 # ========================================================
