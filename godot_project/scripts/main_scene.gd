@@ -10,6 +10,8 @@ extends Control
 @onready var stage_label: Label = $UIPanel/VBox/StageLabel
 @onready var hunger_bar: ProgressBar = $UIPanel/VBox/StatsBar/HungerBar
 @onready var health_bar: ProgressBar = $UIPanel/VBox/StatsBar/HealthBar
+@onready var energy_bar: ProgressBar = $UIPanel/VBox/StatsBar2/EnergyBar
+@onready var affection_bar: ProgressBar = $UIPanel/VBox/StatsBar2/AffectionBar
 @onready var pet_name_label: Label = $UIPanel/VBox/PetNameLabel
 @onready var feed_button: Button = $UIPanel/VBox/ActionButtons/FeedButton
 @onready var pet_button: Button = $UIPanel/VBox/ActionButtons/PetButton
@@ -249,6 +251,8 @@ func _update_ui() -> void:
 	# スタッツバーの更新（スムーズ補間）
 	hunger_bar.value = lerpf(hunger_bar.value, current_pet.stats.hunger * 100.0, 0.1)
 	health_bar.value = lerpf(health_bar.value, current_pet.stats.health * 100.0, 0.1)
+	energy_bar.value = lerpf(energy_bar.value, current_pet.stats.energy * 100.0, 0.1)
+	affection_bar.value = lerpf(affection_bar.value, current_pet.stats.affection * 100.0, 0.1)
 
 	# 空腹バーの色変化（低いと赤に）
 	var hunger_ratio: float = current_pet.stats.hunger
@@ -256,6 +260,13 @@ func _update_ui() -> void:
 		hunger_bar.modulate = Color(1.0, 0.4, 0.4).lerp(Color.WHITE, hunger_ratio / 0.3)
 	else:
 		hunger_bar.modulate = Color.WHITE
+
+	# エネルギーバーの色変化（低いと暗く）
+	var energy_ratio: float = current_pet.stats.energy
+	if energy_ratio < 0.2:
+		energy_bar.modulate = Color(0.6, 0.5, 0.3).lerp(Color.WHITE, energy_ratio / 0.2)
+	else:
+		energy_bar.modulate = Color.WHITE
 
 	# ステージ・年齢表示
 	_update_stage_display()
@@ -464,6 +475,10 @@ func _on_stat_changed(stat_name: String, _old_value: float, new_value: float) ->
 			hunger_bar.value = new_value * 100.0
 		"health":
 			health_bar.value = new_value * 100.0
+		"energy":
+			energy_bar.value = new_value * 100.0
+		"affection":
+			affection_bar.value = new_value * 100.0
 
 
 # === Evolution UI ===
@@ -689,6 +704,8 @@ func _apply_ui_theme() -> void:
 	# スタッツバーのスタイル
 	_style_progress_bar(hunger_bar, Color(0.35, 0.8, 0.45))
 	_style_progress_bar(health_bar, Color(0.9, 0.35, 0.35))
+	_style_progress_bar(energy_bar, Color(0.95, 0.75, 0.2))
+	_style_progress_bar(affection_bar, Color(0.85, 0.45, 0.65))
 
 
 func _style_action_button(btn: Button, color: Color, label_text: String) -> void:

@@ -96,6 +96,35 @@ layout_mode = 2
 value = 100.0
 show_percentage = false
 
+[node name="StatsBar2" type="HBoxContainer" parent="UIPanel/VBox"]
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 12
+
+[node name="EnergyIcon" type="Label" parent="UIPanel/VBox/StatsBar2"]
+layout_mode = 2
+text = "⚡"
+
+[node name="EnergyBar" type="ProgressBar" parent="UIPanel/VBox/StatsBar2"]
+custom_minimum_size = Vector2(130, 20)
+layout_mode = 2
+value = 100.0
+show_percentage = false
+
+[node name="Spacer2" type="Control" parent="UIPanel/VBox/StatsBar2"]
+custom_minimum_size = Vector2(20, 0)
+layout_mode = 2
+
+[node name="AffectionIcon" type="Label" parent="UIPanel/VBox/StatsBar2"]
+layout_mode = 2
+text = "💗"
+
+[node name="AffectionBar" type="ProgressBar" parent="UIPanel/VBox/StatsBar2"]
+custom_minimum_size = Vector2(130, 20)
+layout_mode = 2
+value = 30.0
+show_percentage = false
+
 [node name="ActionButtons" type="HBoxContainer" parent="UIPanel/VBox"]
 layout_mode = 2
 alignment = 1
