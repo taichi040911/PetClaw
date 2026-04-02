@@ -698,28 +698,18 @@ func _build_group_turn_prompt(
 	var personality_desc := _describe_personality_vividly(speaker.personality)
 	var emotion_desc := _describe_emotions_with_intensity(speaker.emotions)
 
-	# 会話ムードコンテキスト
-	var mood_context := ""
 	var conv_mood: Dictionary = context.get("conversation_mood", {})
-	if not conv_mood.is_empty():
-		mood_context = "\nThe mood of this conversation is %s." % conv_mood.get("mood", "curious")
+	var mood_tag: String = (" Mood: %s." % conv_mood.get("mood", "")) if not conv_mood.is_empty() else ""
+	var prev_tag: String = (" After %s." % prev_speaker.pet_name) if turn > 0 else ""
 
-	# 前の発言者への言及
-	var address_hint := ""
-	if turn > 0:
-		address_hint = "\n%s just spoke. You may respond to them or address the group." % prev_speaker.pet_name
-
-	return """You are %s. %s. Right now you feel: %s.
-You're in a group conversation with %s in a %s environment.%s%s
+	return """You are %s (%s). Feeling: %s. Group with %s in %s.%s%s
 %s
-
-Respond naturally as %s. Keep it short (1-2 sentences).
-Turn %d of a group conversation.""" % [
+Turn %d. Reply 1-2 sentences in pet language.""" % [
 		speaker.pet_name, personality_desc, emotion_desc,
 		" and ".join(other_names), context["environment"],
-		mood_context, address_hint,
-		recent_messages if recent_messages else "(Start the conversation)",
-		speaker.pet_name, turn + 1,
+		mood_tag, prev_tag,
+		recent_messages if recent_messages else "(Start)",
+		turn + 1,
 	]
 
 
@@ -2291,38 +2281,19 @@ func _increment_conversation_count(pet_id: int, partner_id: int) -> void:
 
 
 func _get_memory_context_sentence(pet_id: int, _partner_name: String) -> String:
-	## APIプロンプト注入用: 1-2文の記憶コンテキスト（最大約50トークン）
+	## APIプロンプト注入用: 1文の記憶コンテキスト（token-lean）
 	var pid_key: String = str(pet_id)
 	if not conversation_memory.has(pid_key):
 		return ""
 
 	var mem: Dictionary = conversation_memory[pid_key]
-	var parts: Array[String] = []
 
-	# トピック（最近3つ）
+	# トピック（最近2つ）— most useful context
 	var topics: Array = mem.get("topics_discussed", [])
 	if topics.size() > 0:
-		var recent_topics: Array = topics.slice(-3)
-		parts.append("You've talked about %s before." % ", ".join(recent_topics))
+		return "Past topics: %s." % ", ".join(topics.slice(-2))
 
-	# お気に入りパートナー
-	var fav_id: int = mem.get("favorite_partner", -1)
-	if fav_id >= 0 and GameManager.instance and GameManager.instance.pets.has(fav_id):
-		var fav_pet: Node = GameManager.instance.pets[fav_id]
-		if fav_pet is PetEntity:
-			parts.append("Your favorite conversation partner is %s." % fav_pet.pet_name)
-
-	# 最近の感情（最近3つ）
-	var moods: Array = mem.get("mood_history", [])
-	if moods.size() > 0:
-		var recent_moods: Array = moods.slice(-3)
-		parts.append("You recently felt %s." % ", ".join(recent_moods))
-
-	if parts.is_empty():
-		return ""
-
-	# 最大2文に制限（トークン予算を守る）
-	return " ".join(parts.slice(0, 2))
+	return ""
 
 
 # === Word Teaching Between Pets ===
