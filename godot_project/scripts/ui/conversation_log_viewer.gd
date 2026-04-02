@@ -293,6 +293,15 @@ func _add_message_bubble(msg: Dictionary) -> void:
 	header.add_theme_color_override("font_color", Color(0.6, 0.65, 0.8))
 	content.add_child(header)
 
+	# サマリー表示（存在する場合）
+	var summary: String = msg.get("summary", "")
+	if not summary.is_empty():
+		var summary_label: Label = Label.new()
+		summary_label.text = "📋 %s" % summary
+		summary_label.add_theme_font_size_override("font_size", 10)
+		summary_label.add_theme_color_override("font_color", Color(0.45, 0.5, 0.65))
+		content.add_child(summary_label)
+
 	# メッセージ本文
 	var body: Label = Label.new()
 	body.text = text
