@@ -8,6 +8,7 @@ signal conversation_ended(participants: Array[int], summary: String)
 signal conversation_message(pet_id: int, message: String, metadata: Dictionary)
 signal evolution_triggered_by_conversation(evolution_type: String)
 signal relationship_changed(pet1_id: int, pet2_id: int, new_type: String)
+signal word_taught(speaker_id: int, listener_id: int, words: Array[String])
 
 # === パラメータ ===
 var auto_conversation_interval: float = 180.0     # 自動会話間隔（秒）— demo mode で短縮可能
@@ -262,6 +263,91 @@ func _get_emotion_intensity(pet: PetEntity) -> float:
 	return max_intensity
 
 
+# === 会話ムードシステム ===
+func _calculate_conversation_mood(pet1: PetEntity, pet2: PetEntity) -> Dictionary:
+	## 両ペットの感情・関係性・時間帯から会話の雰囲気を決定する
+	var mood: String = "curious"
+	var intensity: float = 0.5
+
+	# 感情値を取得
+	var joy1: float = pet1.emotions.get("joy", 0.0)
+	var joy2: float = pet2.emotions.get("joy", 0.0)
+	var exc1: float = pet1.emotions.get("excitement", 0.0)
+	var exc2: float = pet2.emotions.get("excitement", 0.0)
+	var sad1: float = pet1.emotions.get("sadness", 0.0)
+	var sad2: float = pet2.emotions.get("sadness", 0.0)
+	var fear1: float = pet1.emotions.get("fear", 0.0)
+	var fear2: float = pet2.emotions.get("fear", 0.0)
+
+	# 関係性を取得
+	var rel: Dictionary = _get_or_create_relationship(pet1.pet_id, pet2.pet_id)
+	var rel_type: String = rel.get("relationship_type", "strangers")
+	var conv_count: int = rel.get("conversations_together", 0)
+
+	# エネルギー・体調
+	var low_energy: bool = pet1.stats.energy < 0.3 or pet2.stats.energy < 0.3
+	var health_concern: bool = pet1.stats.health < 0.4 or pet2.stats.health < 0.4
+
+	# 言語ステージ
+	var lang_stage: int = 0
+	if GameManager.instance and GameManager.instance.original_language:
+		lang_stage = GameManager.instance.original_language.get_language_stage().get("stage", 0)
+
+	# 時間帯
+	var hour: int = Time.get_datetime_dict_from_system()["hour"]
+
+	# === ムード判定（優先度順） ===
+
+	# "supportive": 片方がネガティブ感情 + close_friends以上
+	var has_negative: bool = sad1 > 0.3 or sad2 > 0.3 or fear1 > 0.3 or fear2 > 0.3
+	var is_close: bool = rel_type in ["close_friends", "best_friends"]
+	if has_negative and is_close:
+		mood = "supportive"
+		intensity = clampf(maxf(sad1, maxf(sad2, maxf(fear1, fear2))) + 0.2, 0.3, 1.0)
+
+	# "serious": 低エネルギー or 体調不良 or 悲しみ
+	elif low_energy or health_concern or (sad1 > 0.4 and sad2 > 0.4):
+		mood = "serious"
+		intensity = clampf(0.5 + (1.0 - minf(pet1.stats.energy, pet2.stats.energy)) * 0.3, 0.3, 1.0)
+
+	# "competitive": rivals or 両方高excitement
+	elif rel_type == "rivals" or (exc1 > 0.5 and exc2 > 0.5):
+		mood = "competitive"
+		intensity = clampf((exc1 + exc2) / 2.0 + 0.2, 0.4, 1.0)
+
+	# "playful": 両方高joy/excitement + friends以上
+	elif (joy1 > 0.4 or exc1 > 0.4) and (joy2 > 0.4 or exc2 > 0.4) and rel_type in ["friends", "close_friends", "best_friends"]:
+		mood = "playful"
+		intensity = clampf((joy1 + joy2 + exc1 + exc2) / 4.0 + 0.2, 0.4, 1.0)
+
+	# "nostalgic": elder pets or 多数の過去会話
+	elif pet1.evolution_stage >= 5 or pet2.evolution_stage >= 5 or conv_count >= 10:
+		mood = "nostalgic"
+		intensity = clampf(0.4 + float(conv_count) * 0.03, 0.3, 0.9)
+		# 夜間はさらにノスタルジック
+		if hour >= 20 or hour < 5:
+			intensity = clampf(intensity + 0.15, 0.3, 1.0)
+
+	# "curious": 言語ステージ3+ or 新しい関係
+	elif lang_stage >= 3 or rel_type in ["strangers", "acquaintances"]:
+		mood = "curious"
+		intensity = clampf(0.4 + float(lang_stage) * 0.1, 0.3, 0.9)
+
+	# デフォルト: 時間帯に応じた穏やかなムード
+	else:
+		if hour >= 6 and hour < 12:
+			mood = "playful"
+			intensity = 0.4
+		elif hour >= 20 or hour < 5:
+			mood = "nostalgic"
+			intensity = 0.4
+		else:
+			mood = "curious"
+			intensity = 0.4
+
+	return {"mood": mood, "intensity": intensity}
+
+
 # === 会話開始 ===
 func start_conversation(pet1: PetEntity, pet2: PetEntity, trigger: String) -> void:
 	if is_conversation_active:
@@ -283,6 +369,10 @@ func start_conversation(pet1: PetEntity, pet2: PetEntity, trigger: String) -> vo
 	# プロンプト構築
 	var system_prompt := _build_system_prompt(grammar)
 	var context := _build_conversation_context(pet1, pet2, trigger)
+
+	# 会話ムード計算
+	var conv_mood: Dictionary = _calculate_conversation_mood(pet1, pet2)
+	context["conversation_mood"] = conv_mood
 
 	# 会話ループ
 	var participants := [pet1, pet2]
@@ -546,10 +636,16 @@ func _build_turn_prompt(
 	if not rel_str.is_empty():
 		relationship_context = "\n%s" % rel_str
 
+	# 会話記憶コンテキスト（1-2文、最大約50トークン）
+	var conv_memory_context := ""
+	var mem_sentence: String = _get_memory_context_sentence(speaker.pet_id, listener.pet_name)
+	if not mem_sentence.is_empty():
+		conv_memory_context = "\n%s" % mem_sentence
+
 	return """You are %s. Your personality: %s. Your current emotions: %s.
 You're talking to %s in a %s environment.
 Topics around you: %s
-%s%s%s%s%s
+%s%s%s%s%s%s
 %s
 
 Respond naturally as %s. Weave your memories into conversation naturally.
@@ -564,6 +660,7 @@ Turn %d of the conversation.""" % [
 		field_context_str,
 		past_context,
 		relationship_context,
+		conv_memory_context,
 		recent_messages if recent_messages else "(Start the conversation)",
 		speaker.pet_name, turn + 1,
 	]
@@ -944,6 +1041,25 @@ func _run_template_conversation(pet1: PetEntity, pet2: PetEntity, trigger: Strin
 		var speaker: PetEntity = pet1 if msg["pet_id"] == pet1.pet_id else pet2
 		var listener: PetEntity = pet2 if msg["pet_id"] == pet1.pet_id else pet1
 		_process_conversation_emotion(speaker, listener, msg["message"])
+
+	# Word teaching during template conversations
+	var teaching_1: Dictionary = _attempt_word_teaching(pet1, pet2)
+	var teaching_2: Dictionary = _attempt_word_teaching(pet2, pet1)
+	if not teaching_1.get("taught_words", []).is_empty():
+		_apply_word_teaching_to_template(template_messages, teaching_1, pet1, pet2)
+		# Emit new teaching messages to UI
+		for msg: Dictionary in template_messages:
+			if msg.get("word_teaching", false) and not msg.get("_emitted", false):
+				current_conversation.append(msg)
+				conversation_message.emit(msg["pet_id"], msg["message"], msg)
+				msg["_emitted"] = true
+	if not teaching_2.get("taught_words", []).is_empty():
+		_apply_word_teaching_to_template(template_messages, teaching_2, pet2, pet1)
+		for msg: Dictionary in template_messages:
+			if msg.get("word_teaching", false) and not msg.get("_emitted", false):
+				current_conversation.append(msg)
+				conversation_message.emit(msg["pet_id"], msg["message"], msg)
+				msg["_emitted"] = true
 
 	# 完了処理（テンプレートでも言語進化に寄与）
 	_finalize_conversation(pet1, pet2, trigger)
@@ -1360,6 +1476,141 @@ func _get_memory_context_sentence(pet_id: int, _partner_name: String) -> String:
 	return " ".join(parts.slice(0, 2))
 
 
+# === Word Teaching Between Pets ===
+
+func _attempt_word_teaching(speaker: PetEntity, listener: PetEntity) -> Dictionary:
+	## Check OriginalLanguageEngine for words the speaker knows with high Hebbian strength,
+	## and attempt to teach 0-2 of them to the listener.
+	## Teaching probability: 30% base + 10% per relationship level.
+	var result: Dictionary = {
+		"taught_words": [] as Array[String],
+		"teaching_context": "",
+	}
+
+	if not GameManager.instance or not GameManager.instance.original_language:
+		return result
+
+	var lang_engine: OriginalLanguageEngine = GameManager.instance.original_language
+	var vocab: Dictionary = lang_engine.get_full_vocabulary()
+
+	if vocab.is_empty():
+		return result
+
+	# Calculate teaching probability based on relationship level
+	var rel: Dictionary = _get_or_create_relationship(speaker.pet_id, listener.pet_id)
+	var rel_type: String = rel.get("relationship_type", "strangers")
+	var teaching_prob: float = 0.3  # 30% base
+	match rel_type:
+		"friends":
+			teaching_prob += 0.1
+		"close_friends":
+			teaching_prob += 0.2
+		"best_friends":
+			teaching_prob += 0.3
+		"rivals":
+			teaching_prob += 0.05  # rivals still teach, but less
+
+	if randf() > teaching_prob:
+		return result
+
+	# Collect words with high Hebbian strength (> 0.6)
+	var strong_words: Array[String] = []
+	for human_word: String in vocab:
+		var entry: Dictionary = vocab[human_word]
+		if entry.get("strength", 0.0) > 0.6:
+			strong_words.append(human_word)
+
+	if strong_words.is_empty():
+		return result
+
+	# Pick 1-2 random words to teach
+	strong_words.shuffle()
+	var teach_count: int = mini(randi_range(1, 2), strong_words.size())
+	var taught: Array[String] = []
+
+	for i: int in teach_count:
+		var word: String = strong_words[i]
+		taught.append(word)
+
+		# Reinforce the word in the listener's perception via public API
+		# Check for reinforce_word first, then strengthen_association, then strengthen_word
+		if lang_engine.has_method("reinforce_word"):
+			lang_engine.call("reinforce_word", word, 0.1)
+		elif lang_engine.has_method("strengthen_association"):
+			lang_engine.call("strengthen_association", word, 0.1)
+		elif lang_engine.has_method("strengthen_word"):
+			# strengthen_word adds STRENGTH_ON_SUCCESS (0.15), close enough
+			lang_engine.strengthen_word(word)
+
+	if not taught.is_empty():
+		var ai_terms: Array[String] = []
+		for w: String in taught:
+			var entry: Dictionary = vocab.get(w, {})
+			ai_terms.append(entry.get("ai_term", w))
+		result["taught_words"] = taught
+		result["teaching_context"] = "%s taught %s the word(s): %s" % [
+			speaker.pet_name, listener.pet_name, ", ".join(ai_terms)]
+
+		# Update words_taught counter in relationship data
+		var key: String = _get_relationship_key(speaker.pet_id, listener.pet_id)
+		var rel_data: Dictionary = _get_or_create_relationship(speaker.pet_id, listener.pet_id)
+		rel_data["words_taught"] = rel_data.get("words_taught", 0) + taught.size()
+		pet_relationships[key] = rel_data
+
+		word_taught.emit(speaker.pet_id, listener.pet_id, taught)
+		print("[AtoA] Word teaching: %s" % result["teaching_context"])
+
+	return result
+
+
+func _apply_word_teaching_to_template(
+		messages: Array[Dictionary], teaching_result: Dictionary,
+		speaker: PetEntity, listener: PetEntity
+) -> void:
+	## If teaching happened during a template conversation, modify the last template
+	## message to naturally include the taught word.
+	var taught_words: Array = teaching_result.get("taught_words", [])
+	if taught_words.is_empty() or messages.is_empty():
+		return
+
+	if not GameManager.instance or not GameManager.instance.original_language:
+		return
+
+	var vocab: Dictionary = GameManager.instance.original_language.get_full_vocabulary()
+	var first_word: String = taught_words[0] if taught_words.size() > 0 else ""
+	var ai_term: String = vocab.get(first_word, {}).get("ai_term", first_word)
+
+	# Get a suffix for the teaching line
+	var suffix: String = "-mii"
+	if GameManager.language_evolution:
+		var grammar: Dictionary = GameManager.language_evolution.get_current_grammar()
+		var suffixes: Variant = grammar.get("suffixes", [])
+		if suffixes is Array and not suffixes.is_empty():
+			suffix = str(suffixes[randi() % suffixes.size()])
+		elif suffixes is Dictionary and not suffixes.is_empty():
+			suffix = str(suffixes.values()[randi() % suffixes.size()])
+
+	# Add a teaching exchange as extra messages
+	var teaching_templates: Array[String] = [
+		"*%s perks up%s* '%s'%s! Do you know this word%s?" % [speaker.pet_name, suffix, ai_term, suffix, suffix],
+		"*%s listens carefully%s* '%s'%s... I'll remember that%s!" % [listener.pet_name, suffix, ai_term, suffix, suffix],
+	]
+
+	var turn_offset: int = messages.size()
+	for i: int in teaching_templates.size():
+		var pet: PetEntity = speaker if i % 2 == 0 else listener
+		messages.append({
+			"pet_id": pet.pet_id,
+			"pet_name": pet.pet_name,
+			"message": teaching_templates[i],
+			"turn": turn_offset + i,
+			"emotion": _get_dominant_emotion(pet),
+			"emotion_intensity": randf_range(0.3, 0.5),
+			"is_template": true,
+			"word_teaching": true,
+		})
+
+
 # === 会話完了処理 ===
 func _finalize_conversation(pet1: PetEntity, pet2: PetEntity, trigger: String,
 		conv_context: Dictionary = {}) -> void:
@@ -1375,6 +1626,10 @@ func _finalize_conversation(pet1: PetEntity, pet2: PetEntity, trigger: String,
 
 	# コスト記録
 	_record_conversation_cost(current_conversation.size())
+
+	# 会話記憶: カウントとfavorite_partner更新
+	_increment_conversation_count(pet1.pet_id, pet2.pet_id)
+	_increment_conversation_count(pet2.pet_id, pet1.pet_id)
 
 	# 言語進化システムに通知
 	var dominant_emotion := _get_dominant_emotion(pet1)
@@ -1399,6 +1654,22 @@ func _finalize_conversation(pet1: PetEntity, pet2: PetEntity, trigger: String,
 
 	# 言語進化処理（新表現・接尾辞抽出）
 	_process_language_evolution(current_conversation)
+
+	# Word teaching: pets teach each other vocabulary during conversations
+	var teaching_1: Dictionary = _attempt_word_teaching(pet1, pet2)
+	var teaching_2: Dictionary = _attempt_word_teaching(pet2, pet1)
+
+	# Log word teaching metadata into conversation entries
+	if not teaching_1.get("taught_words", []).is_empty():
+		for msg: Dictionary in current_conversation:
+			if msg.get("pet_id", -1) == pet1.pet_id:
+				msg["word_teaching"] = teaching_1
+				break
+	if not teaching_2.get("taught_words", []).is_empty():
+		for msg: Dictionary in current_conversation:
+			if msg.get("pet_id", -1) == pet2.pet_id:
+				msg["word_teaching"] = teaching_2
+				break
 
 	# 記憶に追加（BiologicalMemorySystem経由で自動的に海馬にも格納される）
 	var summary := "Talked with %s about %s" % [pet2.pet_name, trigger]
@@ -1641,6 +1912,10 @@ func _get_relationship_context(pet1_id: int, pet2_id: int) -> String:
 		var word_sample: String = shared[randi() % shared.size()]
 		context += " and share the word '%s'" % word_sample
 
+	var words_taught_count: int = rel.get("words_taught", 0)
+	if words_taught_count > 0:
+		context += " (%d words taught between you)" % words_taught_count
+
 	context += "."
 	return context
 
@@ -1654,6 +1929,7 @@ func to_dict() -> Dictionary:
 		"daily_count": daily_conversation_count,
 		"last_daily_reset": last_daily_reset,
 		"pet_relationships": pet_relationships,
+		"conversation_memory": conversation_memory,
 	}
 
 
@@ -1669,6 +1945,7 @@ func from_dict(data: Dictionary) -> void:
 		last_daily_reset = data["last_daily_reset"]
 	if data.has("pet_relationships"):
 		pet_relationships = data["pet_relationships"]
+	conversation_memory = data.get("conversation_memory", {})
 
 	# 日付が変わっていればリセット
 	var current_day := int(Time.get_unix_time_from_system() / 86400)
