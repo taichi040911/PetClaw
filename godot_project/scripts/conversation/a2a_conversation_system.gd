@@ -640,20 +640,51 @@ func _generate_template_conversation(pet1: PetEntity, pet2: PetEntity, trigger: 
 		# フォールバック: ランダムなテンプレートセットを使用
 		matching_templates = TEMPLATE_CONVERSATIONS[randi() % TEMPLATE_CONVERSATIONS.size()].get("templates", [])
 
+	# ステージ3+: 高度なテンプレートを追加（感情的に深い会話）
+	var current_stage: int = 0
+	if GameManager.instance and GameManager.instance.original_language:
+		current_stage = GameManager.instance.original_language.get_language_stage().get("stage", 0)
+	if current_stage >= 2:
+		matching_templates = matching_templates + _get_advanced_templates(pet1, pet2, trigger)
+
 	# テンプレートから数個を選択
 	var grammar: Dictionary = GameManager.language_evolution.get_current_grammar()
-	var suffix_list = grammar.get("suffixes", [])
-	var selected_suffix = suffix_list[randi() % suffix_list.size()] if not suffix_list.is_empty() else "mii"
+	var suffix_list: Array = []
+	var suffixes_raw: Variant = grammar.get("suffixes", [])
+	if suffixes_raw is Array:
+		suffix_list = suffixes_raw
+	elif suffixes_raw is Dictionary:
+		for key: String in suffixes_raw:
+			suffix_list.append(str(suffixes_raw[key]))
+
+	# 語彙マップを取得（OriginalLanguageEngine）
+	var vocab_replacements: Dictionary = {}  # human_word → ai_term
+	if GameManager.instance and GameManager.instance.original_language:
+		var vocab: Dictionary = GameManager.instance.original_language.get_full_vocabulary()
+		for key: String in vocab:
+			var entry: Dictionary = vocab[key]
+			if entry.get("strength", 0.0) > 0.3:
+				vocab_replacements[entry.get("human_word", "")] = entry.get("ai_term", "")
+
+	# 言語ステージに応じた複雑さ
+	var lang_stage: int = 0
+	if GameManager.instance and GameManager.instance.original_language:
+		var stage_info: Dictionary = GameManager.instance.original_language.get_language_stage()
+		lang_stage = stage_info.get("stage", 0)
 
 	var turn := 0
 	var is_pet1_turn := true
 
-	for template_text in matching_templates.slice(0, 3):  # 最大3ターン
-		var current_pet = pet1 if is_pet1_turn else pet2
-		var other_pet = pet2 if is_pet1_turn else pet1
+	for template_text: String in matching_templates.slice(0, 3):  # 最大3ターン
+		var current_pet: PetEntity = pet1 if is_pet1_turn else pet2
+		@warning_ignore("unused_variable")
+		var other_pet: PetEntity = pet2 if is_pet1_turn else pet1
+
+		# ターンごとに異なる接尾辞を選択（多様性）
+		var selected_suffix: String = suffix_list[randi() % suffix_list.size()] if not suffix_list.is_empty() else "-mii"
 
 		# テンプレート置換
-		var message = template_text
+		var message: String = template_text
 		message = message.replace("{pet1}", pet1.pet_name)
 		message = message.replace("{pet2}", pet2.pet_name)
 		message = message.replace("{suffix}", selected_suffix)
@@ -663,6 +694,21 @@ func _generate_template_conversation(pet1: PetEntity, pet2: PetEntity, trigger: 
 		message = message.replace("{reply_word}", ["truly", "so", "very"][randi() % 3])
 		message = message.replace("{compound_word}", ["happy-glow", "bright-spark", "kind-bloom"][randi() % 3])
 
+		# 独自語彙を注入（ステージ2+で確率的に）
+		if lang_stage >= 1 and not vocab_replacements.is_empty():
+			for human_word: String in vocab_replacements:
+				if message.containsn(human_word) and randf() < 0.6:
+					message = message.replacen(human_word, vocab_replacements[human_word])
+
+		# ステージ3+: 前置詞も使用
+		var prepositions: Variant = grammar.get("prepositions", {})
+		if lang_stage >= 2 and prepositions is Dictionary and not prepositions.is_empty():
+			var prep_keys: Array = prepositions.keys()
+			if randf() < 0.3 and not prep_keys.is_empty():
+				var prep_key: String = prep_keys[randi() % prep_keys.size()]
+				var prep_val: String = str(prepositions[prep_key])
+				message += " %s%s" % [prep_val, selected_suffix]
+
 		result.append({
 			"pet_id": current_pet.pet_id,
 			"pet_name": current_pet.pet_name,
@@ -671,12 +717,41 @@ func _generate_template_conversation(pet1: PetEntity, pet2: PetEntity, trigger: 
 			"emotion": _get_dominant_emotion(current_pet),
 			"emotion_intensity": randf_range(0.2, 0.5),
 			"is_template": true,
+			"environment": current_pet.current_environment,
 		})
 
 		is_pet1_turn = not is_pet1_turn
 		turn += 1
 
 	return result
+
+
+func _get_advanced_templates(pet1: PetEntity, pet2: PetEntity, _trigger: String) -> Array:
+	## ステージ3+用の高度なテンプレート（感情深化・記憶参照・哲学的）
+	var emotion1: String = _get_dominant_emotion(pet1)
+	var emotion2: String = _get_dominant_emotion(pet2)
+
+	var advanced: Array = []
+
+	# 感情に基づく深い会話テンプレート
+	if emotion1 == "love" or emotion2 == "love":
+		advanced.append("{pet1} whispered softly-{suffix}. 'Do you remember our first talk-{suffix}? I still carry that warmth-{suffix}.'")
+		advanced.append("{pet2} smiled gently-{suffix}. 'Every word we share-{suffix} becomes part of who we are-{suffix}.'")
+	elif emotion1 == "sadness" or emotion2 == "sadness":
+		advanced.append("{pet1} gazed at the horizon-{suffix}. 'Sometimes words aren't enough-{suffix}... but trying matters-{suffix}.'")
+		advanced.append("{pet2} sat beside {pet1}-{suffix}. 'Our language grows from shared pain too-{suffix}.'")
+	elif emotion1 == "joy" or emotion2 == "joy":
+		advanced.append("{pet1} invented a new cheer-{suffix}! 'This feeling needs a new word-{suffix}!'")
+		advanced.append("{pet2} echoed the sound-{suffix}. 'Yes-{suffix}! That's exactly what I felt-{suffix}!'")
+	else:
+		advanced.append("{pet1} pondered quietly-{suffix}. 'Our words change as we change-{suffix}... isn't that beautiful-{suffix}?'")
+		advanced.append("{pet2} nodded thoughtfully-{suffix}. 'We're creating something no one else has-{suffix}.'")
+
+	# メタ言語会話（言語そのものについて話す）
+	if randf() < 0.3:
+		advanced.append("{pet1} paused-{suffix}. 'Have you noticed-{suffix}? We speak differently now-{suffix} than when we first met-{suffix}.'")
+
+	return advanced
 
 
 # === テンプレート会話実行（フォールバック経路） ===
