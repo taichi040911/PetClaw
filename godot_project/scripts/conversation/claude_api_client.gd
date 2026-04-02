@@ -134,6 +134,10 @@ func _generate_personality_fallback(context: String) -> String:
 	var is_happy: bool = context.contains("joy") or context.contains("happy")
 	var is_loving: bool = context.contains("love") or context.contains("affection")
 	var is_scared: bool = context.contains("fear") or context.contains("anxious")
+	var is_angry: bool = context.contains("anger") or context.contains("frustrat")
+	var is_tired: bool = context.contains("tired") or context.contains("exhaust") or context.contains("sleepy")
+	var is_proud: bool = context.contains("proud") or context.contains("accomplish")
+	var is_nostalgic: bool = context.contains("nostalg") or context.contains("remember") or context.contains("miss")
 
 	# 現在の文法からサフィックスを取得
 	var suffix: String = "-spark"
@@ -204,17 +208,42 @@ func _generate_personality_fallback(context: String) -> String:
 			"*watches the sky%s* Time flows gently%s..." % [suffix, suffix],
 			"*sits serenely%s* All is well%s." % [suffix, suffix],
 		]
+	elif is_angry:
+		templates = [
+			"*stomps the ground%s* That wasn't fair%s!" % [suffix, suffix],
+			"*bristles%s* I don't like this one bit%s." % [suffix, suffix],
+			"*growls low%s* Give me a moment%s..." % [suffix, suffix],
+		]
+	elif is_tired:
+		templates = [
+			"*yawns wide%s* The world feels so soft right now%s..." % [suffix, suffix],
+			"*curls up slowly%s* Just... resting my eyes%s." % [suffix, suffix],
+			"*blinks heavily%s* Everything is warm and far away%s..." % [suffix, suffix],
+		]
+	elif is_proud:
+		templates = [
+			"*stands tall%s* Did you see what I did%s?" % [suffix, suffix],
+			"*puffs chest%s* I worked so hard for this%s!" % [suffix, suffix],
+			"*beams%s* This feeling... I earned it%s." % [suffix, suffix],
+		]
+	elif is_nostalgic:
+		templates = [
+			"*gazes into the distance%s* I remember when%s..." % [suffix, suffix],
+			"*touches the ground softly%s* This place holds memories%s." % [suffix, suffix],
+			"*sighs warmly%s* Those were good times%s..." % [suffix, suffix],
+		]
 	else:
 		templates = [
 			"*looks around%s* Hmm%s..." % [suffix, suffix],
 			"*yawns softly%s* What shall we do%s?" % [suffix, suffix],
 			"*stretches%s* Another moment together%s." % [suffix, suffix],
+			"*tilts head%s* Something feels different today%s." % [suffix, suffix],
 		]
 
 	var response: String = templates[randi() % templates.size()]
 
-	# 独自語彙を挿入（あれば）
-	if not vocab_word.is_empty() and randf() < 0.4:
+	# 独自語彙を挿入（あれば）— higher rate for consistent invented language feel
+	if not vocab_word.is_empty() and randf() < 0.6:
 		response = response + " " + vocab_word + suffix
 
 	return response

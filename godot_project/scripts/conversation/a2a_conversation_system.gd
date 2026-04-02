@@ -405,6 +405,9 @@ func start_conversation(pet1: PetEntity, pet2: PetEntity, trigger: String) -> vo
 		current_conversation.append(message)
 		conversation_message.emit(current_pet.pet_id, response, message)
 
+		# Reaction: listener may react to the message with an emoji expression
+		_attach_reaction_to_message(message, other_pet)
+
 		# 会話記憶を更新
 		_update_conversation_memory(current_pet.pet_id, message)
 
@@ -483,10 +486,11 @@ Current language rules:
 CRITICAL RULES:
 1. Use the current word order pattern (%s) in your sentences
 2. End phrases or key words with one of the available suffixes
-3. Actions in *asterisks* (e.g., *bounces excitedly*)
-4. Keep responses short (1-3 sentences), expressive, and in-character
-5. Your language should feel natural and evolving — mix pet-speak with emotion
-6. If private vocabulary exists, USE those words instead of human equivalents""" % [
+3. Actions in *asterisks* with sensory detail (e.g., *feels warm sunlight on fur*)
+4. Keep responses under 3 sentences. Use sensory language — textures, warmth, sounds
+5. Never break character. You genuinely ARE this pet
+6. Weave invented words naturally into speech — they are YOUR words, not decoration
+7. Your language should feel natural and evolving — mix pet-speak with emotion""" % [
 		grammar["word_order"],
 		str(grammar["suffixes"]),
 		str(grammar["prepositions"]),
@@ -572,6 +576,42 @@ func _get_past_conversation_summaries(pet1_id: int, pet2_id: int, max_count: int
 	return summaries
 
 
+func _describe_personality_vividly(personality: Dictionary) -> String:
+	## Convert trait dict into a vivid behavioral description
+	var parts: Array[String] = []
+	for trait_name: String in personality:
+		var val: float = personality[trait_name]
+		if val > 0.7:
+			match trait_name:
+				"brave": parts.append("charges into the unknown without hesitation")
+				"curious": parts.append("sniffs and pokes at everything new")
+				"playful": parts.append("always looking for someone to chase or tease")
+				"calm": parts.append("moves slowly, savoring each moment")
+				"gentle": parts.append("touches the world softly, afraid to break it")
+				_: parts.append("strongly %s" % trait_name)
+		elif val > 0.4:
+			parts.append("somewhat %s" % trait_name)
+	if parts.is_empty():
+		return "A quiet pet still finding its voice"
+	return "You " + ", ".join(parts)
+
+
+func _describe_emotions_with_intensity(emotions: Dictionary) -> String:
+	## Add intensity qualifiers to emotion values
+	var parts: Array[String] = []
+	for emotion: String in emotions:
+		var val: float = emotions[emotion]
+		if val > 0.7:
+			parts.append("intense %s" % emotion)
+		elif val > 0.4:
+			parts.append("mild %s" % emotion)
+		elif val > 0.2:
+			parts.append("a whisper of %s" % emotion)
+	if parts.is_empty():
+		return "calm and neutral"
+	return ", ".join(parts)
+
+
 func _build_turn_prompt(
 	speaker: PetEntity, listener: PetEntity,
 	context: Dictionary, turn: int
@@ -648,17 +688,31 @@ func _build_turn_prompt(
 	if not conv_mood.is_empty():
 		mood_context = "\nThe mood of this conversation is %s. Let this influence your tone." % conv_mood.get("mood", "curious")
 
-	return """You are %s. Your personality: %s. Your current emotions: %s.
+	# Build vivid personality description (how the pet acts, not just trait names)
+	var personality_desc := _describe_personality_vividly(speaker.personality)
+
+	# Build emotion with intensity
+	var emotion_desc := _describe_emotions_with_intensity(speaker.emotions)
+
+	# Vulnerability for close relationships
+	var vulnerability_hint := ""
+	var rel_key: String = _get_relationship_key(speaker.pet_id, listener.pet_id)
+	if pet_relationships.has(rel_key):
+		var rel_type: String = pet_relationships[rel_key].get("relationship_type", "strangers")
+		if rel_type in ["close_friends", "best_friends"]:
+			vulnerability_hint = "\nYou feel comfortable being vulnerable with %s." % listener.pet_name
+
+	return """You are %s. %s. Right now you feel: %s.
 You're talking to %s in a %s environment.
 Topics around you: %s
-%s%s%s%s%s%s%s
+%s%s%s%s%s%s%s%s
 %s
 
 Respond naturally as %s. Weave your memories into conversation naturally.
 Reference past conversations when relevant — you remember talking before.
 Express your feelings using your evolving pet language.
 Turn %d of the conversation.""" % [
-		speaker.pet_name, str(speaker.personality), str(speaker.emotions),
+		speaker.pet_name, personality_desc, emotion_desc,
 		listener.pet_name, context["environment"],
 		str(context["env_topics"]),
 		memory_context,
@@ -668,6 +722,7 @@ Turn %d of the conversation.""" % [
 		relationship_context,
 		conv_memory_context,
 		mood_context,
+		vulnerability_hint,
 		recent_messages if recent_messages else "(Start the conversation)",
 		speaker.pet_name, turn + 1,
 	]
@@ -1019,6 +1074,7 @@ func _generate_template_conversation(pet1: PetEntity, pet2: PetEntity, trigger: 
 			"emotion_intensity": randf_range(0.2, 0.5),
 			"is_template": true,
 			"environment": current_pet.current_environment,
+			"reactions": [] as Array[Dictionary],
 		})
 
 		is_pet1_turn = not is_pet1_turn
@@ -1076,6 +1132,9 @@ func _run_template_conversation(pet1: PetEntity, pet2: PetEntity, trigger: Strin
 		var speaker: PetEntity = pet1 if msg["pet_id"] == pet1.pet_id else pet2
 		var listener: PetEntity = pet2 if msg["pet_id"] == pet1.pet_id else pet1
 		_process_conversation_emotion(speaker, listener, msg["message"])
+
+		# Reaction: listener may react to template messages too
+		_attach_reaction_to_message(msg, listener)
 
 	# Word teaching during template conversations
 	var teaching_1: Dictionary = _attempt_word_teaching(pet1, pet2)
