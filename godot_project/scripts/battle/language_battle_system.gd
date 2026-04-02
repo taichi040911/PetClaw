@@ -617,10 +617,10 @@ func _score_creativity(pet: PetEntity, response: String) -> float:
 	else:
 		score += 4.0
 
-	# 性格トレイトによるボーナス
+	# 性格トレイトによるボーナス（制限付き — バランスのため）
 	var curious: float = pet.personality.get("curious", 0.5)
 	var playful: float = pet.personality.get("playful", 0.5)
-	score += (curious + playful) * 5.0  # 最大10点
+	score += (curious + playful) * 2.5  # 最大5点（旧: 10点）
 
 	# 語彙の多様性: ユニークな独自語の数
 	var vocab: Dictionary = _get_pet_vocabulary(pet)
@@ -653,9 +653,9 @@ func _score_emotion(pet: PetEntity, response: String) -> float:
 			score += 3.0
 			break
 
-	# 感情的な性格トレイト（affectionateが高いほど加点）
+	# 感情的な性格トレイト（バランス調整 — 上限を抑える）
 	var affectionate: float = pet.personality.get("affectionate", 0.5)
-	score += affectionate * 7.0  # 最大7点
+	score += affectionate * 4.0  # 最大4点（旧: 7点）
 
 	return minf(score, MAX_EMOTION_SCORE)
 
