@@ -127,7 +127,7 @@ func _build_ui() -> void:
 	_add_section_label("About")
 
 	var version_label: Label = Label.new()
-	version_label.text = "PetClaw v0.3.0 Alpha\nGodot 4.x | Claude API Powered\nLo-fi Pixel Art + Chiptune SFX"
+	version_label.text = "PetClaw v0.4.0 Alpha\nGodot 4.x | Claude API Powered\nLo-fi Pixel Art + Chiptune SFX"
 	version_label.add_theme_font_size_override("font_size", 12)
 	version_label.add_theme_color_override("font_color", Color(0.4, 0.4, 0.5))
 	_vbox.add_child(version_label)
