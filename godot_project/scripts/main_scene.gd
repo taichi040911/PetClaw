@@ -17,8 +17,11 @@ extends Control
 @onready var pet_button: Button = $UIPanel/VBox/ActionButtons/PetButton
 @onready var play_button: Button = $UIPanel/VBox/ActionButtons/PlayButton
 @onready var petbook_button: Button = $UIPanel/VBox/ActionButtons/PetBookButton
+@onready var condition_label: Label = $UIPanel/VBox/ConditionLabel
 @onready var pets_button: Button = $UIPanel/VBox/NavButtons/PetsButton
+@onready var mute_button: Button = $UIPanel/VBox/NavButtons/MuteButton
 @onready var settings_button: Button = $UIPanel/VBox/NavButtons/SettingsButton
+@onready var save_indicator: Label = $UIPanel/VBox/NavButtons/SaveIndicator
 
 # === Pet Reference ===
 var current_pet: PetEntity
@@ -107,6 +110,7 @@ func _ready() -> void:
 	play_button.pressed.connect(_on_play_pressed)
 	petbook_button.pressed.connect(_on_petbook_pressed)
 	pets_button.pressed.connect(_on_pets_pressed)
+	mute_button.pressed.connect(_on_mute_pressed)
 	settings_button.pressed.connect(_on_settings_pressed)
 
 	# スプラッシュスクリーン
@@ -142,14 +146,19 @@ var _action_cooldowns: Dictionary = {}  # action_name → time_remaining
 const ACTION_COOLDOWN: float = 2.0
 var _pet_sleeping: bool = false
 var _sleep_label: Label
+var _is_muted: bool = false
+var _auto_save_timer: float = 0.0
+const AUTO_SAVE_INTERVAL: float = 300.0  # 5分
 
 func _process(delta: float) -> void:
 	_warning_pulse_time += delta
 	_update_cooldowns(delta)
 	_update_sleep_state()
+	_update_auto_save(delta)
 	if current_pet and current_pet.is_alive:
 		_update_ui()
 		_update_status_warnings()
+		_update_condition_label()
 
 
 func _connect_game_signals() -> void:
@@ -707,6 +716,7 @@ func _apply_ui_theme() -> void:
 	# ナビボタン
 	_style_nav_button(pets_button, "🐾 Pets")
 	_style_nav_button(settings_button, "⚙ Settings")
+	_style_mute_button()
 
 	# ラベルスタイリング
 	emotion_label.add_theme_font_size_override("font_size", 20)
@@ -987,6 +997,97 @@ func _on_pet_stroked(stroke_quality: float) -> void:
 		_spawn_floating_text("♥ Nice pet!", UI_PET_COLOR)
 	else:
 		_spawn_floating_text("♥", Color(1.0, 0.7, 0.8, 0.7))
+
+
+# ========================================================
+# Condition Label (Round 36)
+# ========================================================
+
+const CONDITION_CONFIG: Dictionary = {
+	"excellent": {"text": "✨ Excellent", "color": Color(0.4, 0.9, 0.5)},
+	"good": {"text": "😊 Good", "color": Color(0.5, 0.8, 0.4)},
+	"fair": {"text": "😐 Fair", "color": Color(0.8, 0.75, 0.3)},
+	"poor": {"text": "😟 Poor", "color": Color(0.9, 0.5, 0.3)},
+	"critical": {"text": "🚨 Critical!", "color": Color(0.9, 0.3, 0.3)},
+}
+
+func _update_condition_label() -> void:
+	if not current_pet or not condition_label:
+		return
+	var condition: String = current_pet.stats.get_overall_condition()
+	var config: Dictionary = CONDITION_CONFIG.get(condition, CONDITION_CONFIG["fair"])
+	condition_label.text = config["text"]
+	condition_label.add_theme_color_override("font_color", config["color"])
+	condition_label.add_theme_font_size_override("font_size", 12)
+	condition_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+
+
+# ========================================================
+# Mute Toggle (Round 38)
+# ========================================================
+
+func _on_mute_pressed() -> void:
+	_is_muted = not _is_muted
+	_animate_button(mute_button)
+
+	if _is_muted:
+		mute_button.text = "🔇"
+		AudioServer.set_bus_mute(0, true)
+		if _bgm:
+			_bgm.stop()
+	else:
+		mute_button.text = "🔊"
+		AudioServer.set_bus_mute(0, false)
+		if _bgm:
+			_bgm.start()
+
+	# ミュートボタンのスタイル更新
+	_style_mute_button()
+
+
+func _style_mute_button() -> void:
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	if _is_muted:
+		style.bg_color = Color(0.35, 0.2, 0.2)
+	else:
+		style.bg_color = Color(0.2, 0.22, 0.32)
+	style.corner_radius_top_left = 8
+	style.corner_radius_top_right = 8
+	style.corner_radius_bottom_left = 8
+	style.corner_radius_bottom_right = 8
+	mute_button.add_theme_stylebox_override("normal", style)
+	mute_button.add_theme_font_size_override("font_size", 16)
+
+
+# ========================================================
+# Auto-Save (Round 37)
+# ========================================================
+
+func _update_auto_save(delta: float) -> void:
+	_auto_save_timer += delta
+	if _auto_save_timer >= AUTO_SAVE_INTERVAL:
+		_auto_save_timer = 0.0
+		_perform_auto_save()
+
+
+func _perform_auto_save() -> void:
+	if GameManager.instance:
+		GameManager.instance.save_game()
+		_show_save_indicator()
+
+
+func _show_save_indicator() -> void:
+	if not save_indicator:
+		return
+	save_indicator.text = "💾"
+	save_indicator.add_theme_font_size_override("font_size", 14)
+	save_indicator.add_theme_color_override("font_color", Color(0.5, 0.8, 0.5, 0.9))
+	save_indicator.modulate.a = 1.0
+
+	var tween: Tween = create_tween()
+	tween.tween_interval(1.5)
+	tween.tween_property(save_indicator, "modulate:a", 0.0, 0.5)
+	tween.tween_callback(func() -> void: save_indicator.text = "")
 
 
 # ========================================================

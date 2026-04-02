@@ -67,6 +67,11 @@ layout_mode = 2
 text = "— Neutral"
 horizontal_alignment = 1
 
+[node name="ConditionLabel" type="Label" parent="UIPanel/VBox"]
+layout_mode = 2
+text = "Condition: Good"
+horizontal_alignment = 1
+
 [node name="StatsBar" type="HBoxContainer" parent="UIPanel/VBox"]
 layout_mode = 2
 alignment = 1
@@ -160,7 +165,16 @@ custom_minimum_size = Vector2(90, 36)
 layout_mode = 2
 text = "🐾 Pets"
 
+[node name="MuteButton" type="Button" parent="UIPanel/VBox/NavButtons"]
+custom_minimum_size = Vector2(48, 36)
+layout_mode = 2
+text = "🔊"
+
 [node name="SettingsButton" type="Button" parent="UIPanel/VBox/NavButtons"]
 custom_minimum_size = Vector2(90, 36)
 layout_mode = 2
 text = "⚙ Settings"
+
+[node name="SaveIndicator" type="Label" parent="UIPanel/VBox/NavButtons"]
+layout_mode = 2
+text = ""
