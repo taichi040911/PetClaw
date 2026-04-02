@@ -190,9 +190,13 @@ func start_conversation(pet1: PetEntity, pet2: PetEntity, trigger: String) -> vo
 			"emotion": _get_dominant_emotion(current_pet),
 			"word_order": grammar["word_order"],
 		}
+		# 性格方言フィルター（性格に応じてメッセージを微修正）
+		response = _apply_personality_dialect(response, current_pet)
+
 		# 言語コンプライアンスチェック
 		var compliance: Dictionary = _check_language_compliance(response, grammar)
 		message["language_compliance"] = compliance
+		message["message"] = response  # 方言フィルター適用後のメッセージで更新
 
 		current_conversation.append(message)
 		conversation_message.emit(current_pet.pet_id, response, message)
@@ -899,6 +903,51 @@ func _get_participants_from_messages(messages: Array[Dictionary]) -> Array[PetEn
 				if pet is PetEntity:
 					result.append(pet)
 	return result
+
+
+func _apply_personality_dialect(text: String, pet: PetEntity) -> String:
+	## 性格に基づいてテキストを微修正（方言フィルター）
+	## 各性格特性が0.6以上の場合に方言変換を適用
+	var personality: Dictionary = pet.personality
+
+	# 大胆な性格 → 感嘆符を追加、大文字使用
+	if personality.get("bravery", 0.0) > 0.6:
+		if not text.ends_with("!") and randf() < 0.4:
+			text = text.rstrip(".") + "!"
+		# "..." を "!" に変換（強気な口調）
+		if randf() < 0.3:
+			text = text.replace("...", "!")
+
+	# 穏やかな性格 → "..." を多用、短い文
+	if personality.get("gentleness", 0.0) > 0.6:
+		if randf() < 0.3 and not text.contains("..."):
+			text = text.rstrip(".!") + "..."
+
+	# 好奇心旺盛 → "?" を追加
+	if personality.get("curiosity", 0.0) > 0.6:
+		if randf() < 0.25 and not text.contains("?"):
+			text = text.rstrip(".") + "?"
+
+	# 社交的 → 相手の名前を繰り返す傾向
+	if personality.get("sociability", 0.0) > 0.6 and randf() < 0.2:
+		# テキストの先頭に呼びかけを追加（既に呼びかけがなければ）
+		var suffix: String = ""
+		if GameManager.language_evolution:
+			var grammar: Dictionary = GameManager.language_evolution.get_current_grammar()
+			var suffixes: Variant = grammar.get("suffixes", [])
+			if suffixes is Array and not suffixes.is_empty():
+				suffix = str(suffixes[0])
+			elif suffixes is Dictionary and not suffixes.is_empty():
+				suffix = str(suffixes.values()[0])
+		if not suffix.is_empty() and randf() < 0.5:
+			text = "*chirps%s* %s" % [suffix, text]
+
+	# 内気な性格 → 小文字化、"..." や "()" で包む
+	if personality.get("shyness", 0.0) > 0.6 or personality.get("gentleness", 0.0) > 0.7:
+		if randf() < 0.2:
+			text = "(%s)" % text.strip_edges()
+
+	return text
 
 
 func _check_language_compliance(response: String, grammar: Dictionary) -> Dictionary:
