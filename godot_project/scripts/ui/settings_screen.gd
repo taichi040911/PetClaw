@@ -183,10 +183,9 @@ func _add_section_label(text: String) -> void:
 func _enable_demo_mode() -> void:
 	## デモモード: 会話間隔を短縮し、感情をブースト
 	if GameManager.instance and GameManager.instance.a2a_system:
-		# 会話タイマーをリセットして即座にトリガー可能に
-		GameManager.instance.a2a_system.conversation_timer = 150.0  # すぐに会話が始まる
-		# 注: AUTO_CONVERSATION_INTERVAL は const なので変更不可
-		# 代わりにタイマーを進める
+		# 会話間隔を30秒に短縮 + タイマーを進める
+		GameManager.instance.a2a_system.auto_conversation_interval = 30.0
+		GameManager.instance.a2a_system.conversation_timer = 25.0  # 5秒後に会話開始
 
 	# 全ペットの感情をブースト
 	if GameManager.instance:

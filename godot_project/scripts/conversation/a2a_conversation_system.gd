@@ -9,7 +9,7 @@ signal conversation_message(pet_id: int, message: String, metadata: Dictionary)
 signal evolution_triggered_by_conversation(evolution_type: String)
 
 # === パラメータ ===
-const AUTO_CONVERSATION_INTERVAL: float = 180.0   # 自動会話間隔（秒）
+var auto_conversation_interval: float = 180.0     # 自動会話間隔（秒）— demo mode で短縮可能
 const MAX_TURNS_PER_CONVERSATION: int = 6          # 1会話の最大ターン数
 const MIN_EMOTION_FOR_SPONTANEOUS: float = 0.4     # 自発的会話の最低感情強度
 
@@ -101,7 +101,7 @@ func _process(delta: float) -> void:
 		return
 
 	conversation_timer += delta
-	if conversation_timer >= AUTO_CONVERSATION_INTERVAL:
+	if conversation_timer >= auto_conversation_interval:
 		conversation_timer = 0.0
 		_try_auto_conversation()
 
@@ -1240,13 +1240,13 @@ func from_dict(data: Dictionary) -> void:
 # === イベントハンドラ ===
 func _on_climate_event(event_type: String, _intensity: float) -> void:
 	# 気候イベントで自動会話をトリガー
-	conversation_timer = AUTO_CONVERSATION_INTERVAL - 10.0  # すぐに会話が始まりやすくなる
+	conversation_timer = auto_conversation_interval - 10.0  # すぐに会話が始まりやすくなる
 
 
 func _on_language_evolution(event_type: String, _data: Dictionary) -> void:
 	# 言語進化時にもリアクション会話のチャンス
 	if randf() < 0.3:
-		conversation_timer = AUTO_CONVERSATION_INTERVAL - 5.0
+		conversation_timer = auto_conversation_interval - 5.0
 
 
 # === 手動会話トリガー（UI用） ===
@@ -1304,6 +1304,6 @@ func get_conversation_status() -> Dictionary:
 		"daily_count": daily_conversation_count,
 		"max_daily": MAX_DAILY_CONVERSATIONS,
 		"total_conversations": conversation_log.size(),
-		"timer_progress": conversation_timer / AUTO_CONVERSATION_INTERVAL,
+		"timer_progress": conversation_timer / auto_conversation_interval,
 		"avg_compliance": avg_compliance,
 	}
