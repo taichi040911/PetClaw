@@ -24,6 +24,7 @@ var ethical_safeguard: Node  # EthicalSafeguard
 var pet_autonomy: Node  # PetAutonomySystem
 var lifecycle_fsm: RefCounted  # PetLifecycleFSM (extends RefCounted)
 var pet_book: Node  # PetBookCore
+var battle_system: Node  # LanguageBattleSystem
 
 # === Pet Registry ===
 var pets: Dictionary = {}  # pet_id → PetEntity
@@ -94,6 +95,7 @@ func _initialize_systems() -> void:
 	var fsm_script: GDScript = load("res://scripts/life/pet_lifecycle_fsm.gd")
 	lifecycle_fsm = fsm_script.new(0)  # default pet_id=0, reassigned on pet load
 	pet_book = _create_system("res://scripts/social/pet_book_core.gd", "PetBookCore")
+	battle_system = _create_system("res://scripts/battle/language_battle_system.gd", "LanguageBattleSystem")
 
 
 func _create_pet_entity() -> Node:
@@ -165,6 +167,9 @@ func _connect_signals() -> void:
 		lifecycle_fsm.lifecycle_milestone.connect(_on_lifecycle_milestone)
 		lifecycle_fsm.sleep_started.connect(_on_pet_sleep_started)
 		lifecycle_fsm.sleep_ended.connect(_on_pet_sleep_ended)
+
+	# === Battle System 統合接続 ===
+	battle_system.battle_ended.connect(_on_battle_ended)
 
 	# === ラウンド5: PetBook 統合接続 ===
 	# 死亡 → 追悼投稿
@@ -424,6 +429,12 @@ func _on_birth_for_petbook(_parent1_id: int, _parent2_id: int, child: Node) -> v
 		pet_book.create_event_post(child.pet_id, "birth", {"child_name": child.pet_name})
 
 
+func _on_battle_ended(winner_id: int, final_scores: Dictionary) -> void:
+	var p1_total: float = final_scores.get("pet1_total", 0.0)
+	var p2_total: float = final_scores.get("pet2_total", 0.0)
+	print("[GameManager] Battle ended. Winner: %d (%.1f vs %.1f)" % [winner_id, p1_total, p2_total])
+
+
 func queue_petbook_posts(post_data: Dictionary) -> void:
 	## AtoA会話システムからの投稿をPetBookCoreに橋渡し
 	## AtoAConversationSystem._generate_conversation_posts() から呼ばれる
@@ -468,6 +479,7 @@ func save_game() -> void:
 		"pet_book": pet_book.to_dict(),
 		"breeding": breeding.to_dict(),
 		"life_death": life_death.to_dict(),
+		"battle_system": battle_system.to_dict(),
 	}
 
 	for pet_id in pets:
@@ -539,6 +551,9 @@ func _load_game_data() -> void:
 	# ラウンド23: Breeding + LifeDeath復元
 	breeding.from_dict(data.get("breeding", {}))
 	life_death.from_dict(data.get("life_death", {}))
+
+	# Battle System復元
+	battle_system.from_dict(data.get("battle_system", {}))
 
 	# ペット復元
 	for pet_id_str in data.get("pets", {}):

@@ -26,6 +26,7 @@ extends Control
 @onready var dict_button: Button = $UIPanel/VBox/NavButtons/DictButton
 @onready var settings_button: Button = $UIPanel/VBox/NavButtons/SettingsButton
 @onready var save_indicator: Label = $UIPanel/VBox/NavButtons/SaveIndicator
+var battle_button: Button  # Created programmatically in NavButtons
 
 # === Pet Reference ===
 var current_pet: PetEntity
@@ -119,6 +120,14 @@ func _ready() -> void:
 	mute_button.pressed.connect(_on_mute_pressed)
 	dict_button.pressed.connect(_on_dict_pressed)
 	settings_button.pressed.connect(_on_settings_pressed)
+	# Battle button (programmatic, inserted before SaveIndicator in NavButtons)
+	battle_button = Button.new()
+	battle_button.custom_minimum_size = Vector2(80, 36)
+	battle_button.text = "Battle"
+	var nav_buttons: HBoxContainer = $UIPanel/VBox/NavButtons
+	nav_buttons.add_child(battle_button)
+	nav_buttons.move_child(battle_button, save_indicator.get_index())
+	battle_button.pressed.connect(_on_battle_pressed)
 	pet_name_label.gui_input.connect(_on_pet_name_tapped)
 	pet_name_label.mouse_filter = Control.MOUSE_FILTER_STOP
 
@@ -806,6 +815,21 @@ func _on_settings_pressed() -> void:
 	add_child(settings)
 
 
+# === Battle Screen ===
+
+func _on_battle_pressed() -> void:
+	_animate_button(battle_button)
+	if _sfx:
+		_sfx.play(SfxManager.SfxType.UI_OPEN)
+	var battle_screen: BattleScreen = BattleScreen.new()
+	battle_screen.back_requested.connect(func() -> void:
+		battle_screen.queue_free()
+		_fade_in_main_ui()
+	)
+	await _fade_out_main_ui()
+	add_child(battle_screen)
+
+
 # === Pet List Screen ===
 
 func _on_pets_pressed() -> void:
@@ -920,6 +944,7 @@ func _apply_ui_theme() -> void:
 
 	# ナビボタン
 	_style_nav_button(pets_button, "🐾 Pets")
+	_style_nav_button(battle_button, "⚔ Battle")
 	_style_nav_button(settings_button, "⚙ Settings")
 	_style_mute_button()
 
