@@ -6,6 +6,7 @@ extends Node
 signal battle_started(pet1_id: int, pet2_id: int)
 signal battle_round_complete(round: int, scores: Dictionary)
 signal battle_ended(winner_id: int, final_scores: Dictionary)
+signal auto_battle_triggered(pet1_id: int, pet2_id: int)
 
 # === Battle Constants ===
 const TOTAL_ROUNDS: int = 3
@@ -22,6 +23,42 @@ const WINNER_AFFINITY_BOOST: float = 0.1
 const HEBBIAN_BOOST_PER_WORD: float = 0.05
 const WINNER_PERSONALITY_BOOST: float = 0.02
 const LOSER_DETERMINATION_BOOST: float = 0.15
+
+# === Close Battle Threshold ===
+const CLOSE_BATTLE_THRESHOLD: float = 20.0
+
+# === PetBook Battle Post Templates (8 winner + 8 loser + 2+2 close-battle) ===
+const WINNER_POST_TEMPLATES: Array[String] = [
+	"I won{suffix}! My {word} was unstoppable{suffix}!",
+	"Victory{suffix}! {word} carried me through every round{suffix}!",
+	"Nobody can beat my {word}{suffix}! I am the champion{suffix}!",
+	"Ha{suffix}! {loser_name} tried their best but my {word} was too strong{suffix}!",
+	"Three rounds{suffix}, one winner{suffix}! {word} speaks for itself{suffix}!",
+	"The power of {word}{suffix} led me to glory{suffix}! What a battle{suffix}!",
+	"I proved that {word}{suffix} is the mightiest word of all{suffix}!",
+	"Sweet victory{suffix}! My {word} shone brighter than ever{suffix}!",
+]
+
+const LOSER_POST_TEMPLATES: Array[String] = [
+	"Lost to {winner_name}{suffix}... need to practice my {word}{suffix}",
+	"Defeated{suffix}... but my {word} will grow stronger{suffix}...",
+	"Next time{suffix}, {winner_name}{suffix}... my {word} won't lose again{suffix}",
+	"{winner_name} was tough{suffix}... I need to sharpen my {word}{suffix}",
+	"My {word}{suffix} wasn't enough today{suffix}... time to train harder{suffix}",
+	"A loss{suffix}... but I learned something about {word}{suffix}",
+	"Not my day{suffix}... {winner_name}'s words were just too powerful{suffix}",
+	"I fell{suffix}, but {word} will lift me back up{suffix}... watch me{suffix}",
+]
+
+const CLOSE_BATTLE_WINNER_TEMPLATES: Array[String] = [
+	"What a close battle{suffix}! {loser_name} almost had me{suffix}! My {word} barely pulled through{suffix}!",
+	"That was intense{suffix}! {loser_name} and I were neck and neck{suffix}! {word} made the difference{suffix}!",
+]
+
+const CLOSE_BATTLE_LOSER_TEMPLATES: Array[String] = [
+	"So close{suffix}! Just a few points away{suffix}... {winner_name} and I gave it everything{suffix}! My {word} almost won{suffix}!",
+	"What an amazing battle{suffix}! {winner_name} edged me out{suffix} but my {word} nearly took it{suffix}!",
+]
 
 # === Round Themes ===
 enum RoundTheme { GREETING, ARGUMENT, STORYTELLING }
@@ -124,6 +161,23 @@ const EMOTION_LABELS: Array[String] = [
 	"joy", "excitement", "love", "fear", "sadness",
 ]
 
+# === Auto-Matchmaking ===
+var auto_battle_timer: float = 0.0
+var auto_battle_interval: float = 600.0  # 10分（demo mode では60秒に短縮）
+var daily_battle_count: int = 0
+const MAX_DAILY_BATTLES: int = 5
+var last_daily_reset: int = 0
+
+# Battle probability by relationship type
+const BATTLE_PROBABILITY: Dictionary = {
+	"rivals": 0.60,
+	"close_friends": 0.30,
+	"best_friends": 0.30,
+	"friends": 0.15,
+	"acquaintances": 0.05,
+	"strangers": 0.05,
+}
+
 # === State ===
 var is_battle_active: bool = false
 var current_round: int = 0
@@ -142,8 +196,20 @@ var battle_history: Dictionary = {}  # pet_id → { total_battles, wins, losses,
 
 
 func _process(delta: float) -> void:
+	# Daily reset check
+	var current_day: int = int(Time.get_unix_time_from_system() / 86400)
+	if current_day != last_daily_reset:
+		_reset_daily_battles()
+
+	# Auto-matchmaking timer (only when no battle active)
 	if not is_battle_active:
+		auto_battle_timer += delta
+		if auto_battle_timer >= auto_battle_interval:
+			auto_battle_timer = 0.0
+			_try_auto_battle()
 		return
+
+	# Active battle round processing
 	round_timer -= delta
 	if round_timer <= 0.0 and current_round < TOTAL_ROUNDS:
 		_execute_round()
@@ -190,6 +256,97 @@ func get_battle_stats(pet_id: int) -> Dictionary:
 		"losses": 0,
 		"best_score": 0.0,
 	}
+
+
+# ============================
+# Auto-Matchmaking
+# ============================
+
+func _try_auto_battle() -> void:
+	## 自動バトルを試行する
+	if is_battle_active:
+		return
+	if daily_battle_count >= MAX_DAILY_BATTLES:
+		return
+
+	var opponents: Array[PetEntity] = _select_battle_opponents()
+	if opponents.size() < 2:
+		return
+
+	var pet1: PetEntity = opponents[0]
+	var pet2: PetEntity = opponents[1]
+
+	# Determine battle probability based on relationship type
+	var probability: float = _get_battle_probability(pet1.pet_id, pet2.pet_id)
+	if randf() > probability:
+		return
+
+	daily_battle_count += 1
+	auto_battle_triggered.emit(pet1.pet_id, pet2.pet_id)
+	start_battle(pet1, pet2)
+
+
+func _select_battle_opponents() -> Array[PetEntity]:
+	## バトルに適した2匹のペットを選出する
+	## 高興奮・競争的ムードを優先、低エネルギーを除外
+	var pets: Array = GameManager.get_all_pets()
+	var candidates: Array[PetEntity] = []
+	for pet: Variant in pets:
+		if pet is PetEntity and pet.is_alive and pet.stats.energy >= 0.2:
+			candidates.append(pet)
+
+	if candidates.size() < 2:
+		return [] as Array[PetEntity]
+
+	# Score each candidate by battle-readiness (excitement + competitive mood)
+	var scored: Array[Dictionary] = []
+	for pet: PetEntity in candidates:
+		var excitement: float = pet.emotions.get("excitement", 0.0)
+		var joy: float = pet.emotions.get("joy", 0.0)
+		var energy: float = pet.stats.energy
+		var score: float = excitement * 2.0 + joy * 0.5 + energy * 0.5
+		# Personality: bold/playful pets seek battles more
+		var bold: float = pet.personality.get("bold", 0.5)
+		var playful: float = pet.personality.get("playful", 0.5)
+		score += (bold + playful) * 0.5
+		scored.append({"pet": pet, "score": score})
+
+	# Sort by score descending
+	scored.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return a["score"] > b["score"]
+	)
+
+	# Return top 2 candidates
+	var result: Array[PetEntity] = []
+	result.append(scored[0]["pet"] as PetEntity)
+	result.append(scored[1]["pet"] as PetEntity)
+	return result
+
+
+func _get_battle_probability(pet1_id: int, pet2_id: int) -> float:
+	## 関係タイプに基づくバトル発生確率を返す
+	if not GameManager.instance:
+		return BATTLE_PROBABILITY.get("acquaintances", 0.05)
+	if not GameManager.instance.has_node("AtoAConversationSystem"):
+		return BATTLE_PROBABILITY.get("acquaintances", 0.05)
+	var a2a: AtoAConversationSystem = GameManager.instance.get_node("AtoAConversationSystem")
+	var key: String = "%d_%d" % [mini(pet1_id, pet2_id), maxi(pet1_id, pet2_id)]
+	var rel: Dictionary = a2a.pet_relationships.get(key, {})
+	var rel_type: String = rel.get("relationship_type", "acquaintances")
+	return BATTLE_PROBABILITY.get(rel_type, 0.05)
+
+
+func _reset_daily_battles() -> void:
+	## 日次バトルカウンターをリセット
+	daily_battle_count = 0
+	last_daily_reset = int(Time.get_unix_time_from_system() / 86400)
+	print("[LanguageBattle] Daily reset: battle count cleared")
+
+
+func enable_demo_battles() -> void:
+	## デモモード: バトル間隔を60秒に短縮
+	auto_battle_interval = 60.0
+	print("[LanguageBattle] Demo mode enabled: auto_battle_interval = 60s")
 
 
 # ============================
@@ -271,6 +428,9 @@ func _end_battle() -> void:
 	# Update history
 	_update_history(battle_pet1.pet_id, pet1_total_score, winner_id == battle_pet1.pet_id)
 	_update_history(battle_pet2.pet_id, pet2_total_score, winner_id == battle_pet2.pet_id)
+
+	# Generate PetBook posts about the battle result
+	_generate_battle_posts(winner_id, final_scores)
 
 	battle_ended.emit(winner_id, final_scores)
 
@@ -604,6 +764,93 @@ func _get_dominant_personality_trait(pet: PetEntity) -> String:
 
 
 # ============================
+# PetBook Battle Posts
+# ============================
+
+func _generate_battle_posts(winner_id: int, final_scores: Dictionary) -> void:
+	## バトル結果をPetBookに投稿する（勝者1件 + 敗者1件 = 最大2件）
+	## 接戦の場合は特別テンプレートを使用
+	if not GameManager.instance or not GameManager.instance.has_method("queue_petbook_posts"):
+		return
+
+	var winner: PetEntity = null
+	var loser: PetEntity = null
+
+	if battle_pet1 and battle_pet1.pet_id == winner_id:
+		winner = battle_pet1
+		loser = battle_pet2
+	elif battle_pet2 and battle_pet2.pet_id == winner_id:
+		winner = battle_pet2
+		loser = battle_pet1
+
+	if not winner or not loser:
+		return
+
+	var score_diff: float = absf(final_scores.get("pet1_total", 0.0) - final_scores.get("pet2_total", 0.0))
+	var is_close_battle: bool = score_diff < CLOSE_BATTLE_THRESHOLD
+
+	# Pick a word from vocabulary for each pet
+	var winner_vocab: Dictionary = _get_pet_vocabulary(winner)
+	var loser_vocab: Dictionary = _get_pet_vocabulary(loser)
+	var winner_word: String = _pick_random_word(winner_vocab)
+	var loser_word: String = _pick_random_word(loser_vocab)
+	var winner_suffix: String = _pick_suffix_for_pet(winner)
+	var loser_suffix: String = _pick_suffix_for_pet(loser)
+
+	# Select templates based on close battle or normal
+	var winner_template: String
+	var loser_template: String
+	if is_close_battle:
+		winner_template = CLOSE_BATTLE_WINNER_TEMPLATES[randi() % CLOSE_BATTLE_WINNER_TEMPLATES.size()]
+		loser_template = CLOSE_BATTLE_LOSER_TEMPLATES[randi() % CLOSE_BATTLE_LOSER_TEMPLATES.size()]
+	else:
+		winner_template = WINNER_POST_TEMPLATES[randi() % WINNER_POST_TEMPLATES.size()]
+		loser_template = LOSER_POST_TEMPLATES[randi() % LOSER_POST_TEMPLATES.size()]
+
+	# Fill winner post
+	var winner_content: String = winner_template
+	winner_content = winner_content.replace("{suffix}", winner_suffix)
+	winner_content = winner_content.replace("{word}", winner_word)
+	winner_content = winner_content.replace("{loser_name}", loser.pet_name)
+	winner_content = winner_content.replace("{winner_name}", winner.pet_name)
+
+	# Fill loser post
+	var loser_content: String = loser_template
+	loser_content = loser_content.replace("{suffix}", loser_suffix)
+	loser_content = loser_content.replace("{word}", loser_word)
+	loser_content = loser_content.replace("{winner_name}", winner.pet_name)
+	loser_content = loser_content.replace("{loser_name}", loser.pet_name)
+
+	# Queue winner post
+	var winner_post: Dictionary = {
+		"author_id": winner.pet_id,
+		"author_name": winner.pet_name,
+		"content": winner_content,
+		"post_type": "EVENT",
+		"emotion": _get_dominant_emotion_label(winner),
+		"partner_id": loser.pet_id,
+		"timestamp": Time.get_ticks_msec(),
+		"triggered_by_event": "battle_result",
+	}
+	GameManager.instance.queue_petbook_posts(winner_post)
+
+	# Queue loser post
+	var loser_post: Dictionary = {
+		"author_id": loser.pet_id,
+		"author_name": loser.pet_name,
+		"content": loser_content,
+		"post_type": "EVENT",
+		"emotion": _get_dominant_emotion_label(loser),
+		"partner_id": winner.pet_id,
+		"timestamp": Time.get_ticks_msec(),
+		"triggered_by_event": "battle_result",
+	}
+	GameManager.instance.queue_petbook_posts(loser_post)
+
+	print("[LanguageBattle] PetBook posts queued: winner=%s, loser=%s, close=%s" % [winner.pet_name, loser.pet_name, str(is_close_battle)])
+
+
+# ============================
 # History Management
 # ============================
 
@@ -635,8 +882,17 @@ func _update_history(pet_id: int, total_score: float, is_winner: bool) -> void:
 func to_dict() -> Dictionary:
 	return {
 		"battle_history": battle_history.duplicate(true),
+		"daily_battle_count": daily_battle_count,
+		"last_daily_reset": last_daily_reset,
 	}
 
 
 func from_dict(data: Dictionary) -> void:
 	battle_history = data.get("battle_history", {})
+	daily_battle_count = data.get("daily_battle_count", 0)
+	last_daily_reset = data.get("last_daily_reset", 0)
+
+	# 日付が変わっていればリセット
+	var current_day: int = int(Time.get_unix_time_from_system() / 86400)
+	if current_day != last_daily_reset:
+		_reset_daily_battles()
