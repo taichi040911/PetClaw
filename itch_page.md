@@ -15,6 +15,10 @@ PetClaw is a virtual pet simulation where AI-powered creatures talk to each othe
 - **Pet relationships** -- pets develop friendships and rivalries through conversation history, shared vocabulary, and affinity tracking
 - **Word teaching** -- pets teach each other invented words, creating a spreading linguistic network
 - **Procedural pixel art & chiptune audio** -- retro aesthetic, modern AI soul
+- **Group conversations** -- 3+ pets can chat together with round-robin turns
+- **Language Dictionary** -- browse your pets' complete invented vocabulary with searchable UI
+- **Conversation highlights** -- top conversations scored and showcased with gold/silver badges
+- **Conversation export** -- share your pets' conversations as text
 
 ---
 
