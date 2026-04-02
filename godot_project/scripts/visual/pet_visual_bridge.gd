@@ -85,14 +85,24 @@ func _ready() -> void:
 		shadow.texture = _create_shadow_texture()
 
 
+var _status_label: Label  # 状態テキスト（Zzz, !, 💧）
+var _zzz_timer: float = 0.0
+
 func _process(delta: float) -> void:
-	if not pet_entity or not pet_entity.is_alive:
+	if not pet_entity:
+		return
+
+	# 死亡状態 — グレースケール化して停止
+	if not pet_entity.is_alive:
+		if body_sprite:
+			body_sprite.modulate = body_sprite.modulate.lerp(Color(0.3, 0.3, 0.3, 0.6), 0.02)
 		return
 
 	_idle_time += delta
 	_update_idle_animation(delta)
 	_update_emotion_visuals()
 	_update_blink(delta)
+	_update_status_visuals(delta)
 
 	# フォーム変更チェック
 	var form_id: String = pet_entity.get("current_form") if pet_entity.get("current_form") else "blob"
@@ -172,13 +182,18 @@ func _setup_emotion_particles() -> void:
 # ========================================================
 
 func _update_idle_animation(_delta: float) -> void:
+	# エネルギーに応じたバウンス強度（低エネルギー=ほぼ動かない）
+	var energy_mult: float = 1.0
+	if pet_entity:
+		energy_mult = 0.3 + pet_entity.stats.energy * 0.7  # 0.3〜1.0
+
 	# ゆっくりとした上下バウンス（呼吸のような動き）
-	_bounce_offset = sin(_idle_time * 1.5) * 3.0
+	_bounce_offset = sin(_idle_time * 1.5) * 3.0 * energy_mult
 	position = _original_position + Vector2(0, _bounce_offset)
 
 	# 好奇心が高い場合、左右にわずかに揺れる
 	if pet_entity and pet_entity.personality.get("curious", 0.5) > 0.7:
-		var sway: float = sin(_idle_time * 0.8) * 2.0
+		var sway: float = sin(_idle_time * 0.8) * 2.0 * energy_mult
 		position.x = _original_position.x + sway
 
 
@@ -201,6 +216,57 @@ func _update_blink(delta: float) -> void:
 			_blink_interval = randf_range(2.5, 4.5)
 			if eyes_sprite:
 				eyes_sprite.modulate.a = 0.1  # ほぼ閉じ
+
+
+# ========================================================
+# ステータスビジュアル（空腹・病気・眠い）
+# ========================================================
+
+func _update_status_visuals(delta: float) -> void:
+	if not pet_entity:
+		return
+
+	var hunger: float = pet_entity.stats.hunger
+	var health: float = pet_entity.stats.health
+	var energy: float = pet_entity.stats.energy
+
+	# 空腹 — 暗くなる + 動きが鈍る
+	if hunger < 0.2 and body_sprite:
+		var dim: float = 0.5 + hunger * 2.5  # 0.5〜1.0
+		body_sprite.modulate.a = lerpf(body_sprite.modulate.a, dim, 0.05)
+
+	# 体調不良 — 緑がかる
+	if health < 0.3 and body_sprite:
+		var sick_tint: Color = Color(0.7, 0.9, 0.7)
+		body_sprite.modulate = body_sprite.modulate.lerp(sick_tint, 0.03)
+
+	# 眠い — DayNightCycleと連動
+	if DayNightCycle.instance and DayNightCycle.instance.is_sleepy_time():
+		_zzz_timer += delta
+		# 3秒ごとにZzzラベルを浮かべる
+		if _zzz_timer > 3.0:
+			_zzz_timer = 0.0
+			_spawn_zzz_label()
+		# アイドル動作をゆっくりに
+		_idle_time *= 0.98  # 段々遅くなる
+
+	# エネルギー低下 — バウンスが小さくなる（_update_idle_animation内で使用）
+
+
+func _spawn_zzz_label() -> void:
+	var zzz: Label = Label.new()
+	zzz.text = ["z", "Z", "z Z"][randi() % 3]
+	zzz.add_theme_font_size_override("font_size", 16)
+	zzz.add_theme_color_override("font_color", Color(0.6, 0.6, 0.9, 0.5))
+	zzz.position = Vector2(randf_range(-15, 25), -60)
+	zzz.z_index = 10
+	add_child(zzz)
+
+	var tween: Tween = create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(zzz, "position:y", zzz.position.y - 40, 1.5)
+	tween.tween_property(zzz, "modulate:a", 0.0, 1.5)
+	tween.chain().tween_callback(zzz.queue_free)
 
 
 # ========================================================
