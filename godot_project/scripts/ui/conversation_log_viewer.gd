@@ -346,6 +346,33 @@ func _add_message_bubble(msg: Dictionary) -> void:
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD
 	content.add_child(body)
 
+	# リアクション表示（R84で追加されるデータ）
+	var reactions: Array = msg.get("reactions", [])
+	if not reactions.is_empty():
+		var reactions_text: String = ""
+		for reaction: Variant in reactions:
+			if reaction is Dictionary:
+				var r: Dictionary = reaction
+				reactions_text += "%s %s  " % [r.get("emoji", ""), r.get("reactor_name", "")]
+		if not reactions_text.is_empty():
+			var reactions_label: Label = Label.new()
+			reactions_label.text = reactions_text.strip_edges()
+			reactions_label.add_theme_font_size_override("font_size", 9)
+			reactions_label.add_theme_color_override("font_color", Color(0.5, 0.55, 0.65))
+			content.add_child(reactions_label)
+
+	# ワードティーチング表示
+	var word_teaching: Variant = msg.get("word_teaching", {})
+	if word_teaching is Dictionary and not (word_teaching as Dictionary).is_empty():
+		var wt: Dictionary = word_teaching as Dictionary
+		var wt_context: String = wt.get("teaching_context", "")
+		if not wt_context.is_empty():
+			var wt_label: Label = Label.new()
+			wt_label.text = "📚 %s" % wt_context
+			wt_label.add_theme_font_size_override("font_size", 9)
+			wt_label.add_theme_color_override("font_color", Color(0.5, 0.7, 0.45))
+			content.add_child(wt_label)
+
 
 func _build_relationship_indicator(name_a: String, name_b: String) -> Label:
 	## 連続メッセージ間の関係性を小さなテキストで表示

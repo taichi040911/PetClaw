@@ -106,11 +106,13 @@ func _show_next_message() -> void:
 
 	# 吹き出しを作成
 	var is_left: bool = msg.get("is_left", true)
+	var reactions: Array = msg.get("reactions", [])
 	var bubble: PanelContainer = _create_bubble(
 		msg.get("pet_name", "???"),
 		msg.get("text", "..."),
 		msg.get("emotion", "neutral"),
-		is_left
+		is_left,
+		reactions
 	)
 
 	_bubble_container.add_child(bubble)
@@ -128,8 +130,28 @@ func _show_next_message() -> void:
 	tween.tween_property(bubble, "position:y", bubble.position.y - 20, 0.2) \
 		.set_ease(Tween.EASE_OUT)
 
+	# リアクションのフェードインアニメーション（0.5秒遅延で順次表示）
+	if reactions.size() > 0:
+		var reaction_label: Label = _find_reaction_label(bubble)
+		if reaction_label:
+			reaction_label.modulate.a = 0.0
+			var reaction_tween: Tween = create_tween()
+			reaction_tween.tween_interval(0.5)
+			reaction_tween.tween_property(reaction_label, "modulate:a", 1.0, 0.3) \
+				.set_ease(Tween.EASE_IN_OUT)
 
-func _create_bubble(pet_name: String, text: String, emotion: String, is_left: bool) -> PanelContainer:
+
+## リアクションラベルをバブル内から検索する
+func _find_reaction_label(bubble: PanelContainer) -> Label:
+	var vbox: VBoxContainer = bubble.get_child(0) as VBoxContainer
+	if vbox and vbox.get_child_count() >= 3:
+		var candidate: Node = vbox.get_child(vbox.get_child_count() - 1)
+		if candidate is Label and candidate.name == "ReactionsLabel":
+			return candidate as Label
+	return null
+
+
+func _create_bubble(pet_name: String, text: String, emotion: String, is_left: bool, reactions: Array = []) -> PanelContainer:
 	var panel: PanelContainer = PanelContainer.new()
 	panel.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN if is_left else Control.SIZE_SHRINK_END
 
@@ -171,5 +193,23 @@ func _create_bubble(pet_name: String, text: String, emotion: String, is_left: bo
 	text_label.add_theme_font_size_override("font_size", 14)
 	text_label.add_theme_color_override("font_color", Color(0.85, 0.88, 0.95))
 	vbox.add_child(text_label)
+
+	# リアクション表示（emoji + reactor_name の小さいラベル）
+	if reactions.size() > 0:
+		var reaction_parts: PackedStringArray = PackedStringArray()
+		for reaction: Variant in reactions:
+			if reaction is Dictionary:
+				var emoji_str: String = reaction.get("emoji", "")
+				var reactor: String = reaction.get("reactor_name", "")
+				if emoji_str != "" and reactor != "":
+					reaction_parts.append("%s %s" % [emoji_str, reactor])
+		if reaction_parts.size() > 0:
+			var reaction_label: Label = Label.new()
+			reaction_label.name = "ReactionsLabel"
+			reaction_label.text = "  ".join(reaction_parts)
+			reaction_label.add_theme_font_size_override("font_size", 10)
+			reaction_label.add_theme_color_override("font_color", Color(0.5, 0.55, 0.65))
+			reaction_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			vbox.add_child(reaction_label)
 
 	return panel
