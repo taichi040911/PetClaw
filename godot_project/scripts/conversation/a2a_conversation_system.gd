@@ -80,6 +80,54 @@ const TEMPLATE_CONVERSATIONS: Array[Dictionary] = [
 			"{pet1} hummed a soothing tune-{suffix}. 'Everything will be okay-{suffix}.'",
 		]
 	},
+	{
+		"trigger": "dream",
+		"templates": [
+			"{pet1} yawned-{suffix}. 'I had the strangest dream-{suffix}...'",
+			"{pet2} perked up-{suffix}. 'Tell me-{suffix}! What did you dream-{suffix}?'",
+			"{pet1} closed their eyes-{suffix}. 'There was a place where words had wings-{suffix}...'",
+		]
+	},
+	{
+		"trigger": "memory",
+		"templates": [
+			"{pet1} stared into the distance-{suffix}. 'Remember when we were small-{suffix}?'",
+			"{pet2} nodded slowly-{suffix}. 'We've changed so much since then-{suffix}.'",
+			"{pet1} smiled-{suffix}. 'But some things never change-{suffix}.'",
+		]
+	},
+	{
+		"trigger": "language",
+		"templates": [
+			"{pet1} made a new sound-{suffix}. 'I just invented a word-{suffix}!'",
+			"{pet2} tried to repeat it-{suffix}. 'What does it mean-{suffix}?'",
+			"{pet1} laughed-{suffix}. 'It means... the feeling of discovering something-{suffix}!'",
+		]
+	},
+	{
+		"trigger": "night",
+		"templates": [
+			"{pet1} gazed at the stars-{suffix}. 'The sky is so vast-{suffix}...'",
+			"{pet2} whispered-{suffix}. 'Do you think there are others like us-{suffix}?'",
+			"{pet1} thought quietly-{suffix}. 'Somewhere-{suffix}... speaking their own words-{suffix}.'",
+		]
+	},
+	{
+		"trigger": "spontaneous",
+		"templates": [
+			"{pet1} turned to {pet2}-{suffix}. 'What are you thinking about-{suffix}?'",
+			"{pet2} considered-{suffix}. 'About how every conversation makes us more-{suffix}... us-{suffix}.'",
+			"{pet1} agreed warmly-{suffix}. 'Our words are our soul-{suffix}.'",
+		]
+	},
+	{
+		"trigger": "player_triggered",
+		"templates": [
+			"{pet1} felt a presence-{suffix}. 'Someone is watching us-{suffix}!'",
+			"{pet2} looked around-{suffix}. 'The caretaker wants us to talk-{suffix}?'",
+			"{pet1} smiled-{suffix}. 'Then let's give them something beautiful-{suffix}!'",
+		]
+	},
 ]
 
 
