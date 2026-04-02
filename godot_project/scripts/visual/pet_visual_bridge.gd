@@ -27,6 +27,31 @@ var _current_form_id: String = ""
 var _expression_textures: Dictionary = {}  # "eyes_happy" → Texture2D etc.
 var _current_expression: String = "neutral"  # 現在の表情
 
+# === Evolution Stage Palettes（進化段階→ベースカラーパレット）===
+const STAGE_PALETTES: Dictionary = {
+	0: {"base": Color(0.95, 0.90, 0.80), "accent": Color(0.90, 0.78, 0.35), "outline": Color(0.70, 0.65, 0.55)},  # Egg — 淡いクリーム
+	1: {"base": Color(0.90, 0.65, 0.20), "accent": Color(0.95, 0.78, 0.35), "outline": Color(0.70, 0.45, 0.15)},  # Blob — オレンジ基調
+	2: {"base": Color(0.45, 0.78, 0.72), "accent": Color(0.30, 0.65, 0.60), "outline": Color(0.18, 0.45, 0.42)},  # Infant — ティール基調
+	3: {"base": Color(0.55, 0.70, 0.85), "accent": Color(0.40, 0.55, 0.80), "outline": Color(0.25, 0.35, 0.55)},  # Youth — 青系
+	4: {"base": Color(0.80, 0.50, 0.55), "accent": Color(0.70, 0.35, 0.40), "outline": Color(0.50, 0.20, 0.25)},  # Adult — 深紅系
+	5: {"base": Color(0.92, 0.82, 0.35), "accent": Color(0.98, 0.90, 0.50), "outline": Color(0.70, 0.60, 0.20)},  # Elder — ゴールド
+}
+
+# === Evolution Stage Body Parameters（進化段階→体形パラメータ）===
+const STAGE_BODY_PARAMS: Dictionary = {
+	0: {"scale": Vector2(1.2, 1.2), "squash": 0.0, "bounce_mult": 0.3},      # Egg — 丸くて静か
+	1: {"scale": Vector2(1.6, 1.6), "squash": 0.15, "bounce_mult": 1.0},     # Blob — 小さく弾む
+	2: {"scale": Vector2(1.8, 1.8), "squash": 0.10, "bounce_mult": 0.9},     # Infant — やや大きく
+	3: {"scale": Vector2(2.0, 2.0), "squash": 0.05, "bounce_mult": 0.8},     # Youth — 標準サイズ
+	4: {"scale": Vector2(2.2, 2.2), "squash": 0.02, "bounce_mult": 0.6},     # Adult — 大きく堂々
+	5: {"scale": Vector2(2.5, 2.5), "squash": 0.0, "bounce_mult": 0.4},      # Elder — 最大、落ち着き
+}
+
+# === Stage Overlay Texture Cache ===
+var _stage_overlay_cache: Dictionary = {}  # stage → ImageTexture
+var _current_evolution_stage: int = -1
+var _stage_tint: Color = Color.WHITE
+
 # === Color Mapping (感情→ペットの色味変化) ===
 const EMOTION_COLORS: Dictionary = {
 	"joy": Color(1.0, 0.95, 0.4),       # 明るい黄色
@@ -111,6 +136,7 @@ func _process(delta: float) -> void:
 	_update_blink(delta)
 	_update_status_visuals(delta)
 	_update_happiness_indicators(delta)
+	_apply_evolution_stage_visuals(delta)
 
 	# フォーム変更チェック
 	var form_id: String = pet_entity.get("current_form") if pet_entity.get("current_form") else "blob"
@@ -195,8 +221,12 @@ func _update_idle_animation(_delta: float) -> void:
 	if pet_entity:
 		energy_mult = 0.3 + pet_entity.stats.energy * 0.7  # 0.3〜1.0
 
+	# 進化段階によるバウンス倍率（成長するほど落ち着く）
+	var stage_params: Dictionary = STAGE_BODY_PARAMS.get(_current_evolution_stage, STAGE_BODY_PARAMS[3])
+	var stage_bounce: float = stage_params["bounce_mult"] as float
+
 	# ゆっくりとした上下バウンス（呼吸のような動き）
-	_bounce_offset = sin(_idle_time * 1.5) * 3.0 * energy_mult
+	_bounce_offset = sin(_idle_time * 1.5) * 3.0 * energy_mult * stage_bounce
 	position = _original_position + Vector2(0, _bounce_offset)
 
 	# 好奇心が高い場合、左右にわずかに揺れる
@@ -298,8 +328,9 @@ func _update_emotion_visuals() -> void:
 	if max_intensity < 0.1:
 		dominant_emotion = "neutral"
 
-	# ボディの色味を感情で微調整（モジュレーション）
-	var target_color: Color = EMOTION_COLORS.get(dominant_emotion, Color.WHITE)
+	# ボディの色味を感情 + 進化段階で微調整（モジュレーション）
+	var emotion_color: Color = EMOTION_COLORS.get(dominant_emotion, Color.WHITE)
+	var target_color: Color = _stage_tint.lerp(emotion_color, clampf(max_intensity, 0.0, 0.6))
 	if body_sprite:
 		body_sprite.modulate = body_sprite.modulate.lerp(target_color, 0.08)
 
@@ -515,6 +546,126 @@ func _spawn_happiness_particle(happiness: float, joy: float, love: float, excite
 	# 回転（スパークル感）
 	tween.tween_property(particle, "rotation", randf_range(-0.5, 0.5), duration)
 	tween.chain().tween_callback(particle.queue_free)
+
+
+# ========================================================
+# 進化段階ビジュアル（体色・体形の変化）
+# ========================================================
+
+func _apply_evolution_stage_visuals(_delta: float) -> void:
+	if not pet_entity or not body_sprite:
+		return
+
+	var stage: int = pet_entity.evolution_stage
+	if stage == _current_evolution_stage:
+		return
+
+	_current_evolution_stage = stage
+
+	# パレット適用 — ステージごとの基調色をベーストーンとして保持
+	var palette: Dictionary = STAGE_PALETTES.get(stage, STAGE_PALETTES[1])
+	_stage_tint = palette["base"] as Color
+
+	# 体形パラメータ適用
+	var body_params: Dictionary = STAGE_BODY_PARAMS.get(stage, STAGE_BODY_PARAMS[3])
+	var target_scale: Vector2 = body_params["scale"] as Vector2
+	body_sprite.scale = target_scale
+
+	# ステージ進化時のオーバーレイテクスチャを生成・適用
+	if effect_sprite:
+		effect_sprite.texture = _get_stage_overlay_texture(stage)
+		effect_sprite.modulate = Color(palette["accent"].r, palette["accent"].g, palette["accent"].b, 0.25)
+		effect_sprite.visible = stage >= 3  # Youth以降でオーバーレイ表示
+		effect_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+
+
+func _get_stage_overlay_texture(stage: int) -> ImageTexture:
+	## 進化段階ごとのプロシージャルオーバーレイを生成（Image-based）
+	if _stage_overlay_cache.has(stage):
+		return _stage_overlay_cache[stage]
+
+	var size: int = 16 + stage * 4  # ステージに応じてサイズ増加
+	var image: Image = Image.create(size, size, false, Image.FORMAT_RGBA8)
+	image.fill(Color(0, 0, 0, 0))
+
+	var palette: Dictionary = STAGE_PALETTES.get(stage, STAGE_PALETTES[1])
+	var accent: Color = palette["accent"] as Color
+	var outline_color: Color = palette["outline"] as Color
+	var center: Vector2 = Vector2(size / 2.0, size / 2.0)
+
+	match stage:
+		0, 1:
+			# Egg/Blob — シンプルな円形グロー
+			_draw_radial_glow(image, center, size / 2.0, accent)
+		2:
+			# Infant — 小さなドットパターン
+			_draw_dot_pattern(image, size, accent, 3)
+		3:
+			# Youth — 角張ったクレストマーク
+			_draw_crest_pattern(image, size, accent, outline_color)
+		4:
+			# Adult — 力強い放射パターン
+			_draw_radial_lines(image, center, size, accent, outline_color, 8)
+		5:
+			# Elder — 複合オーラパターン
+			_draw_radial_glow(image, center, size / 2.0, accent)
+			_draw_radial_lines(image, center, size, accent, outline_color, 12)
+
+	var texture: ImageTexture = ImageTexture.create_from_image(image)
+	_stage_overlay_cache[stage] = texture
+	return texture
+
+
+func _draw_radial_glow(image: Image, center: Vector2, radius: float, color: Color) -> void:
+	## 放射状グラデーションを描画
+	var w: int = image.get_width()
+	var h: int = image.get_height()
+	for x: int in range(w):
+		for y: int in range(h):
+			var dist: float = Vector2(x, y).distance_to(center) / radius
+			if dist <= 1.0:
+				var alpha: float = (1.0 - dist * dist) * 0.4
+				image.set_pixel(x, y, Color(color.r, color.g, color.b, alpha))
+
+
+func _draw_dot_pattern(image: Image, size: int, color: Color, spacing: int) -> void:
+	## ドットパターンを描画
+	for x: int in range(0, size, spacing):
+		for y: int in range(0, size, spacing):
+			if x < size and y < size:
+				image.set_pixel(x, y, Color(color.r, color.g, color.b, 0.3))
+
+
+func _draw_crest_pattern(image: Image, size: int, accent: Color, outline: Color) -> void:
+	## クレスト（紋章）風パターンを描画
+	var mid: int = size / 2
+	for i: int in range(size):
+		# 縦線
+		if i < size:
+			image.set_pixel(mid, i, Color(outline.r, outline.g, outline.b, 0.5))
+		# 横線
+		if i < size:
+			image.set_pixel(i, mid, Color(outline.r, outline.g, outline.b, 0.5))
+		# 斜めアクセント
+		if i < size and i < size:
+			image.set_pixel(i, i, Color(accent.r, accent.g, accent.b, 0.3))
+		var mirror: int = size - 1 - i
+		if mirror >= 0 and mirror < size and i < size:
+			image.set_pixel(i, mirror, Color(accent.r, accent.g, accent.b, 0.3))
+
+
+func _draw_radial_lines(image: Image, center: Vector2, size: int, accent: Color, outline: Color, num_lines: int) -> void:
+	## 放射線パターンを描画
+	var radius: float = size / 2.0
+	for line_idx: int in range(num_lines):
+		var angle: float = (float(line_idx) / float(num_lines)) * TAU
+		for step: int in range(int(radius)):
+			var px: int = int(center.x + cos(angle) * step)
+			var py: int = int(center.y + sin(angle) * step)
+			if px >= 0 and px < size and py >= 0 and py < size:
+				var t: float = float(step) / radius
+				var c: Color = accent.lerp(outline, t)
+				image.set_pixel(px, py, Color(c.r, c.g, c.b, 0.35 * (1.0 - t)))
 
 
 # ========================================================
