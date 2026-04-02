@@ -200,6 +200,13 @@ func _connect_game_signals() -> void:
 		if GameManager.language_evolution.has_signal("suffix_created"):
 			GameManager.language_evolution.suffix_created.connect(_on_suffix_created)
 
+	# 関係性変化シグナル（R79で追加）
+	if GameManager.instance.a2a_system:
+		if GameManager.instance.a2a_system.has_signal("relationship_changed"):
+			GameManager.instance.a2a_system.relationship_changed.connect(
+				_on_relationship_changed
+			)
+
 	# 死亡シグナル
 	if GameManager.instance.life_death:
 		if GameManager.instance.life_death.has_signal("pet_died"):
@@ -617,6 +624,27 @@ func _on_language_stage_up(new_stage: int, stage_name: String) -> void:
 
 func _on_suffix_created(suffix: String, _context: String, _reason: String) -> void:
 	_show_language_toast("🔤 New suffix: %s" % suffix, Color(0.5, 0.8, 0.5))
+
+
+func _on_relationship_changed(pet1_id: int, pet2_id: int, new_type: String) -> void:
+	## R79: 関係性変化時のトースト通知
+	var name1: String = "Pet"
+	var name2: String = "Pet"
+	if GameManager.instance:
+		if GameManager.instance.pets.has(pet1_id):
+			name1 = GameManager.instance.pets[pet1_id].pet_name
+		if GameManager.instance.pets.has(pet2_id):
+			name2 = GameManager.instance.pets[pet2_id].pet_name
+
+	var rel_icons: Dictionary = {
+		"strangers": "👤", "acquaintances": "🤝", "friends": "💚",
+		"close_friends": "💛", "rivals": "⚔", "best_friends": "💎",
+	}
+	var icon: String = rel_icons.get(new_type, "🤝")
+	_show_language_toast(
+		"%s %s & %s are now %s!" % [icon, name1, name2, new_type.replace("_", " ")],
+		Color(0.7, 0.8, 0.6),
+	)
 
 
 func _show_language_toast(text: String, color: Color) -> void:
@@ -1103,7 +1131,7 @@ func _on_pet_stroked(stroke_quality: float) -> void:
 
 	if GameManager.instance and GameManager.instance.emotion_system:
 		GameManager.instance.emotion_system.stimulate(
-			current_pet.pet_id, "love", love_boost
+			current_pet, "love", love_boost, "stroke_pet"
 		)
 	elif GameManager.instance and GameManager.instance.care_system:
 		GameManager.instance.care_system.perform_action(current_pet, "pet")
