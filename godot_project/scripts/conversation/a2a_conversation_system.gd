@@ -212,6 +212,38 @@ const TEMPLATE_CONVERSATIONS: Array[Dictionary] = [
 			"{pet1} nodded peacefully-{suffix}. 'Evenings are for quiet words-{suffix}.'",
 		]
 	},
+	{
+		"trigger": "culture",
+		"templates": [
+			"{pet1} hummed a familiar tune-{suffix}. 'Remember our song-{suffix}? Let's sing it together-{suffix}!'",
+			"{pet2} perked up-{suffix}. 'The festival is coming soon-{suffix}! We should prepare-{suffix}!'",
+			"{pet1} shared a story-{suffix}. 'Once upon a time-{suffix}, two friends discovered something amazing-{suffix}...'",
+		]
+	},
+	{
+		"trigger": "grief",
+		"templates": [
+			"{pet1} stared into the distance-{suffix}. 'I still think about them sometimes-{suffix}...'",
+			"{pet2} put a paw on {pet1}-{suffix}. 'It's okay to miss them-{suffix}. They were special-{suffix}.'",
+			"{pet1} took a deep breath-{suffix}. 'Maybe they can hear our words from wherever they are-{suffix}.'",
+		]
+	},
+	{
+		"trigger": "team",
+		"templates": [
+			"{pet1} rallied the team-{suffix}. 'Together we can do anything-{suffix}!'",
+			"{pet2} agreed enthusiastically-{suffix}. 'Our team is the strongest-{suffix}!'",
+			"{pet1} planned ahead-{suffix}. 'Let's explore together-{suffix} and discover new things-{suffix}!'",
+		]
+	},
+	{
+		"trigger": "dream",
+		"templates": [
+			"{pet1} yawned-{suffix}. 'I had the strangest dream last night-{suffix}...'",
+			"{pet2} leaned in-{suffix}. 'Tell me about it-{suffix}! I love dream stories-{suffix}!'",
+			"{pet1} described-{suffix}. 'There was a place where all our words floated in the air-{suffix}...'",
+		]
+	},
 ]
 
 # === グループ会話テンプレート（3匹用） ===
@@ -378,6 +410,30 @@ func _select_conversation_topic(pet1: PetEntity, pet2: PetEntity) -> String:
 		var topics: Array = GameManager.ecosystem.get_a2a_topics()
 		if not topics.is_empty():
 			candidates.append("weather")
+
+	# R115: 文化的トピック
+	if GameManager.instance and GameManager.instance.get("cultural_system"):
+		var cs: Node = GameManager.instance.cultural_system
+		if cs.get("artifacts") and cs.artifacts.size() > 0:
+			candidates.append("culture")
+
+	# R115: 悲嘆中のペット → grief トピック
+	if GameManager.instance and GameManager.instance.get("memory_bridge"):
+		var mb: Node = GameManager.instance.memory_bridge
+		var gs: Dictionary = mb.get("grief_states") if mb.get("grief_states") else {}
+		if gs.has(pet1.pet_id) or gs.has(pet2.pet_id):
+			candidates.append("grief")
+			candidates.append("grief")  # 重み付け
+
+	# R115: チーム活動中 → team トピック
+	if GameManager.instance and GameManager.instance.get("team_orchestrator"):
+		var to: Node = GameManager.instance.team_orchestrator
+		var teams: Dictionary = to.get("active_teams") if to.get("active_teams") else {}
+		for tid: String in teams:
+			var members: Array = teams[tid].get("members", [])
+			if pet1.pet_id in members or pet2.pet_id in members:
+				candidates.append("team")
+				break
 
 	return candidates[randi() % candidates.size()]
 
@@ -1131,14 +1187,48 @@ func _build_turn_prompt(
 	# Environment: 1 sentence from helper
 	var env_line: String = _get_environment_context(speaker)
 
+	# R115: Cultural context (1 phrase max)
+	var culture_snippet := ""
+	if GameManager.instance and GameManager.instance.get("cultural_system"):
+		var cs: Node = GameManager.instance.cultural_system
+		var known: Array = cs.get("_pet_cultural_knowledge").get(speaker.pet_id, []) if cs.get("_pet_cultural_knowledge") else []
+		if not known.is_empty():
+			var art_id: String = known[known.size() - 1]
+			var arts: Dictionary = cs.get("artifacts")
+			if arts and arts.has(art_id):
+				var art: Dictionary = arts[art_id]
+				culture_snippet = " Culture: knows '%s' (%s)." % [art.get("name", ""), art.get("type_name", "")]
+
+	# R115: Memory bridge hints (grief/dreams/nostalgia)
+	var bridge_snippet := ""
+	if GameManager.instance and GameManager.instance.get("memory_bridge"):
+		var mb: Node = GameManager.instance.memory_bridge
+		if mb.has_method("get_conversation_hints"):
+			var hints: Array = mb.get_conversation_hints(speaker.pet_id)
+			if not hints.is_empty():
+				bridge_snippet = " Thoughts: %s." % hints[0]
+
+	# R115: Team context
+	var team_snippet := ""
+	if GameManager.instance and GameManager.instance.get("team_orchestrator"):
+		var to: Node = GameManager.instance.team_orchestrator
+		var teams: Dictionary = to.get("active_teams") if to.get("active_teams") else {}
+		for tid: String in teams:
+			var team: Dictionary = teams[tid]
+			var members: Array = team.get("members", [])
+			if speaker.pet_id in members:
+				team_snippet = " On team: %s." % team.get("task_name", "mission")
+				break
+
 	# --- Assemble prompt (target <500 tokens) ---
-	return """You are %s (%s). Feeling: %s. Talking to %s. %s%s%s%s%s%s%s
+	return """You are %s (%s). Feeling: %s. Talking to %s. %s%s%s%s%s%s%s%s%s%s
 %s
 Turn %d. Reply 1-3 sentences in pet language.""" % [
 		speaker.pet_name, personality_desc, emotion_desc,
 		listener.pet_name, env_line,
 		bio_snippet, field_snippet, past_snippet,
 		rel_snippet, mem_snippet, mood_snippet,
+		culture_snippet, bridge_snippet, team_snippet,
 		recent_messages if recent_messages else "(Start)",
 		turn + 1,
 	]
