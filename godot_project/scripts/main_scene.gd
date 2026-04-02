@@ -92,6 +92,15 @@ func _ready() -> void:
 	pets_button.pressed.connect(_on_pets_pressed)
 	settings_button.pressed.connect(_on_settings_pressed)
 
+	# スプラッシュスクリーン
+	$PetArea.visible = false
+	$UIPanel.visible = false
+	var splash: SplashScreen = SplashScreen.new()
+	add_child(splash)
+	await splash.splash_finished
+	$PetArea.visible = true
+	$UIPanel.visible = true
+
 	# GameManager の初期化完了を待つ
 	await get_tree().process_frame
 	await get_tree().process_frame
