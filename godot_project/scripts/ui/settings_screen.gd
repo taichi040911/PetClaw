@@ -146,18 +146,125 @@ func _build_ui() -> void:
 	demo_info.add_theme_color_override("font_color", Color(0.5, 0.55, 0.7))
 	demo_row.add_child(demo_info)
 
-	# AtoA システム統計表示
+	# === AtoA Analytics ===
+	_add_section_label("📊 AtoA Analytics")
+
 	if GameManager.instance and GameManager.instance.a2a_system:
-		var stats_label: Label = Label.new()
-		var status: Dictionary = GameManager.instance.a2a_system.get_conversation_status()
-		stats_label.text = "Conversations: %d | Budget: $%.2f | Compliance: %.0f%%" % [
-			status["total_conversations"],
-			status["budget_remaining"],
-			status.get("avg_compliance", 0.0) * 100.0,
+		var a2a: AtoAConversationSystem = GameManager.instance.a2a_system
+		var status: Dictionary = a2a.get_conversation_status()
+		var log: Array[Dictionary] = a2a.conversation_log
+		var rels: Dictionary = a2a.pet_relationships
+
+		# --- Compute analytics ---
+		# API vs Template ratio
+		var api_count: int = 0
+		var tpl_count: int = 0
+		for entry: Dictionary in log:
+			if entry.get("is_template", false):
+				tpl_count += 1
+			else:
+				api_count += 1
+
+		# Total unique relationships + strongest
+		var strongest_key: String = ""
+		var strongest_affinity: float = 0.0
+		for rel_key: String in rels:
+			var rel: Dictionary = rels[rel_key]
+			var aff: float = rel.get("affinity", 0.0)
+			if aff > strongest_affinity:
+				strongest_affinity = aff
+				strongest_key = rel_key
+
+		# Total words taught across all relationships
+		var total_words_taught: int = 0
+		for rel_key: String in rels:
+			var rel: Dictionary = rels[rel_key]
+			total_words_taught += int(rel.get("words_taught", 0))
+
+		# Most active pet (most messages in log)
+		var pet_msg_counts: Dictionary = {}
+		for entry: Dictionary in log:
+			var pid: int = entry.get("pet_id", -1)
+			if pid >= 0:
+				pet_msg_counts[pid] = pet_msg_counts.get(pid, 0) + 1
+		var most_active_id: int = -1
+		var most_active_count: int = 0
+		for pid: int in pet_msg_counts:
+			var cnt: int = pet_msg_counts[pid]
+			if cnt > most_active_count:
+				most_active_count = cnt
+				most_active_id = pid
+		var most_active_name: String = "—"
+		if most_active_id >= 0 and GameManager.instance.pets.has(most_active_id):
+			var active_pet: Variant = GameManager.instance.pets[most_active_id]
+			if active_pet is PetEntity:
+				most_active_name = "%s (%d msgs)" % [active_pet.pet_name, most_active_count]
+
+		# Format strongest relationship label
+		var strongest_label: String = "—"
+		if not strongest_key.is_empty():
+			strongest_label = "%s (%.0f%%)" % [strongest_key.replace("_", " ↔ "), strongest_affinity * 100.0]
+
+		# --- Build analytics rows ---
+		var analytics_data: Array[Array] = [
+			["Total Conversations", "%d" % status.get("total_conversations", 0)],
+			["Daily Count / Max", "%d / %d" % [status.get("daily_count", 0), status.get("max_daily", 25)]],
+			["API / Template", "%d / %d" % [api_count, tpl_count]],
+			["Budget Remaining", "$%.3f" % status.get("budget_remaining", 0.0)],
+			["Daily Cost", "$%.3f" % a2a.daily_conversation_cost],
+			["Avg Compliance", "%.0f%%" % (status.get("avg_compliance", 0.0) * 100.0)],
+			["Unique Relationships", "%d" % rels.size()],
+			["Strongest Bond", strongest_label],
+			["Words Taught", "%d" % total_words_taught],
+			["Most Active Pet", most_active_name],
 		]
-		stats_label.add_theme_font_size_override("font_size", 11)
-		stats_label.add_theme_color_override("font_color", Color(0.45, 0.5, 0.65))
-		_vbox.add_child(stats_label)
+
+		for row_data: Array in analytics_data:
+			var row: HBoxContainer = HBoxContainer.new()
+			row.add_theme_constant_override("separation", 8)
+			_vbox.add_child(row)
+
+			var lbl: Label = Label.new()
+			lbl.text = row_data[0]
+			lbl.custom_minimum_size = Vector2(160, 0)
+			lbl.add_theme_font_size_override("font_size", 11)
+			lbl.add_theme_color_override("font_color", Color(0.5, 0.52, 0.65))
+			row.add_child(lbl)
+
+			var val: Label = Label.new()
+			val.text = row_data[1]
+			val.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			val.add_theme_font_size_override("font_size", 12)
+			val.add_theme_color_override("font_color", Color(0.6, 0.7, 0.85))
+			row.add_child(val)
+
+		# Reset Daily Stats button
+		var reset_row: HBoxContainer = HBoxContainer.new()
+		reset_row.add_theme_constant_override("separation", 12)
+		_vbox.add_child(reset_row)
+
+		var reset_btn: Button = Button.new()
+		reset_btn.text = "Reset Daily Stats"
+		reset_btn.custom_minimum_size = Vector2(160, 32)
+		reset_btn.pressed.connect(func() -> void:
+			if GameManager.instance and GameManager.instance.a2a_system:
+				GameManager.instance.a2a_system._on_day_change()
+				reset_btn.text = "✓ Reset Done"
+				reset_btn.disabled = true
+		)
+		reset_row.add_child(reset_btn)
+
+		var reset_hint: Label = Label.new()
+		reset_hint.text = "Clears daily count & cost"
+		reset_hint.add_theme_font_size_override("font_size", 11)
+		reset_hint.add_theme_color_override("font_color", Color(0.45, 0.48, 0.6))
+		reset_row.add_child(reset_hint)
+	else:
+		var no_data_label: Label = Label.new()
+		no_data_label.text = "AtoA system not available"
+		no_data_label.add_theme_font_size_override("font_size", 11)
+		no_data_label.add_theme_color_override("font_color", Color(0.5, 0.45, 0.45))
+		_vbox.add_child(no_data_label)
 
 	# === バージョン情報 ===
 	_add_section_label("About")
