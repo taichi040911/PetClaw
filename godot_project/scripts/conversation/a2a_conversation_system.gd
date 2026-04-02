@@ -26,6 +26,38 @@ var daily_conversation_cost: float = 0.0
 var daily_conversation_count: int = 0
 const MAX_DAILY_CONVERSATIONS: int = 25            # 1日の最大会話数（50ペット÷2≈25）
 
+# === イベント会話管理 ===
+const MAX_DAILY_EVENT_CONVERSATIONS: int = 3       # 1日のイベント会話上限
+var daily_event_conversation_count: int = 0
+
+# === イベント会話テンプレート ===
+const EVENT_CONVERSATION_TEMPLATES: Dictionary = {
+	"evolution": [
+		"Did you see? {pet_name} just evolved{suffix}! So amazing{suffix}!",
+		"I wonder what it feels like to evolve{suffix}... {pet_name} looks different now{suffix}.",
+	],
+	"birth": [
+		"A new friend just arrived{suffix}! Welcome, little one{suffix}!",
+		"I remember when I was that small{suffix}... so long ago{suffix}.",
+	],
+	"death_nearby": [
+		"I can't believe {pet_name} is gone{suffix}... I'll miss them{suffix}.",
+		"The world feels emptier now{suffix}. {pet_name} was a good friend{suffix}.",
+	],
+	"first_word": [
+		"Did you hear that{suffix}? Someone just invented a new word{suffix}!",
+		"Our language keeps growing{suffix}! I love learning new words{suffix}.",
+	],
+	"milestone": [
+		"Can you believe how much we've talked{suffix}? {count} conversations{suffix}!",
+		"We've come so far together{suffix}. Remember our first chat{suffix}?",
+	],
+	"player_achievement": [
+		"The caretaker did something wonderful{suffix}! I feel so proud{suffix}!",
+		"Our caretaker keeps getting better{suffix}. We're lucky{suffix}!",
+	],
+}
+
 # === State ===
 var conversation_timer: float = 0.0
 var is_conversation_active: bool = false
@@ -146,6 +178,38 @@ const TEMPLATE_CONVERSATIONS: Array[Dictionary] = [
 			"{pet1} felt a presence-{suffix}. 'Someone is watching us-{suffix}!'",
 			"{pet2} looked around-{suffix}. 'The caretaker wants us to talk-{suffix}?'",
 			"{pet1} smiled-{suffix}. 'Then let's give them something beautiful-{suffix}!'",
+		]
+	},
+	{
+		"trigger": "night_sky",
+		"templates": [
+			"{pet1} gazed upward-{suffix}. 'The stars are so bright tonight-{suffix}...'",
+			"{pet2} huddled closer-{suffix}. 'The night makes everything feel closer-{suffix}.'",
+			"{pet1} yawned softly-{suffix}. 'I could stay up forever watching this-{suffix}.'",
+		]
+	},
+	{
+		"trigger": "rainy_mood",
+		"templates": [
+			"{pet1} listened quietly-{suffix}. 'I love how the rain sounds-{suffix}.'",
+			"{pet2} shook water off-{suffix}. 'It's so refreshing-{suffix}! Like the world is washing clean-{suffix}.'",
+			"{pet1} splashed a puddle-{suffix}. 'Rain makes new words easier to find-{suffix}!'",
+		]
+	},
+	{
+		"trigger": "morning_energy",
+		"templates": [
+			"{pet1} stretched in the morning light-{suffix}. 'A new day-{suffix}! What shall we discover-{suffix}?'",
+			"{pet2} blinked sleepily-{suffix}. 'The sunrise makes me feel like anything is possible-{suffix}.'",
+			"{pet1} bounced eagerly-{suffix}. 'Morning energy is the best energy-{suffix}!'",
+		]
+	},
+	{
+		"trigger": "evening_calm",
+		"templates": [
+			"{pet1} watched the sunset-{suffix}. 'The evening light is so warm-{suffix}...'",
+			"{pet2} sighed contentedly-{suffix}. 'Today was a good day-{suffix}, wasn't it-{suffix}?'",
+			"{pet1} nodded peacefully-{suffix}. 'Evenings are for quiet words-{suffix}.'",
 		]
 	},
 ]
@@ -493,6 +557,7 @@ func start_conversation(pet1: PetEntity, pet2: PetEntity, trigger: String) -> vo
 			"emotion": _get_dominant_emotion(current_pet),
 			"word_order": grammar["word_order"],
 			"trigger": context.get("trigger", ""),
+			"environment_snapshot": _get_environment_context(current_pet),
 		}
 		# 性格方言フィルター（性格に応じてメッセージを微修正）
 		response = _apply_personality_dialect(response, current_pet)
@@ -834,6 +899,7 @@ func trigger_reaction_conversation(
 		"message": response,
 		"reaction_type": reaction_type,
 		"target_id": target.pet_id,
+		"environment_snapshot": _get_environment_context(pet),
 	}
 	conversation_log.append(message)
 	conversation_message.emit(pet.pet_id, response, message)
@@ -1002,6 +1068,72 @@ func _describe_emotions_with_intensity(emotions: Dictionary) -> String:
 	return ", ".join(parts)
 
 
+func _get_environment_context(speaker: PetEntity) -> String:
+	## Gather environment info into a 1-2 sentence description for conversation context.
+	var parts: Array[String] = []
+
+	# Time of day
+	var hour: int = Time.get_datetime_dict_from_system().get("hour", 12)
+	var time_label: String = ""
+	if hour >= 5 and hour < 12:
+		time_label = "morning"
+	elif hour >= 12 and hour < 17:
+		time_label = "afternoon"
+	elif hour >= 17 and hour < 21:
+		time_label = "evening"
+	else:
+		time_label = "night"
+
+	# Environment name
+	var env_name: String = "forest"
+	if GameManager.instance and GameManager.instance.get("ecosystem"):
+		var eco: Node = GameManager.instance.ecosystem
+		env_name = eco.get("current_environment") if eco.get("current_environment") else "forest"
+	elif speaker:
+		env_name = speaker.current_environment if speaker.current_environment else "forest"
+	var env_display: String = env_name
+
+	# Active weather/event
+	var weather_str: String = ""
+	if GameManager.instance and GameManager.instance.get("ecosystem"):
+		var eco: Node = GameManager.instance.ecosystem
+		var active_evt: String = eco.get("active_event") if eco.get("active_event") else ""
+		if active_evt != "":
+			weather_str = active_evt
+
+	# Build first sentence
+	var first_sentence: String = "It's a %s %s in the %s." % [
+		"rainy" if weather_str == "rain" or weather_str == "storm" else "quiet",
+		time_label, env_display]
+	if weather_str != "" and weather_str != "rain" and weather_str != "storm":
+		first_sentence = "It's %s in the %s. A %s event is happening." % [time_label, env_display, weather_str]
+	parts.append(first_sentence)
+
+	# Recent player actions (within 5 minutes / 300 seconds of game_time)
+	if GameManager.instance:
+		var game_time: float = GameManager.instance.get("game_time") if GameManager.instance.get("game_time") else 0.0
+		var care_times: Dictionary = GameManager.instance.get("_care_last_action_time") if GameManager.instance.get("_care_last_action_time") else {}
+		var last_care: float = care_times.get(speaker.pet_id, 0.0) as float
+		if last_care > 0.0 and (game_time - last_care) < 300.0:
+			var mins_ago: int = int((game_time - last_care) / 60.0)
+			if mins_ago < 1:
+				parts.append("You were just cared for moments ago.")
+			else:
+				parts.append("You were cared for %d minute(s) ago." % mins_ago)
+
+	# Nearby pets count
+	var nearby_count: int = 0
+	if GameManager.instance:
+		var all_pets: Array = GameManager.instance.get_all_pets()
+		for p: Variant in all_pets:
+			if p != speaker and p.get("is_alive"):
+				nearby_count += 1
+	if nearby_count > 0:
+		parts.append("%d other pet(s) are nearby." % nearby_count)
+
+	return " ".join(parts)
+
+
 func _build_turn_prompt(
 	speaker: PetEntity, listener: PetEntity,
 	context: Dictionary, turn: int
@@ -1092,9 +1224,12 @@ func _build_turn_prompt(
 		if rel_type in ["close_friends", "best_friends"]:
 			vulnerability_hint = "\nYou feel comfortable being vulnerable with %s." % listener.pet_name
 
+	# Environment context (weather, time, nearby pets, recent care)
+	var env_context_str := "\n" + _get_environment_context(speaker)
+
 	return """You are %s. %s. Right now you feel: %s.
 You're talking to %s in a %s environment.
-Topics around you: %s
+Topics around you: %s%s
 %s%s%s%s%s%s%s%s
 %s
 
@@ -1105,6 +1240,7 @@ Turn %d of the conversation.""" % [
 		speaker.pet_name, personality_desc, emotion_desc,
 		listener.pet_name, context["environment"],
 		str(context["env_topics"]),
+		env_context_str,
 		memory_context,
 		shared_context,
 		field_context_str,
@@ -1534,6 +1670,7 @@ func _on_day_change() -> void:
 	## 日付変更時にリセット
 	daily_conversation_cost = 0.0
 	daily_conversation_count = 0
+	daily_event_conversation_count = 0
 	last_daily_reset = int(Time.get_unix_time_from_system() / 86400)
 	print("[AtoA] Daily reset: Budget restored to $%.2f" % DAILY_CONVERSATION_BUDGET)
 
@@ -1658,6 +1795,7 @@ func _generate_template_conversation(pet1: PetEntity, pet2: PetEntity, trigger: 
 			"emotion_intensity": randf_range(0.2, 0.5),
 			"is_template": true,
 			"environment": current_pet.current_environment,
+			"environment_snapshot": _get_environment_context(current_pet),
 			"reactions": [] as Array[Dictionary],
 		})
 
@@ -2953,6 +3091,7 @@ func to_dict() -> Dictionary:
 		"conversation_log": conversation_log.slice(-50),  # 最新50会話のみ保存
 		"daily_cost": daily_conversation_cost,
 		"daily_count": daily_conversation_count,
+		"daily_event_count": daily_event_conversation_count,
 		"last_daily_reset": last_daily_reset,
 		"pet_relationships": pet_relationships,
 		"conversation_memory": conversation_memory,
@@ -2974,6 +3113,7 @@ func from_dict(data: Dictionary) -> void:
 		pet_relationships = data["pet_relationships"]
 	conversation_memory = data.get("conversation_memory", {})
 	_next_conversation_id = data.get("next_conversation_id", 0)
+	daily_event_conversation_count = data.get("daily_event_count", 0)
 
 	# 日付が変わっていればリセット
 	var current_day := int(Time.get_unix_time_from_system() / 86400)
@@ -3041,6 +3181,90 @@ func trigger_conversation_now() -> void:
 	await start_conversation(pet1, pet2, "player_triggered")
 
 
+# === イベント会話トリガー（外部システムから呼び出し） ===
+func trigger_event_conversation(event_type: String, context: Dictionary = {}) -> void:
+	## 外部システム（進化・誕生・死亡等）からのイベント会話をトリガー
+	## バイパス: タイマーチェック不要。制約: 日次イベント会話上限を尊重
+	if daily_event_conversation_count >= MAX_DAILY_EVENT_CONVERSATIONS:
+		print("[AtoA] Event conversation skipped: daily event limit reached (%d/%d)" % [
+			daily_event_conversation_count, MAX_DAILY_EVENT_CONVERSATIONS])
+		return
+
+	if not EVENT_CONVERSATION_TEMPLATES.has(event_type):
+		push_warning("[AtoA] Unknown event type for conversation: %s" % event_type)
+		return
+
+	# 生存ペットから2匹選ぶ（会話の観察者として）
+	var pets: Array = GameManager.get_all_pets()
+	var alive_pets: Array[PetEntity] = []
+	for pet: PetEntity in pets:
+		if pet.is_alive:
+			alive_pets.append(pet)
+
+	if alive_pets.size() < 1:
+		return
+
+	# 文法情報を取得して接尾辞を選択
+	var grammar: Dictionary = GameManager.language_evolution.get_current_grammar()
+	var suffix_list: Array = []
+	var suffixes_raw: Variant = grammar.get("suffixes", [])
+	if suffixes_raw is Array:
+		suffix_list = suffixes_raw
+	elif suffixes_raw is Dictionary:
+		for key: String in suffixes_raw:
+			suffix_list.append(str(suffixes_raw[key]))
+	var selected_suffix: String = suffix_list[randi() % suffix_list.size()] if not suffix_list.is_empty() else "-mii"
+
+	# テンプレートリストからランダムに1つ選択
+	var templates: Array = EVENT_CONVERSATION_TEMPLATES[event_type]
+	var template_text: String = templates[randi() % templates.size()]
+
+	# コンテキストから置換用の値を取得
+	var pet_name: String = context.get("pet_name", "someone")
+	var count_str: String = str(context.get("count", 0))
+
+	# テンプレート置換
+	var message: String = template_text
+	message = message.replace("{suffix}", selected_suffix)
+	message = message.replace("{pet_name}", pet_name)
+	message = message.replace("{count}", count_str)
+
+	# 独自語彙を注入（ステージ1+）
+	var lang_stage: int = 0
+	if GameManager.instance and GameManager.instance.original_language:
+		var stage_info: Dictionary = GameManager.instance.original_language.get_language_stage()
+		lang_stage = stage_info.get("stage", 0)
+	if lang_stage >= 1 and GameManager.instance and GameManager.instance.original_language:
+		var vocab: Dictionary = GameManager.instance.original_language.get_full_vocabulary()
+		for key: String in vocab:
+			var entry: Dictionary = vocab[key]
+			if entry.get("strength", 0.0) > 0.3:
+				var human_word: String = entry.get("human_word", "")
+				var ai_term: String = entry.get("ai_term", "")
+				if not human_word.is_empty() and message.containsn(human_word) and randf() < 0.5:
+					message = message.replacen(human_word, ai_term)
+
+	# 話し手をランダムに選択
+	var speaker: PetEntity = alive_pets[randi() % alive_pets.size()]
+
+	# メッセージ構築と送信
+	var msg: Dictionary = {
+		"pet_id": speaker.pet_id,
+		"pet_name": speaker.pet_name,
+		"message": message,
+		"emotion": _get_dominant_emotion(speaker),
+		"is_template": true,
+		"is_event": true,
+		"event_type": event_type,
+		"turn": 0,
+	}
+	conversation_log.append(msg)
+	conversation_message.emit(speaker.pet_id, message, msg)
+	daily_event_conversation_count += 1
+	print("[AtoA] Event conversation triggered: %s (%d/%d daily)" % [
+		event_type, daily_event_conversation_count, MAX_DAILY_EVENT_CONVERSATIONS])
+
+
 func get_conversation_status() -> Dictionary:
 	## UI表示用のステータス情報を返す
 	# 平均コンプライアンススコアを計算
@@ -3062,4 +3286,6 @@ func get_conversation_status() -> Dictionary:
 		"total_conversations": conversation_log.size(),
 		"timer_progress": conversation_timer / auto_conversation_interval,
 		"avg_compliance": avg_compliance,
+		"daily_event_count": daily_event_conversation_count,
+		"max_daily_events": MAX_DAILY_EVENT_CONVERSATIONS,
 	}
