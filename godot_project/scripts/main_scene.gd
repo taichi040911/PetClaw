@@ -32,6 +32,7 @@ var _conversation_bubble: ConversationBubble
 var _sfx: SfxManager
 var _day_night: DayNightCycle
 var _bgm: AmbientBGM
+var _notifications: CareNotification
 
 # === UI Theme Colors ===
 const UI_BG: Color = Color(0.08, 0.10, 0.18)
@@ -75,6 +76,10 @@ func _ready() -> void:
 	_bgm = AmbientBGM.new()
 	add_child(_bgm)
 	_bgm.start()
+
+	# ケア通知初期化
+	_notifications = CareNotification.new()
+	add_child(_notifications)
 
 	# UIスタイリング
 	_apply_ui_theme()
