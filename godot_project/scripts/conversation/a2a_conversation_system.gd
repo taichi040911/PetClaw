@@ -642,10 +642,16 @@ func _build_turn_prompt(
 	if not mem_sentence.is_empty():
 		conv_memory_context = "\n%s" % mem_sentence
 
+	# 会話ムードコンテキスト（1文、トークン予算を守る）
+	var mood_context := ""
+	var conv_mood: Dictionary = context.get("conversation_mood", {})
+	if not conv_mood.is_empty():
+		mood_context = "\nThe mood of this conversation is %s. Let this influence your tone." % conv_mood.get("mood", "curious")
+
 	return """You are %s. Your personality: %s. Your current emotions: %s.
 You're talking to %s in a %s environment.
 Topics around you: %s
-%s%s%s%s%s%s
+%s%s%s%s%s%s%s
 %s
 
 Respond naturally as %s. Weave your memories into conversation naturally.
@@ -661,6 +667,7 @@ Turn %d of the conversation.""" % [
 		past_context,
 		relationship_context,
 		conv_memory_context,
+		mood_context,
 		recent_messages if recent_messages else "(Start the conversation)",
 		speaker.pet_name, turn + 1,
 	]
@@ -893,8 +900,19 @@ func _on_day_change() -> void:
 
 
 # === テンプレート会話フォールバック ===
-func _generate_template_conversation(pet1: PetEntity, pet2: PetEntity, trigger: String) -> Array[Dictionary]:
-	## APIバジェット切れ時にテンプレート会話を生成
+# ムード→推奨テンプレートトリガーマッピング
+const MOOD_TEMPLATE_PREFERENCES: Dictionary = {
+	"playful": ["play", "food", "greeting"],
+	"serious": ["comfort", "memory", "night"],
+	"nostalgic": ["memory", "night", "dream"],
+	"competitive": ["play", "curiosity", "spontaneous"],
+	"supportive": ["comfort", "dream", "memory"],
+	"curious": ["curiosity", "language", "spontaneous"],
+}
+
+func _generate_template_conversation(pet1: PetEntity, pet2: PetEntity, trigger: String,
+		conv_mood: Dictionary = {}) -> Array[Dictionary]:
+	## APIバジェット切れ時にテンプレート会話を生成（ムード考慮）
 
 	var result: Array[Dictionary] = []
 
@@ -904,6 +922,20 @@ func _generate_template_conversation(pet1: PetEntity, pet2: PetEntity, trigger: 
 		if template.get("trigger", "") == trigger:
 			matching_templates = template.get("templates", [])
 			break
+
+	if matching_templates.is_empty():
+		# ムードに基づくテンプレート優先選択
+		var mood_name: String = conv_mood.get("mood", "")
+		var preferred_triggers: Array = MOOD_TEMPLATE_PREFERENCES.get(mood_name, [])
+		if not preferred_triggers.is_empty():
+			# 推奨トリガーから順にマッチするテンプレートを探す
+			for pref_trigger: Variant in preferred_triggers:
+				for template in TEMPLATE_CONVERSATIONS:
+					if template.get("trigger", "") == str(pref_trigger):
+						matching_templates = template.get("templates", [])
+						break
+				if not matching_templates.is_empty():
+					break
 
 	if matching_templates.is_empty():
 		# フォールバック: ランダムなテンプレートセットを使用
@@ -1029,8 +1061,11 @@ func _run_template_conversation(pet1: PetEntity, pet2: PetEntity, trigger: Strin
 	is_conversation_active = true
 	current_conversation = []
 
-	# テンプレート会話を生成
-	var template_messages: Array[Dictionary] = _generate_template_conversation(pet1, pet2, trigger)
+	# 会話ムード計算（テンプレート選択に影響）
+	var conv_mood: Dictionary = _calculate_conversation_mood(pet1, pet2)
+
+	# テンプレート会話を生成（ムード考慮）
+	var template_messages: Array[Dictionary] = _generate_template_conversation(pet1, pet2, trigger, conv_mood)
 
 	# メッセージを順次送信（UIに表示）
 	for msg: Dictionary in template_messages:
@@ -1061,9 +1096,9 @@ func _run_template_conversation(pet1: PetEntity, pet2: PetEntity, trigger: Strin
 				conversation_message.emit(msg["pet_id"], msg["message"], msg)
 				msg["_emitted"] = true
 
-	# 完了処理（テンプレートでも言語進化に寄与）
-	_finalize_conversation(pet1, pet2, trigger)
-	print("[AtoA] Template conversation completed (%d turns)" % template_messages.size())
+	# 完了処理（テンプレートでも言語進化に寄与、ムードコンテキストを渡す）
+	_finalize_conversation(pet1, pet2, trigger, {"conversation_mood": conv_mood})
+	print("[AtoA] Template conversation completed (%d turns, mood: %s)" % [template_messages.size(), conv_mood.get("mood", "unknown")])
 
 
 # === 会話レスポンスの言語進化処理 ===
@@ -1616,6 +1651,13 @@ func _finalize_conversation(pet1: PetEntity, pet2: PetEntity, trigger: String,
 		conv_context: Dictionary = {}) -> void:
 	is_conversation_active = false
 
+	# 会話ムードをログエントリに付与
+	var conv_mood: Dictionary = conv_context.get("conversation_mood", {})
+	for msg: Dictionary in current_conversation:
+		if not conv_mood.is_empty():
+			msg["conversation_mood"] = conv_mood.get("mood", "")
+			msg["conversation_mood_intensity"] = conv_mood.get("intensity", 0.0)
+
 	# 会話サマリーを生成してログエントリに付与
 	var conv_summary: String = _generate_conversation_summary(pet1, pet2, trigger)
 	for msg: Dictionary in current_conversation:
@@ -1804,6 +1846,59 @@ func _get_dominant_emotion(pet: PetEntity) -> String:
 			max_val = pet.emotions[emotion]
 			max_emotion = emotion
 	return max_emotion
+
+
+# === Conversation Reaction System ===
+func _generate_reaction(listener: PetEntity, _message_text: String) -> Dictionary:
+	## Generate an emoji-like reaction from the listener based on personality and emotion.
+	## Returns empty Dictionary if no reaction (60% of time).
+	## 100% local/procedural — no API calls.
+	if randf() > 0.4:
+		return {}
+
+	var emotion: String = _get_dominant_emotion(listener)
+	var emoji: String = ""
+
+	match emotion:
+		"joy":
+			emoji = ["😄", "⚡"][randi() % 2]
+		"excitement":
+			emoji = ["⚡", "😄"][randi() % 2]
+		"love":
+			emoji = ["♥", "🥰"][randi() % 2]
+		"sadness":
+			emoji = "😢"
+		"fear":
+			emoji = "😨"
+		_:
+			# neutral / curious / other
+			emoji = ["🤔", "✨"][randi() % 2]
+
+	# Personality influence: curious pets lean toward 🤔/✨, brave pets toward ⚡
+	var personality: Dictionary = listener.personality
+	if personality.get("curiosity", 0.0) > 0.6 and randf() < 0.4:
+		emoji = ["🤔", "✨"][randi() % 2]
+	elif personality.get("bravery", 0.0) > 0.6 and randf() < 0.3:
+		emoji = "⚡"
+	elif personality.get("gentleness", 0.0) > 0.6 and randf() < 0.3:
+		emoji = ["♥", "✨"][randi() % 2]
+
+	return {
+		"reactor_id": listener.pet_id,
+		"reactor_name": listener.pet_name,
+		"emoji": emoji,
+	}
+
+
+func _attach_reaction_to_message(msg: Dictionary, listener: PetEntity) -> void:
+	## Check if listener reacts to the message and attach reaction data.
+	var reaction: Dictionary = _generate_reaction(listener, msg.get("message", ""))
+	if not msg.has("reactions"):
+		msg["reactions"] = [] as Array[Dictionary]
+	if reaction.is_empty():
+		return
+	var reactions_arr: Array = msg["reactions"]
+	reactions_arr.append(reaction)
 
 
 # === Relationship Dynamics ===
