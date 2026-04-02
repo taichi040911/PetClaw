@@ -9,7 +9,9 @@ signal conversation_triggered  ## 手動会話トリガー時にMainSceneに通�
 var _vbox: VBoxContainer
 var _scroll: ScrollContainer
 var _trigger_button: Button
+var _export_button: Button
 var _status_label: Label
+var _export_toast: Label
 var _refresh_timer: float = 0.0
 var _relationships_container: VBoxContainer
 var _last_displayed_pet_name: String = ""
@@ -120,6 +122,28 @@ func _add_conversation_controls() -> void:
 	_trigger_button.add_theme_font_size_override("font_size", 14)
 	_trigger_button.pressed.connect(_on_trigger_pressed)
 	controls.add_child(_trigger_button)
+
+	# エクスポートボタン
+	_export_button = Button.new()
+	_export_button.text = "📤 Export"
+	_export_button.custom_minimum_size = Vector2(120, 48)
+	var export_style: StyleBoxFlat = StyleBoxFlat.new()
+	export_style.bg_color = Color(0.18, 0.15, 0.35)
+	export_style.corner_radius_top_left = 12
+	export_style.corner_radius_top_right = 12
+	export_style.corner_radius_bottom_left = 12
+	export_style.corner_radius_bottom_right = 12
+	_export_button.add_theme_stylebox_override("normal", export_style)
+	var export_hover: StyleBoxFlat = export_style.duplicate()
+	export_hover.bg_color = Color(0.25, 0.2, 0.5)
+	_export_button.add_theme_stylebox_override("hover", export_hover)
+	var export_pressed: StyleBoxFlat = export_style.duplicate()
+	export_pressed.bg_color = Color(0.12, 0.1, 0.25)
+	_export_button.add_theme_stylebox_override("pressed", export_pressed)
+	_export_button.add_theme_color_override("font_color", Color(0.85, 0.8, 1.0))
+	_export_button.add_theme_font_size_override("font_size", 14)
+	_export_button.pressed.connect(_on_export_pressed)
+	controls.add_child(_export_button)
 
 	# ステータスラベル
 	_status_label = Label.new()
@@ -610,3 +634,107 @@ func _add_conversation_stats(log: Array) -> void:
 	stats_body.add_theme_color_override("font_color", Color(0.45, 0.5, 0.6))
 	stats_body.autowrap_mode = TextServer.AUTOWRAP_WORD
 	stats_vbox.add_child(stats_body)
+
+
+func _on_export_pressed() -> void:
+	if not GameManager.instance or not GameManager.instance.a2a_system:
+		_show_export_toast("No conversation data to export")
+		return
+
+	var log: Array = GameManager.instance.a2a_system.conversation_log
+	if log.is_empty():
+		_show_export_toast("No conversations to export")
+		return
+
+	var export_text: String = _build_export_text(log)
+
+	# ファイルに書き出し
+	var file: FileAccess = FileAccess.open("user://conversation_export.txt", FileAccess.WRITE)
+	if not file:
+		push_warning("ConversationLogViewer: Failed to open export file")
+		_show_export_toast("Export failed — could not write file")
+		return
+	file.store_string(export_text)
+	file.close()
+
+	# Web環境ではクリップボードにもコピー
+	if OS.get_name() == "Web":
+		DisplayServer.clipboard_set(export_text)
+		_show_export_toast("Exported & copied to clipboard!")
+	else:
+		_show_export_toast("Exported to conversation_export.txt")
+
+
+func _build_export_text(log: Array) -> String:
+	var lines: Array[String] = []
+	lines.append("=== PetClaw Conversation Log ===")
+	lines.append("Exported: %s" % Time.get_datetime_string_from_system(false, true))
+	lines.append("")
+
+	# 最新10件をエクスポート
+	var export_log: Array = log.slice(-10)
+	for entry: Variant in export_log:
+		if not entry is Dictionary:
+			continue
+		var d: Dictionary = entry as Dictionary
+		var pet_name: String = d.get("pet_name", "???")
+		var emotion: String = d.get("emotion", "neutral")
+		var message: String = d.get("message", "...")
+		lines.append("[%s] (%s): %s" % [pet_name, emotion, message])
+
+		# リアクション行
+		var reactions: Array = d.get("reactions", [])
+		if not reactions.is_empty():
+			var reaction_parts: Array[String] = []
+			for reaction: Variant in reactions:
+				if reaction is Dictionary:
+					var r: Dictionary = reaction
+					reaction_parts.append("%s %s" % [r.get("emoji", ""), r.get("reactor_name", "")])
+			if not reaction_parts.is_empty():
+				lines.append("Reactions: %s" % ", ".join(reaction_parts))
+		lines.append("")
+
+	# フッター: 言語統計
+	lines.append("---")
+	var total_vocab_uses: int = 0
+	for entry2: Variant in log:
+		if not entry2 is Dictionary:
+			continue
+		var d2: Dictionary = entry2 as Dictionary
+		var comp: Dictionary = d2.get("language_compliance", {})
+		var checks: Dictionary = comp.get("checks", {})
+		if checks.get("uses_vocabulary", false):
+			total_vocab_uses += 1
+
+	var stage: String = "unknown"
+	if GameManager.instance and GameManager.instance.a2a_system:
+		var a2a: AtoAConversationSystem = GameManager.instance.a2a_system
+		var status: Dictionary = a2a.get_conversation_status()
+		stage = "Day %d, %d conversations" % [status.get("daily_count", 0), log.size()]
+
+	lines.append("Language stats: %d invented word uses | %s" % [total_vocab_uses, stage])
+	lines.append("=== End of Log ===")
+
+	return "\n".join(lines)
+
+
+func _show_export_toast(message: String) -> void:
+	# 既存トーストを削除
+	if _export_toast and is_instance_valid(_export_toast):
+		_export_toast.queue_free()
+
+	_export_toast = Label.new()
+	_export_toast.text = message
+	_export_toast.add_theme_font_size_override("font_size", 12)
+	_export_toast.add_theme_color_override("font_color", Color(0.9, 0.95, 0.8))
+	_export_toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_export_toast.set_anchors_preset(PRESET_BOTTOM_WIDE)
+	_export_toast.offset_top = -40
+	_export_toast.offset_bottom = -12
+	add_child(_export_toast)
+
+	# 3秒後にフェードアウト・削除
+	var tween: Tween = create_tween()
+	tween.tween_interval(2.0)
+	tween.tween_property(_export_toast, "modulate:a", 0.0, 1.0)
+	tween.tween_callback(_export_toast.queue_free)
