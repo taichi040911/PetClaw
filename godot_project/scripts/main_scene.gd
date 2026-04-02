@@ -23,6 +23,7 @@ extends Control
 @onready var env_button: Button = $UIPanel/VBox/NavButtons/EnvButton
 @onready var pets_button: Button = $UIPanel/VBox/NavButtons/PetsButton
 @onready var mute_button: Button = $UIPanel/VBox/NavButtons/MuteButton
+@onready var dict_button: Button = $UIPanel/VBox/NavButtons/DictButton
 @onready var settings_button: Button = $UIPanel/VBox/NavButtons/SettingsButton
 @onready var save_indicator: Label = $UIPanel/VBox/NavButtons/SaveIndicator
 
@@ -116,6 +117,7 @@ func _ready() -> void:
 	env_button.pressed.connect(_on_env_pressed)
 	pets_button.pressed.connect(_on_pets_pressed)
 	mute_button.pressed.connect(_on_mute_pressed)
+	dict_button.pressed.connect(_on_dict_pressed)
 	settings_button.pressed.connect(_on_settings_pressed)
 	pet_name_label.gui_input.connect(_on_pet_name_tapped)
 	pet_name_label.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -756,6 +758,21 @@ func _show_tutorial() -> void:
 
 
 # === Settings Screen ===
+
+# === Language Dictionary Screen ===
+
+func _on_dict_pressed() -> void:
+	_animate_button(dict_button)
+	if _sfx:
+		_sfx.play(SfxManager.SfxType.UI_OPEN)
+	var dict_screen: LanguageDictionaryScreen = LanguageDictionaryScreen.new()
+	dict_screen.back_requested.connect(func() -> void:
+		dict_screen.queue_free()
+		_fade_in_main_ui()
+	)
+	await _fade_out_main_ui()
+	add_child(dict_screen)
+
 
 func _on_settings_pressed() -> void:
 	_animate_button(settings_button)

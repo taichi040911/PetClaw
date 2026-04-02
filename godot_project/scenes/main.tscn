@@ -189,6 +189,11 @@ custom_minimum_size = Vector2(48, 36)
 layout_mode = 2
 text = "🔊"
 
+[node name="DictButton" type="Button" parent="UIPanel/VBox/NavButtons"]
+custom_minimum_size = Vector2(72, 36)
+layout_mode = 2
+text = "📖 Dict"
+
 [node name="SettingsButton" type="Button" parent="UIPanel/VBox/NavButtons"]
 custom_minimum_size = Vector2(90, 36)
 layout_mode = 2
