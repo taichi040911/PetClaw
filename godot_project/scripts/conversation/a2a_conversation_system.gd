@@ -190,6 +190,10 @@ func start_conversation(pet1: PetEntity, pet2: PetEntity, trigger: String) -> vo
 			"emotion": _get_dominant_emotion(current_pet),
 			"word_order": grammar["word_order"],
 		}
+		# 言語コンプライアンスチェック
+		var compliance: Dictionary = _check_language_compliance(response, grammar)
+		message["language_compliance"] = compliance
+
 		current_conversation.append(message)
 		conversation_message.emit(current_pet.pet_id, response, message)
 
@@ -897,6 +901,72 @@ func _get_participants_from_messages(messages: Array[Dictionary]) -> Array[PetEn
 	return result
 
 
+func _check_language_compliance(response: String, grammar: Dictionary) -> Dictionary:
+	## Claude応答が言語ルールに従っているかチェック
+	var score: float = 0.0
+	var checks: Dictionary = {}
+	var total_checks: int = 0
+
+	# 1. 接尾辞使用チェック
+	var suffixes: Variant = grammar.get("suffixes", [])
+	var suffix_list: Array = []
+	if suffixes is Array:
+		suffix_list = suffixes
+	elif suffixes is Dictionary:
+		for key: String in suffixes:
+			suffix_list.append(str(suffixes[key]))
+
+	var suffix_found: bool = false
+	for s: Variant in suffix_list:
+		if response.contains(str(s)):
+			suffix_found = true
+			break
+	checks["has_suffix"] = suffix_found
+	if suffix_found:
+		score += 1.0
+	total_checks += 1
+
+	# 2. アクション表現チェック（*action*パターン）
+	var has_action: bool = response.contains("*") and response.count("*") >= 2
+	checks["has_action"] = has_action
+	if has_action:
+		score += 1.0
+	total_checks += 1
+
+	# 3. 適切な長さチェック（1-3文: 20-200文字）
+	var good_length: bool = response.length() >= 20 and response.length() <= 200
+	checks["good_length"] = good_length
+	if good_length:
+		score += 1.0
+	total_checks += 1
+
+	# 4. 独自語彙使用チェック
+	var uses_vocab: bool = false
+	if GameManager.instance and GameManager.instance.original_language:
+		var vocab: Dictionary = GameManager.instance.original_language.get_full_vocabulary()
+		for key: String in vocab:
+			var entry: Dictionary = vocab[key]
+			if entry.get("strength", 0.0) > 0.3:
+				if response.containsn(entry.get("ai_term", "")):
+					uses_vocab = true
+					break
+	checks["uses_vocabulary"] = uses_vocab
+	if uses_vocab:
+		score += 1.0
+	total_checks += 1
+
+	# スコア算出（0.0 ~ 1.0）
+	var final_score: float = score / float(total_checks) if total_checks > 0 else 0.0
+
+	if final_score < 0.5:
+		print("[AtoA] Low compliance (%.0f%%): %s" % [final_score * 100.0, str(checks)])
+
+	return {
+		"score": final_score,
+		"checks": checks,
+	}
+
+
 func _generate_conversation_summary(pet1: PetEntity, pet2: PetEntity, trigger: String) -> String:
 	## 会話の短いサマリーを生成（将来の会話で参照可能）
 	var dominant_emotion: String = _get_dominant_emotion(pet1)
@@ -1104,6 +1174,17 @@ func trigger_conversation_now() -> void:
 
 func get_conversation_status() -> Dictionary:
 	## UI表示用のステータス情報を返す
+	# 平均コンプライアンススコアを計算
+	var avg_compliance: float = 0.0
+	var compliance_count: int = 0
+	for entry: Dictionary in conversation_log.slice(-20):
+		var comp: Dictionary = entry.get("language_compliance", {})
+		if comp.has("score"):
+			avg_compliance += comp["score"]
+			compliance_count += 1
+	if compliance_count > 0:
+		avg_compliance /= float(compliance_count)
+
 	return {
 		"is_active": is_conversation_active,
 		"budget_remaining": DAILY_CONVERSATION_BUDGET - daily_conversation_cost,
@@ -1111,4 +1192,5 @@ func get_conversation_status() -> Dictionary:
 		"max_daily": MAX_DAILY_CONVERSATIONS,
 		"total_conversations": conversation_log.size(),
 		"timer_progress": conversation_timer / AUTO_CONVERSATION_INTERVAL,
+		"avg_compliance": avg_compliance,
 	}
