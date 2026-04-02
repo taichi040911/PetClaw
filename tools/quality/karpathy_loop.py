@@ -319,7 +319,13 @@ class KarpathyLoop:
         template_blocks = re.split(r"RoundTheme\.\w+\s*:\s*\[", content)[1:]
         templates_per_theme: dict[str, int] = {}
         for theme, block in zip(themes, template_blocks):
-            count = block.count('",') + (1 if '"]' in block.split("],")[0] else 0)
+            # Truncate block at first '],' or '}' to avoid counting strings
+            # outside the template array.
+            end_idx = block.find("],")
+            if end_idx == -1:
+                end_idx = block.find("]")
+            array_block = block[:end_idx] if end_idx != -1 else block
+            count = len(re.findall(r'"[^"]*"', array_block))
             templates_per_theme[theme] = count
 
         # Reward constants
