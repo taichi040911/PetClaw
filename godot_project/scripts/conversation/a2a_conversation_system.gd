@@ -2648,6 +2648,18 @@ func _finalize_conversation(pet1: PetEntity, pet2: PetEntity, trigger: String,
 	# 傍観者リアクション（3匹以上いる場合）
 	_trigger_observer_reactions(pet1, pet2, dominant_emotion, current_conversation)
 
+	# R121: 文化的相互作用パターン記録（会話トリガーベース）
+	if GameManager.instance and GameManager.instance.get("cultural_system"):
+		GameManager.instance.cultural_system.record_interaction_pattern(
+			[pet1.pet_id, pet2.pet_id], trigger)
+
+	# R121: 会話後のノスタルジアチェック（会話相手が記憶のパートナーなら）
+	if GameManager.instance and GameManager.instance.get("memory_bridge"):
+		var mb: Node = GameManager.instance.memory_bridge
+		if mb.has_method("check_nostalgia_trigger"):
+			mb.check_nostalgia_trigger(pet1.pet_id, pet2.pet_id)
+			mb.check_nostalgia_trigger(pet2.pet_id, pet1.pet_id)
+
 	conversation_ended.emit([pet1.pet_id, pet2.pet_id], summary)
 	current_conversation = []
 

@@ -169,6 +169,27 @@ func _summarize_memory(mem: Dictionary) -> String:
 	return "%s%s, feeling %s" % [mem.get("event_type", "something"), partner_str, mem.get("emotion_tag", "a feeling")]
 
 
+func check_nostalgia_trigger(pet_id: int, partner_id: int) -> void:
+	## R121: 会話後にパートナー関連の記憶でノスタルジアをトリガー
+	var gm := GameManager.instance
+	if not gm or not gm.biological_memory:
+		return
+	var memories: Dictionary = gm.biological_memory.pet_memories.get(pet_id, {})
+	var cortex: Array = memories.get("cortex", [])
+	if cortex.is_empty():
+		return
+	# パートナーとの過去の記憶を探す
+	for mem: Dictionary in cortex:
+		var content: Dictionary = mem.get("content", {})
+		if content.get("with", -1) == partner_id and randf() < 0.25:
+			var summary: String = _summarize_memory(mem)
+			_log_nostalgia(pet_id, summary)
+			nostalgia_triggered.emit(pet_id, summary)
+			# 記憶の重要度を少しブースト（想起効果）
+			mem["importance"] = minf(mem.get("importance", 0.5) + 0.05, 1.0)
+			return
+
+
 func _log_nostalgia(pet_id: int, summary: String) -> void:
 	if pet_id not in nostalgia_log:
 		nostalgia_log[pet_id] = [] as Array[Dictionary]
