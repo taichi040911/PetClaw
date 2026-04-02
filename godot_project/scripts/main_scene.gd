@@ -207,6 +207,13 @@ func _connect_game_signals() -> void:
 				_on_relationship_changed
 			)
 
+	# 単語教示シグナル（R85で追加）
+	if GameManager.instance.a2a_system:
+		if GameManager.instance.a2a_system.has_signal("word_taught"):
+			GameManager.instance.a2a_system.word_taught.connect(
+				_on_word_taught
+			)
+
 	# 死亡シグナル
 	if GameManager.instance.life_death:
 		if GameManager.instance.life_death.has_signal("pet_died"):
@@ -644,6 +651,23 @@ func _on_relationship_changed(pet1_id: int, pet2_id: int, new_type: String) -> v
 	_show_language_toast(
 		"%s %s & %s are now %s!" % [icon, name1, name2, new_type.replace("_", " ")],
 		Color(0.7, 0.8, 0.6),
+	)
+
+
+func _on_word_taught(speaker_id: int, listener_id: int, words: Array[String]) -> void:
+	## R85: 単語教示時のトースト通知
+	var speaker_name: String = "Pet"
+	var listener_name: String = "Pet"
+	if GameManager.instance:
+		if GameManager.instance.pets.has(speaker_id):
+			speaker_name = GameManager.instance.pets[speaker_id].pet_name
+		if GameManager.instance.pets.has(listener_id):
+			listener_name = GameManager.instance.pets[listener_id].pet_name
+
+	var words_str: String = ", ".join(words.map(func(w: String) -> String: return "'%s'" % w))
+	_show_language_toast(
+		"📚 %s taught %s: %s" % [speaker_name, listener_name, words_str],
+		Color(0.6, 0.8, 0.5),
 	)
 
 
