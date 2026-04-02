@@ -994,12 +994,38 @@ func _generate_conversation_summary(pet1: PetEntity, pet2: PetEntity, trigger: S
 	return " ".join(summary_parts)
 
 
-# === 会話中の感情処理 ===
-func _process_conversation_emotion(speaker: PetEntity, listener: PetEntity, _message: String) -> void:
+# === 会話中の感情処理（感情伝染あり） ===
+func _process_conversation_emotion(speaker: PetEntity, listener: PetEntity, message: String) -> void:
 	# 会話自体がaffection/joyを少し上げる
 	GameManager.emotion_system.stimulate(speaker, "joy", 0.05, "a2a_conversation")
 	GameManager.emotion_system.stimulate(listener, "joy", 0.03, "a2a_conversation")
 	speaker.stats.modify("affection", 0.01)
+
+	# 感情伝染: 話者の強い感情がリスナーに伝播
+	var speaker_emotion: String = _get_dominant_emotion(speaker)
+	var speaker_intensity: float = _get_emotion_intensity(speaker)
+
+	if speaker_intensity > 0.5:
+		# 伝染強度 = 話者の強度 × 伝染率 × メッセージの感情性
+		var contagion_rate: float = 0.3
+		# メッセージに感嘆符やアクションが多いほど伝染しやすい
+		var exclamation_count: int = message.count("!") + message.count("*")
+		var message_intensity: float = clampf(float(exclamation_count) * 0.15, 0.0, 0.5)
+		var contagion_amount: float = speaker_intensity * contagion_rate * (0.5 + message_intensity)
+
+		# 同じ感情をリスナーにも刺激
+		GameManager.emotion_system.stimulate(listener, speaker_emotion, contagion_amount, "emotional_contagion")
+
+		# 反対感情の減衰（悲しみが伝染すると喜びが下がる等）
+		var opposite_emotions: Dictionary = {
+			"joy": "sadness", "sadness": "joy",
+			"love": "fear", "fear": "love",
+			"excitement": "sadness",
+		}
+		var opposite: String = opposite_emotions.get(speaker_emotion, "")
+		if not opposite.is_empty() and listener.emotions.has(opposite):
+			var current: float = listener.emotions[opposite]
+			listener.emotions[opposite] = maxf(0.0, current - contagion_amount * 0.5)
 
 
 # === 会話完了処理 ===
