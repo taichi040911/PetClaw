@@ -28,6 +28,7 @@ extends Control
 @onready var save_indicator: Label = $UIPanel/VBox/NavButtons/SaveIndicator
 var battle_button: Button  # Created programmatically in NavButtons
 var network_button: Button  # Created programmatically in NavButtons
+var achievement_button: Button  # Created programmatically in NavButtons
 
 # === Pet Reference ===
 var current_pet: PetEntity
@@ -136,6 +137,13 @@ func _ready() -> void:
 	nav_buttons.add_child(network_button)
 	nav_buttons.move_child(network_button, save_indicator.get_index())
 	network_button.pressed.connect(_on_network_pressed)
+	# Achievement button (programmatic, inserted before SaveIndicator in NavButtons)
+	achievement_button = Button.new()
+	achievement_button.custom_minimum_size = Vector2(80, 36)
+	achievement_button.text = "Trophy"
+	nav_buttons.add_child(achievement_button)
+	nav_buttons.move_child(achievement_button, save_indicator.get_index())
+	achievement_button.pressed.connect(_on_achievement_pressed)
 	pet_name_label.gui_input.connect(_on_pet_name_tapped)
 	pet_name_label.mouse_filter = Control.MOUSE_FILTER_STOP
 
@@ -237,6 +245,12 @@ func _connect_game_signals() -> void:
 	if GameManager.instance.life_death:
 		if GameManager.instance.life_death.has_signal("pet_died"):
 			GameManager.instance.life_death.pet_died.connect(_on_pet_died)
+
+	# 実績アンロック通知（R113で追加）
+	if GameManager.instance.get("achievement_system"):
+		var ach_sys: Node = GameManager.instance.achievement_system
+		if ach_sys.has_signal("achievement_unlocked"):
+			ach_sys.achievement_unlocked.connect(_on_achievement_unlocked)
 
 
 # === 初回起動: 卵孵化 ===
@@ -849,6 +863,26 @@ func _on_battle_pressed() -> void:
 	)
 	await _fade_out_main_ui()
 	add_child(battle_screen)
+
+
+# === Achievement Screen ===
+
+func _on_achievement_pressed() -> void:
+	_animate_button(achievement_button)
+	if _sfx:
+		_sfx.play(SfxManager.SfxType.UI_OPEN)
+	var ach_screen: AchievementScreen = AchievementScreen.new()
+	ach_screen.back_requested.connect(func() -> void:
+		ach_screen.queue_free()
+		_fade_in_main_ui()
+	)
+	await _fade_out_main_ui()
+	add_child(ach_screen)
+
+
+func _on_achievement_unlocked(achievement_id: String, title: String) -> void:
+	## R113: 実績アンロック時のトースト通知
+	_show_language_toast("Achievement: %s" % title, Color(1.0, 0.85, 0.3))
 
 
 # === Pet List Screen ===

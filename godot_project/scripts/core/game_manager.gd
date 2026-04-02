@@ -26,6 +26,9 @@ var lifecycle_fsm: RefCounted  # PetLifecycleFSM (extends RefCounted)
 var pet_book: Node  # PetBookCore
 var battle_system: Node  # LanguageBattleSystem
 var achievement_system: Node  # AchievementSystem
+var cultural_system: Node  # CulturalEmergenceSystem
+var team_orchestrator: Node  # PetTeamOrchestrator
+var memory_bridge: Node  # MemoryPersonalityBridge
 
 # === Pet Registry ===
 var pets: Dictionary = {}  # pet_id → PetEntity
@@ -102,6 +105,9 @@ func _initialize_systems() -> void:
 	pet_book = _create_system("res://scripts/social/pet_book_core.gd", "PetBookCore")
 	battle_system = _create_system("res://scripts/battle/language_battle_system.gd", "LanguageBattleSystem")
 	achievement_system = _create_system("res://scripts/progression/achievement_system.gd", "AchievementSystem")
+	cultural_system = _create_system("res://scripts/culture/cultural_emergence_system.gd", "CulturalEmergenceSystem")
+	team_orchestrator = _create_system("res://scripts/orchestration/pet_team_orchestrator.gd", "PetTeamOrchestrator")
+	memory_bridge = _create_system("res://scripts/memory/memory_personality_bridge.gd", "MemoryPersonalityBridge")
 
 
 func _create_pet_entity() -> Node:
@@ -177,6 +183,33 @@ func _connect_signals() -> void:
 	# === Achievement System: 関係性変化 ===
 	if a2a_system.has_signal("relationship_changed"):
 		a2a_system.relationship_changed.connect(_on_relationship_changed_for_achievement)
+
+	# === R115: Future AtoA — Cultural Emergence / Team Orchestrator / Memory Bridge ===
+	# AtoA会話完了 → 文化的アーティファクト生成試行 + 文化伝達
+	a2a_system.conversation_ended.connect(_on_a2a_for_culture)
+
+	# 死亡 → 悲嘆処理開始
+	life_death.pet_died.connect(_on_pet_died_for_grief)
+
+	# 睡眠 → 夢合成
+	if lifecycle_fsm:
+		lifecycle_fsm.sleep_started.connect(_on_sleep_for_dreams)
+
+	# チーム完了 → 文化イベント企画シグナル
+	team_orchestrator.team_completed.connect(_on_team_completed)
+	team_orchestrator.team_formed.connect(_on_team_formed_log)
+
+	# 文化創発 → ログ
+	cultural_system.artifact_created.connect(_on_artifact_created)
+	cultural_system.tradition_established.connect(_on_tradition_established)
+
+	# 記憶ブリッジ → 悲嘆/ノスタルジア/トラウマ/夢
+	memory_bridge.grief_stage_changed.connect(_on_grief_stage_changed)
+	memory_bridge.dream_generated.connect(_on_dream_generated)
+	memory_bridge.trauma_processed.connect(_on_trauma_processed)
+
+	# 交配 → 文化継承
+	breeding.offspring_born.connect(_on_birth_for_culture)
 
 	# === Battle System 統合接続 ===
 	battle_system.battle_ended.connect(_on_battle_ended)
@@ -485,6 +518,107 @@ func queue_petbook_posts(post_data: Dictionary) -> void:
 		pet_book.publish_conversation_post(post_data)
 
 
+# === R115: Future AtoA Signal Handlers ===
+
+func _on_a2a_for_culture(participants: Array[int], summary: String) -> void:
+	## AtoA会話完了 → 文化的アーティファクト生成 + 伝達
+	if cultural_system and participants.size() >= 2:
+		if randf() < 0.12:  # 12% chance to create artifact from conversation
+			cultural_system.create_story_from_conversation(participants[0], participants[1], summary)
+		cultural_system.attempt_cultural_transmission(participants[0], participants[1])
+		# 相互パターン記録（儀式検出用）
+		cultural_system.record_interaction_pattern(participants, "conversation")
+
+
+func _on_pet_died_for_grief(pet_id: int, _cause: String) -> void:
+	## ペット死亡 → 親しいペットの悲嘆処理を開始
+	if not memory_bridge:
+		return
+	for other_id: int in pets:
+		if other_id == pet_id:
+			continue
+		var pet: Node = pets[other_id]
+		if not pet.is_alive:
+			continue
+		# 関係性をチェック（affinity > 0.6で悲嘆発動）
+		if a2a_system:
+			var rels: Dictionary = a2a_system.pet_relationships
+			var key1: String = "%d_%d" % [mini(pet_id, other_id), maxi(pet_id, other_id)]
+			if rels.has(key1):
+				var affinity: float = rels[key1].get("affinity", 0.0)
+				if affinity >= 0.6 and memory_bridge.has_method("start_grief"):
+					memory_bridge.start_grief(other_id, pet_id, affinity)
+
+
+func _on_sleep_for_dreams(pet_id: int) -> void:
+	## 睡眠開始 → 夢合成
+	if memory_bridge and memory_bridge.has_method("process_dreams"):
+		var dream_content: String = memory_bridge.process_dreams(pet_id)
+		if not dream_content.is_empty():
+			print("[GameManager] Pet %d dreaming: %s" % [pet_id, dream_content.left(50)])
+
+
+func _on_team_formed_log(team_id: String, members: Array[int], task: String) -> void:
+	print("[GameManager] Team %s formed: %s (%s)" % [team_id, str(members), task])
+
+
+func _on_team_completed(team_id: String, results: Dictionary) -> void:
+	print("[GameManager] Team %s completed: %s" % [team_id, str(results)])
+	# EVENT_PLANNING完了 → 文化イベントトリガー
+	if results.get("task_type", "") == "EVENT_PLANNING" and cultural_system:
+		var members: Array = results.get("members", [])
+		var int_members: Array[int] = []
+		for m: Variant in members:
+			int_members.append(m as int)
+		if int_members.size() >= 2:
+			cultural_system.create_story_from_conversation(
+				int_members[0], int_members[1], "Team event creation")
+
+
+func _on_artifact_created(artifact_id: String, artifact_type: String) -> void:
+	print("[GameManager] Cultural artifact created: %s (%s)" % [artifact_id, artifact_type])
+	if achievement_system and achievement_system.has_method("check_achievement"):
+		achievement_system.check_achievement("culture_creator", {"artifact_type": artifact_type})
+
+
+func _on_tradition_established(artifact_id: String) -> void:
+	print("[GameManager] Tradition established: %s" % artifact_id)
+	if achievement_system and achievement_system.has_method("check_achievement"):
+		achievement_system.check_achievement("tradition_keeper", {"artifact_id": artifact_id})
+
+
+func _on_grief_stage_changed(pet_id: int, stage: String) -> void:
+	print("[GameManager] Pet %d grief stage: %s" % [pet_id, stage])
+	if stage == "acceptance" and achievement_system and achievement_system.has_method("check_achievement"):
+		achievement_system.check_achievement("resilient", {"pet_id": pet_id})
+
+
+func _on_dream_generated(pet_id: int, dream_content: String) -> void:
+	print("[GameManager] Pet %d dream: %s" % [pet_id, dream_content.left(60)])
+	# 夢をPetBookに投稿
+	if pet_book:
+		var pet_name: String = "Pet"
+		if pets.has(pet_id):
+			pet_name = pets[pet_id].pet_name
+		queue_petbook_posts({
+			"type": "dream",
+			"pet_id": pet_id,
+			"content": "%s dreamed: %s" % [pet_name, dream_content],
+			"tags": ["dream", "memory"],
+		})
+
+
+func _on_trauma_processed(pet_id: int, growth_trait: String) -> void:
+	print("[GameManager] Pet %d processed trauma → gained: %s" % [pet_id, growth_trait])
+
+
+func _on_birth_for_culture(_parent1_id: int, _parent2_id: int, child: Node) -> void:
+	## 文化継承: 親の文化知識を子孫に伝達
+	if cultural_system and cultural_system.has_method("inherit_culture_for_offspring"):
+		cultural_system.inherit_culture_for_offspring(
+			[_parent1_id, _parent2_id], child.pet_id)
+
+
 func _on_rebel_post_for_language(post: Variant) -> void:  # PetBookPost
 	## 反乱投稿の言語パターンを言語進化システムに通知
 	if language_evolution and not post.rebel_expressions.is_empty():
@@ -524,6 +658,9 @@ func save_game() -> void:
 		"life_death": life_death.to_dict(),
 		"battle_system": battle_system.to_dict(),
 		"achievement_system": achievement_system.to_dict(),
+		"cultural_system": cultural_system.to_dict(),
+		"team_orchestrator": team_orchestrator.to_dict(),
+		"memory_bridge": memory_bridge.to_dict(),
 	}
 
 	for pet_id in pets:
@@ -601,6 +738,11 @@ func _load_game_data() -> void:
 
 	# Achievement System復元
 	achievement_system.from_dict(data.get("achievement_system", {}))
+
+	# R115: Future AtoA Systems復元
+	cultural_system.from_dict(data.get("cultural_system", {}))
+	team_orchestrator.from_dict(data.get("team_orchestrator", {}))
+	memory_bridge.from_dict(data.get("memory_bridge", {}))
 
 	# ペット復元
 	for pet_id_str in data.get("pets", {}):
