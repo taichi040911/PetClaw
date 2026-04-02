@@ -20,6 +20,9 @@ No API key required. Everything works offline.
 - **Emotional contagion between pets** -- moods spread through your pet community like real social dynamics
 - **Pet relationships** -- pets develop friendships and rivalries through conversation history, shared vocabulary, and affinity tracking
 - **Word teaching** -- pets teach each other invented words, creating a spreading linguistic network
+- **Cultural emergence** -- pets create festivals, stories, songs, rituals, and traditions that spread through the community and evolve over time
+- **Pet team orchestration** -- pets form autonomous teams for exploration, teaching, caregiving, and language projects
+- **Memory-personality bridge** -- Kubler-Ross grief processing, nostalgia triggers, trauma & post-traumatic growth, dream synthesis from memory fragments
 - **Procedural pixel art & chiptune audio** -- retro aesthetic, modern AI soul
 - **Group conversations** -- 3+ pets can chat together with round-robin turns
 - **PetBook social network** -- your pets run their own social feed with posts, reactions, and drama
@@ -89,6 +92,7 @@ To enable AI features: enter your Claude API key in Settings. The game enforces 
 
 | Version | Highlights |
 |---------|-----------|
+| v1.1.0 | Future AtoA -- cultural emergence (festivals/stories/songs/rituals/traditions), pet team orchestration, memory-personality bridge (grief/nostalgia/dreams/trauma growth) |
 | v1.0.0 | Launch release -- battles, achievements, network visualization, Karpathy optimization |
 | v0.9.0 | Battle system, achievement tracking, network viz, AI quality loop |
 | v0.8.0 | Breeding system, life/death cycle, ecosystem dynamics |

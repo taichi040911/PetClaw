@@ -266,6 +266,67 @@ func _build_ui() -> void:
 		no_data_label.add_theme_color_override("font_color", Color(0.5, 0.45, 0.45))
 		_vbox.add_child(no_data_label)
 
+	# === Future AtoA Analytics ===
+	_add_section_label("Future AtoA")
+
+	if GameManager.instance:
+		var future_data: Array[Array] = []
+
+		# Cultural System stats
+		if GameManager.instance.get("cultural_system"):
+			var cs: Node = GameManager.instance.cultural_system
+			var arts: Dictionary = cs.get("artifacts") if cs.get("artifacts") else {}
+			var traditions: int = 0
+			for aid: String in arts:
+				if arts[aid].get("type_name", "") == "tradition":
+					traditions += 1
+			future_data.append(["Cultural Artifacts", "%d" % arts.size()])
+			future_data.append(["Traditions", "%d" % traditions])
+
+		# Team Orchestrator stats
+		if GameManager.instance.get("team_orchestrator"):
+			var to: Node = GameManager.instance.team_orchestrator
+			var active: Dictionary = to.get("active_teams") if to.get("active_teams") else {}
+			var completed: Array = to.get("completed_teams") if to.get("completed_teams") else []
+			future_data.append(["Active Teams", "%d" % active.size()])
+			future_data.append(["Completed Missions", "%d" % completed.size()])
+
+		# Memory Bridge stats
+		if GameManager.instance.get("memory_bridge"):
+			var mb: Node = GameManager.instance.memory_bridge
+			var gs: Dictionary = mb.get("grief_states") if mb.get("grief_states") else {}
+			var tm: Dictionary = mb.get("trauma_markers") if mb.get("trauma_markers") else {}
+			var dl: Dictionary = mb.get("dream_log") if mb.get("dream_log") else {}
+			var total_dreams: int = 0
+			for pid: Variant in dl:
+				total_dreams += dl[pid].size() if dl[pid] is Array else 0
+			future_data.append(["Active Grief", "%d pets" % gs.size()])
+			future_data.append(["Total Dreams", "%d" % total_dreams])
+
+		if future_data.is_empty():
+			var no_data: Label = Label.new()
+			no_data.text = "Future AtoA systems initializing..."
+			no_data.add_theme_font_size_override("font_size", 11)
+			_vbox.add_child(no_data)
+		else:
+			for row_data: Array in future_data:
+				var row: HBoxContainer = HBoxContainer.new()
+				row.add_theme_constant_override("separation", 8)
+				_vbox.add_child(row)
+
+				var lbl: Label = Label.new()
+				lbl.text = row_data[0]
+				lbl.custom_minimum_size = Vector2(160, 0)
+				lbl.add_theme_font_size_override("font_size", 11)
+				lbl.add_theme_color_override("font_color", Color(0.5, 0.55, 0.7))
+				row.add_child(lbl)
+
+				var val: Label = Label.new()
+				val.text = row_data[1]
+				val.add_theme_font_size_override("font_size", 12)
+				val.add_theme_color_override("font_color", Color(0.65, 0.75, 0.9))
+				row.add_child(val)
+
 	# === バージョン情報 ===
 	_add_section_label("About")
 
