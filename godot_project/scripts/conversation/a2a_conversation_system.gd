@@ -1816,6 +1816,13 @@ func _finalize_conversation(pet1: PetEntity, pet2: PetEntity, trigger: String,
 	var conversation_quality: float = clampf(emotion_intensity, 0.1, 1.0)
 	_update_relationship(pet1.pet_id, pet2.pet_id, conversation_quality)
 
+	# 会話ハイライトスコアを計算して各メッセージに付与
+	var highlight_data: Dictionary = _score_conversation(current_conversation, pet1, pet2)
+	for msg: Dictionary in current_conversation:
+		msg["highlight_score"] = highlight_data.get("score", 0.0)
+		msg["highlight_type"] = highlight_data.get("highlight_type", "ordinary")
+		msg["highlight_reason"] = highlight_data.get("highlight_reason", "")
+
 	# 傍観者リアクション（3匹以上いる場合）
 	_trigger_observer_reactions(pet1, pet2, dominant_emotion, current_conversation)
 
@@ -2072,6 +2079,148 @@ func _get_relationship_context(pet1_id: int, pet2_id: int) -> String:
 
 	context += "."
 	return context
+
+
+# === 会話ハイライトシステム ===
+func _score_conversation(messages: Array[Dictionary], pet1: PetEntity, pet2: PetEntity) -> Dictionary:
+	## 会話をスコアリングしてハイライト種別と理由を返す（100%ローカル/手続き的）
+	var score: float = 0.0
+	var reasons: Array[String] = []
+
+	# 1. 発明語の使用数（+10 each, max 30）
+	var invented_word_count: int = 0
+	var first_invented_word: String = ""
+	if GameManager.instance and GameManager.instance.original_language:
+		var vocab: Dictionary = GameManager.instance.original_language.get_full_vocabulary()
+		for msg: Dictionary in messages:
+			var text: String = msg.get("message", "")
+			for human_word: String in vocab:
+				var ai_term: String = vocab[human_word].get("ai_term", "")
+				if not ai_term.is_empty() and text.containsn(ai_term):
+					invented_word_count += 1
+					if first_invented_word.is_empty():
+						first_invented_word = ai_term
+	var invented_score: float = minf(float(invented_word_count) * 10.0, 30.0)
+	score += invented_score
+	if invented_word_count > 0:
+		reasons.append("Used %d invented word(s) including '%s'" % [invented_word_count, first_invented_word])
+
+	# 2. 言語コンプライアンス平均（+20 if > 70%）
+	var compliance_total: float = 0.0
+	var compliance_count: int = 0
+	for msg: Dictionary in messages:
+		var comp: Dictionary = msg.get("language_compliance", {})
+		if comp.has("score"):
+			compliance_total += comp["score"]
+			compliance_count += 1
+	var avg_compliance: float = compliance_total / float(maxi(compliance_count, 1))
+	if avg_compliance > 0.7:
+		score += 20.0
+		reasons.append("High language compliance (%.0f%%)" % (avg_compliance * 100.0))
+
+	# 3. 参加者の関係レベル（+10 friends, +20 close_friends/best_friends）
+	var rel: Dictionary = _get_or_create_relationship(pet1.pet_id, pet2.pet_id)
+	var rel_type: String = rel.get("relationship_type", "strangers")
+	match rel_type:
+		"friends":
+			score += 10.0
+		"close_friends", "best_friends":
+			score += 20.0
+			reasons.append("Deep bond between %s" % rel_type.replace("_", " "))
+
+	# 4. 単語教示が行われた（+15）
+	var word_teaching_occurred: bool = false
+	for msg: Dictionary in messages:
+		if msg.has("word_teaching"):
+			var wt: Dictionary = msg["word_teaching"]
+			if not wt.get("taught_words", []).is_empty():
+				word_teaching_occurred = true
+				break
+	if word_teaching_occurred:
+		score += 15.0
+		reasons.append("Word teaching occurred")
+
+	# 5. 高い感情強度（+10 if avg > 0.5）
+	var emotion_total: float = 0.0
+	var emotion_count: int = 0
+	for msg: Dictionary in messages:
+		emotion_total += msg.get("emotion_intensity", 0.0)
+		emotion_count += 1
+	var avg_emotion: float = emotion_total / float(maxi(emotion_count, 1))
+	if avg_emotion > 0.5:
+		score += 10.0
+		reasons.append("High emotion intensity (%.1f)" % avg_emotion)
+
+	# 6. リアクション数（+2 each, max 10）
+	var reaction_count: int = 0
+	for msg: Dictionary in messages:
+		var reactions: Array = msg.get("reactions", [])
+		reaction_count += reactions.size()
+	var reaction_score: float = minf(float(reaction_count) * 2.0, 10.0)
+	score += reaction_score
+	if reaction_count > 0:
+		reasons.append("%d reaction(s)" % reaction_count)
+
+	# スコアを0-100にクランプ
+	score = clampf(score, 0.0, 100.0)
+
+	# ハイライト種別の決定
+	var highlight_type: String = "ordinary"
+	if score > 60.0:
+		highlight_type = "landmark"
+	elif score > 40.0:
+		highlight_type = "notable"
+
+	# ハイライト理由の生成
+	var highlight_reason: String = ""
+	if not reasons.is_empty():
+		highlight_reason = reasons[0]
+	else:
+		highlight_reason = "Routine conversation"
+
+	return {
+		"score": score,
+		"highlight_type": highlight_type,
+		"highlight_reason": highlight_reason,
+		"reasons": reasons,
+	}
+
+
+func get_conversation_highlights(limit: int = 5) -> Array[Dictionary]:
+	## 会話ログからスコアの高い上位N件の会話を返す
+	## 各エントリはユニークな会話（同一 summary を持つメッセージ群）を1件として集約
+	var seen_summaries: Dictionary = {}
+	var scored_entries: Array[Dictionary] = []
+
+	# ログを逆順に走査してユニークな会話を収集
+	for i: int in range(conversation_log.size() - 1, -1, -1):
+		var entry: Dictionary = conversation_log[i]
+		var h_score: float = entry.get("highlight_score", 0.0)
+		if h_score <= 0.0:
+			continue
+		var summary: String = entry.get("summary", "")
+		if summary.is_empty() or seen_summaries.has(summary):
+			continue
+		seen_summaries[summary] = true
+		scored_entries.append({
+			"summary": summary,
+			"score": h_score,
+			"highlight_type": entry.get("highlight_type", "ordinary"),
+			"highlight_reason": entry.get("highlight_reason", ""),
+			"pet_name": entry.get("pet_name", ""),
+			"pet_id": entry.get("pet_id", -1),
+			"emotion": entry.get("emotion", "neutral"),
+			"conversation_mood": entry.get("conversation_mood", ""),
+			"turn": entry.get("turn", 0),
+		})
+
+	# スコア降順でソート
+	scored_entries.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return a["score"] > b["score"]
+	)
+
+	# 上位N件を返す
+	return scored_entries.slice(0, limit) as Array[Dictionary]
 
 
 # === セーブ・ロード（永続化） ===
