@@ -15,6 +15,10 @@ enum NotifyType {
 	LONELY,       ## 放置されている
 	CONVERSATION, ## AtoA会話が発生
 	NEW_WORD,     ## 新しい単語が発明された
+	RELATIONSHIP_UPGRADE,  ## ペット同士が友達/親友になった
+	WORD_TAUGHT,           ## ペットが他ペットに言葉を教えた
+	LANDMARK_CONVERSATION, ## 高スコア会話が発生
+	LANGUAGE_MILESTONE,    ## 言語が新しいステージに進化
 }
 
 ## 通知データ
@@ -48,11 +52,37 @@ const NOTIFY_DATA: Dictionary = {
 		"icon": "🗣️",
 		"text": "",  # 動的に設定
 		"color": Color(0.3, 0.7, 0.5),
+		"duration": DISPLAY_DURATION,
 	},
 	NotifyType.NEW_WORD: {
 		"icon": "📚",
 		"text": "",  # 動的に設定
 		"color": Color(0.6, 0.4, 0.8),
+		"duration": DISPLAY_DURATION,
+	},
+	NotifyType.RELATIONSHIP_UPGRADE: {
+		"icon": "💕",
+		"text": "",  # 動的に設定
+		"color": Color(0.85, 0.45, 0.65),
+		"duration": 5.0,
+	},
+	NotifyType.WORD_TAUGHT: {
+		"icon": "🎓",
+		"text": "",  # 動的に設定
+		"color": Color(0.4, 0.65, 0.85),
+		"duration": DISPLAY_DURATION,
+	},
+	NotifyType.LANDMARK_CONVERSATION: {
+		"icon": "⭐",
+		"text": "",  # 動的に設定
+		"color": Color(0.9, 0.75, 0.2),
+		"duration": 6.0,
+	},
+	NotifyType.LANGUAGE_MILESTONE: {
+		"icon": "🌱",
+		"text": "",  # 動的に設定
+		"color": Color(0.3, 0.8, 0.45),
+		"duration": 6.0,
 	},
 }
 
@@ -70,6 +100,13 @@ var _container: VBoxContainer
 var _next_y_offset: float = 0.0
 ## 動的テキスト用: NotifyType → String のキー
 var _dynamic_text_queue: Dictionary = {}
+
+## AtoAイベント定期チェック用
+var _a2a_check_timer: float = 0.0
+const A2A_CHECK_INTERVAL: float = 5.0
+var _last_known_conversation_count: int = 0
+var _last_known_relationship_types: Dictionary = {}  # "petA_petB" → relationship_type
+var _last_known_language_stage: int = -1
 
 
 func _ready() -> void:
@@ -94,11 +131,17 @@ func _process(delta: float) -> void:
 	for key: int in _cooldowns.keys():
 		_cooldowns[key] = maxf(0.0, _cooldowns[key] - delta)
 
-	# チェック間隔
+	# ペットケアチェック間隔
 	_check_timer += delta
 	if _check_timer >= CHECK_INTERVAL:
 		_check_timer = 0.0
 		_check_pet_needs()
+
+	# AtoAイベント定期ポーリング
+	_a2a_check_timer += delta
+	if _a2a_check_timer >= A2A_CHECK_INTERVAL:
+		_a2a_check_timer = 0.0
+		_poll_a2a_events()
 
 
 func _check_pet_needs() -> void:
@@ -189,6 +232,7 @@ func _show_notification(notify_type: NotifyType) -> void:
 
 
 func _dismiss_notification(notify_type: NotifyType, panel: PanelContainer) -> void:
+
 	if not is_instance_valid(panel):
 		_active_notifications.erase(notify_type)
 		return
@@ -207,13 +251,21 @@ func _connect_external_signals() -> void:
 
 	# AtoAConversationSystem の conversation_ended に接続
 	var a2a_system: Node = _find_system_node("AtoAConversationSystem")
-	if a2a_system and a2a_system.has_signal("conversation_ended"):
-		a2a_system.conversation_ended.connect(_on_conversation_ended)
+	if a2a_system:
+		if a2a_system.has_signal("conversation_ended"):
+			a2a_system.conversation_ended.connect(_on_conversation_ended)
+		if a2a_system.has_signal("relationship_changed"):
+			a2a_system.relationship_changed.connect(_on_relationship_changed)
+		if a2a_system.has_signal("word_taught"):
+			a2a_system.word_taught.connect(_on_word_taught)
 
 	# OriginalLanguageEngine の word_invented に接続
 	var lang_engine: Node = _find_system_node("OriginalLanguageEngine")
-	if lang_engine and lang_engine.has_signal("word_invented"):
-		lang_engine.word_invented.connect(_on_word_invented)
+	if lang_engine:
+		if lang_engine.has_signal("word_invented"):
+			lang_engine.word_invented.connect(_on_word_invented)
+		if lang_engine.has_signal("language_stage_advanced"):
+			lang_engine.language_stage_advanced.connect(_on_language_stage_advanced)
 
 
 func _find_system_node(class_name_str: String) -> Node:
