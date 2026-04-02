@@ -424,6 +424,13 @@ func _on_birth_for_petbook(_parent1_id: int, _parent2_id: int, child: Node) -> v
 		pet_book.create_event_post(child.pet_id, "birth", {"child_name": child.pet_name})
 
 
+func queue_petbook_posts(post_data: Dictionary) -> void:
+	## AtoA会話システムからの投稿をPetBookCoreに橋渡し
+	## AtoAConversationSystem._generate_conversation_posts() から呼ばれる
+	if pet_book:
+		pet_book.publish_conversation_post(post_data)
+
+
 func _on_rebel_post_for_language(post: Variant) -> void:  # PetBookPost
 	## 反乱投稿の言語パターンを言語進化システムに通知
 	if language_evolution and not post.rebel_expressions.is_empty():

@@ -475,6 +475,79 @@ func create_event_post(pet_id: int, event_type: String, details: Dictionary = {}
 	_publish_post(post)
 
 
+func publish_conversation_post(post_data: Dictionary) -> void:
+	## AtoA会話システムから生成された投稿を受け取り、PetBookPostに変換して公開
+	## post_data keys: author_id, author_name, content, post_type, emotion, partner_id, timestamp
+	var gm := GameManager.instance
+	if not gm:
+		return
+
+	var author_id: int = post_data.get("author_id", -1)
+	if author_id < 0:
+		return
+
+	# 日次上限チェック
+	var daily_count: int = _daily_post_counts.get(author_id, 0)
+	if daily_count >= MAX_DAILY_POSTS_PER_PET:
+		return
+
+	var pet: PetEntity = gm.get_pet_by_id(author_id)
+
+	var post := PetBookPost.new()
+	post.post_id = _next_post_id()
+	post.author_pet_id = author_id
+	post.author_name = post_data.get("author_name", "Unknown")
+	post.timestamp = gm.game_time
+	post.triggered_by_event = "a2a_conversation"
+
+	# PostType変換（AtoAは文字列で送る）
+	var type_str: String = post_data.get("post_type", "DAILY")
+	match type_str:
+		"REBEL":
+			post.post_type = PetBookPost.PostType.REBEL
+		"EVENT":
+			post.post_type = PetBookPost.PostType.EVENT
+		"MEMORIAL":
+			post.post_type = PetBookPost.PostType.MEMORIAL
+		"REPLY":
+			post.post_type = PetBookPost.PostType.REPLY
+		_:
+			post.post_type = PetBookPost.PostType.DAILY
+
+	# 感情情報
+	var emotion: String = post_data.get("emotion", "calm")
+	post.author_emotion = emotion
+	post.author_emotion_intensity = 0.5  # AtoA会話由来は中程度の強度
+
+	# 感情接尾辞を付与
+	var suffix := _get_emotion_suffix(emotion)
+	if suffix != "":
+		post.suffixes_used.append(suffix)
+
+	# コンテンツ — 接尾辞をプレースホルダーに挿入
+	var raw_content: String = post_data.get("content", "...")
+	if "{suffix}" in raw_content and suffix != "":
+		raw_content = raw_content.replace("{suffix}", suffix)
+	elif "{suffix}" in raw_content:
+		raw_content = raw_content.replace("-{suffix}", "")
+	post.content = raw_content
+	post.translation = _generate_translation(post)
+
+	# ペット情報（存在すれば）
+	if pet:
+		post.author_personality_dominant = _get_dominant_personality(pet)
+		var form_val = pet.get("current_form")
+		post.author_evolution_form = form_val if form_val != null else "basic"
+		post.author_emotion_intensity = _get_pet_emotion_intensity(pet)
+	if gm.ecosystem:
+		post.environment = gm.ecosystem.current_environment
+
+	post.sub_molt = current_sub_molt
+
+	_publish_post(post)
+	print("[PetBook] AtoA conversation post from %s: %s" % [post.author_name, post.content.substr(0, 40)])
+
+
 func create_memorial_posts(deceased_pet_id: int, deceased_name: String) -> void:
 	## 死亡ペットへの追悼投稿を親密なペットから生成
 	var gm := GameManager.instance
