@@ -17,6 +17,7 @@ extends Control
 @onready var feed_button: Button = $UIPanel/VBox/ActionButtons/FeedButton
 @onready var pet_button: Button = $UIPanel/VBox/ActionButtons/PetButton
 @onready var play_button: Button = $UIPanel/VBox/ActionButtons/PlayButton
+@onready var chat_button: Button = $UIPanel/VBox/ActionButtons/ChatButton
 @onready var petbook_button: Button = $UIPanel/VBox/ActionButtons/PetBookButton
 @onready var condition_label: Label = $UIPanel/VBox/ConditionLabel
 @onready var env_button: Button = $UIPanel/VBox/NavButtons/EnvButton
@@ -110,6 +111,7 @@ func _ready() -> void:
 	feed_button.pressed.connect(_on_feed_pressed)
 	pet_button.pressed.connect(_on_pet_pressed)
 	play_button.pressed.connect(_on_play_pressed)
+	chat_button.pressed.connect(_on_chat_pressed)
 	petbook_button.pressed.connect(_on_petbook_pressed)
 	env_button.pressed.connect(_on_env_pressed)
 	pets_button.pressed.connect(_on_pets_pressed)
@@ -707,6 +709,19 @@ func _on_env_pressed() -> void:
 	add_child(env_sel)
 
 
+func _on_chat_pressed() -> void:
+	_animate_button(chat_button)
+	if _sfx:
+		_sfx.play(SfxManager.SfxType.UI_OPEN)
+	var chat_viewer: ConversationLogViewer = ConversationLogViewer.new()
+	chat_viewer.back_requested.connect(func() -> void:
+		chat_viewer.queue_free()
+		_fade_in_main_ui()
+	)
+	await _fade_out_main_ui()
+	add_child(chat_viewer)
+
+
 func _on_petbook_pressed() -> void:
 	if petbook_screen:
 		return
@@ -752,6 +767,7 @@ func _apply_ui_theme() -> void:
 	_style_action_button(feed_button, UI_FEED_COLOR, "🍖 Feed")
 	_style_action_button(pet_button, UI_PET_COLOR, "🤚 Pet")
 	_style_action_button(play_button, UI_PLAY_COLOR, "⚽ Play")
+	_style_action_button(chat_button, Color(0.4, 0.65, 0.85), "💬 Chat")
 	_style_action_button(petbook_button, UI_BOOK_COLOR, "📱 Book")
 
 	# ナビボタン

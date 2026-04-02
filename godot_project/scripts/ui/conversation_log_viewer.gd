@@ -1,0 +1,241 @@
+## ConversationLogViewer — AtoA会話ログをスクロール可能なUIで表示
+## メイン画面のPetBookボタン隣に「💬 Chat」ボタンを追加し、
+## ペット同士の過去の会話を閲覧 + 言語進化状況を可視化
+class_name ConversationLogViewer
+extends Control
+
+signal back_requested
+
+var _vbox: VBoxContainer
+var _scroll: ScrollContainer
+
+
+func _ready() -> void:
+	set_anchors_preset(PRESET_FULL_RECT)
+	_build_ui()
+
+
+func _build_ui() -> void:
+	# 背景
+	var bg: ColorRect = ColorRect.new()
+	bg.color = Color(0.06, 0.07, 0.12)
+	bg.set_anchors_preset(PRESET_FULL_RECT)
+	add_child(bg)
+
+	# ヘッダー
+	var header: HBoxContainer = HBoxContainer.new()
+	header.set_anchors_preset(PRESET_TOP_WIDE)
+	header.offset_bottom = 48
+	header.offset_left = 8
+	header.offset_right = -8
+	add_child(header)
+
+	var back_btn: Button = Button.new()
+	back_btn.text = "< Back"
+	back_btn.pressed.connect(func() -> void: back_requested.emit())
+	var btn_style: StyleBoxFlat = StyleBoxFlat.new()
+	btn_style.bg_color = Color(0.2, 0.22, 0.32)
+	btn_style.corner_radius_top_left = 8
+	btn_style.corner_radius_top_right = 8
+	btn_style.corner_radius_bottom_left = 8
+	btn_style.corner_radius_bottom_right = 8
+	back_btn.add_theme_stylebox_override("normal", btn_style)
+	back_btn.add_theme_color_override("font_color", Color(0.7, 0.75, 0.85))
+	header.add_child(back_btn)
+
+	var title: Label = Label.new()
+	title.text = "  💬 AtoA Conversations"
+	title.add_theme_font_size_override("font_size", 18)
+	title.add_theme_color_override("font_color", Color(0.9, 0.9, 1.0))
+	header.add_child(title)
+
+	# スクロールエリア
+	_scroll = ScrollContainer.new()
+	_scroll.set_anchors_preset(PRESET_FULL_RECT)
+	_scroll.offset_top = 52
+	_scroll.offset_left = 8
+	_scroll.offset_right = -8
+	_scroll.offset_bottom = -8
+	add_child(_scroll)
+
+	_vbox = VBoxContainer.new()
+	_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_vbox.add_theme_constant_override("separation", 12)
+	_scroll.add_child(_vbox)
+
+	# 言語進化ステータスカード
+	_add_language_status_card()
+
+	# 会話ログを表示
+	_add_conversation_log()
+
+
+func _add_language_status_card() -> void:
+	var card: PanelContainer = PanelContainer.new()
+	var card_style: StyleBoxFlat = StyleBoxFlat.new()
+	card_style.bg_color = Color(0.1, 0.12, 0.2, 0.8)
+	card_style.corner_radius_top_left = 12
+	card_style.corner_radius_top_right = 12
+	card_style.corner_radius_bottom_left = 12
+	card_style.corner_radius_bottom_right = 12
+	card_style.border_width_left = 1
+	card_style.border_width_right = 1
+	card_style.border_width_top = 1
+	card_style.border_width_bottom = 1
+	card_style.border_color = Color(0.3, 0.35, 0.5, 0.4)
+	card_style.content_margin_left = 12
+	card_style.content_margin_right = 12
+	card_style.content_margin_top = 8
+	card_style.content_margin_bottom = 8
+	card.add_theme_stylebox_override("panel", card_style)
+	_vbox.add_child(card)
+
+	var card_vbox: VBoxContainer = VBoxContainer.new()
+	card_vbox.add_theme_constant_override("separation", 4)
+	card.add_child(card_vbox)
+
+	# タイトル
+	var card_title: Label = Label.new()
+	card_title.text = "🧬 Language Evolution"
+	card_title.add_theme_font_size_override("font_size", 14)
+	card_title.add_theme_color_override("font_color", Color(0.6, 0.8, 1.0))
+	card_vbox.add_child(card_title)
+
+	# 言語ステージ
+	if GameManager.instance and GameManager.instance.original_language:
+		var stage_info: Dictionary = GameManager.instance.original_language.get_language_stage()
+		var stage_label: Label = Label.new()
+		stage_label.text = "Stage %d: %s  |  %d words invented" % [
+			stage_info["stage"] + 1, stage_info["name"], stage_info["vocabulary_size"]
+		]
+		stage_label.add_theme_font_size_override("font_size", 12)
+		stage_label.add_theme_color_override("font_color", Color(0.7, 0.75, 0.85))
+		card_vbox.add_child(stage_label)
+
+	# 文法情報
+	if GameManager.language_evolution:
+		var grammar: Dictionary = GameManager.language_evolution.get_current_grammar()
+		var grammar_label: Label = Label.new()
+		grammar_label.text = "Word order: %s  |  Suffixes: %d  |  Prepositions: %d" % [
+			grammar["word_order"],
+			grammar["suffixes"].size(),
+			grammar["prepositions"].size(),
+		]
+		grammar_label.add_theme_font_size_override("font_size", 11)
+		grammar_label.add_theme_color_override("font_color", Color(0.55, 0.6, 0.75))
+		card_vbox.add_child(grammar_label)
+
+		# 接尾辞一覧
+		var suffix_text: String = "Suffixes: " + ", ".join(grammar["suffixes"])
+		var suffix_label: Label = Label.new()
+		suffix_label.text = suffix_text
+		suffix_label.add_theme_font_size_override("font_size", 10)
+		suffix_label.add_theme_color_override("font_color", Color(0.5, 0.55, 0.7))
+		suffix_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+		card_vbox.add_child(suffix_label)
+
+	# 語彙サマリー
+	if GameManager.instance and GameManager.instance.original_language:
+		var vocab_label: Label = Label.new()
+		vocab_label.text = GameManager.instance.original_language.get_vocabulary_summary()
+		vocab_label.add_theme_font_size_override("font_size", 10)
+		vocab_label.add_theme_color_override("font_color", Color(0.5, 0.7, 0.5))
+		vocab_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+		card_vbox.add_child(vocab_label)
+
+
+func _add_conversation_log() -> void:
+	if not GameManager.instance or not GameManager.instance.a2a_system:
+		var empty_label: Label = Label.new()
+		empty_label.text = "No conversations yet. Pets will start talking when emotions run high!"
+		empty_label.add_theme_font_size_override("font_size", 13)
+		empty_label.add_theme_color_override("font_color", Color(0.5, 0.5, 0.6))
+		empty_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+		_vbox.add_child(empty_label)
+		return
+
+	var log: Array = GameManager.instance.a2a_system.conversation_log
+	if log.is_empty():
+		var empty_label: Label = Label.new()
+		empty_label.text = "No conversations yet.\n\nPets automatically start talking every 3 minutes when their emotions are strong enough (>40%).\n\nTry feeding, petting, or playing to increase emotions!"
+		empty_label.add_theme_font_size_override("font_size", 12)
+		empty_label.add_theme_color_override("font_color", Color(0.5, 0.5, 0.6))
+		empty_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+		_vbox.add_child(empty_label)
+		return
+
+	# セクションタイトル
+	var log_title: Label = Label.new()
+	log_title.text = "📜 Recent Conversations (%d total)" % log.size()
+	log_title.add_theme_font_size_override("font_size", 14)
+	log_title.add_theme_color_override("font_color", Color(0.7, 0.7, 0.85))
+	_vbox.add_child(log_title)
+
+	# 最新20件を逆順で表示
+	var display_log: Array = log.slice(-20)
+	display_log.reverse()
+
+	for msg: Variant in display_log:
+		if not msg is Dictionary:
+			continue
+		_add_message_bubble(msg as Dictionary)
+
+
+func _add_message_bubble(msg: Dictionary) -> void:
+	var pet_name: String = msg.get("pet_name", "???")
+	var text: String = msg.get("message", "...")
+	var emotion: String = msg.get("emotion", "neutral")
+	var is_template: bool = msg.get("is_template", false)
+
+	var bubble: PanelContainer = PanelContainer.new()
+	var bubble_style: StyleBoxFlat = StyleBoxFlat.new()
+
+	# 感情に応じた色
+	var emotion_colors: Dictionary = {
+		"joy": Color(0.15, 0.18, 0.1),
+		"love": Color(0.18, 0.12, 0.15),
+		"excitement": Color(0.18, 0.16, 0.08),
+		"sadness": Color(0.1, 0.12, 0.18),
+		"fear": Color(0.14, 0.1, 0.16),
+		"neutral": Color(0.1, 0.11, 0.16),
+	}
+	bubble_style.bg_color = emotion_colors.get(emotion, Color(0.1, 0.11, 0.16))
+	bubble_style.corner_radius_top_left = 10
+	bubble_style.corner_radius_top_right = 10
+	bubble_style.corner_radius_bottom_left = 10
+	bubble_style.corner_radius_bottom_right = 10
+	bubble_style.content_margin_left = 10
+	bubble_style.content_margin_right = 10
+	bubble_style.content_margin_top = 6
+	bubble_style.content_margin_bottom = 6
+
+	if is_template:
+		bubble_style.border_width_left = 1
+		bubble_style.border_color = Color(0.4, 0.35, 0.2, 0.3)
+
+	bubble.add_theme_stylebox_override("panel", bubble_style)
+	_vbox.add_child(bubble)
+
+	var content: VBoxContainer = VBoxContainer.new()
+	content.add_theme_constant_override("separation", 2)
+	bubble.add_child(content)
+
+	# ペット名 + 感情
+	var emotion_icons: Dictionary = {
+		"joy": "☀", "love": "♥", "excitement": "⚡",
+		"sadness": "💧", "fear": "👁", "neutral": "·",
+	}
+	var header: Label = Label.new()
+	var template_tag: String = " [template]" if is_template else ""
+	header.text = "%s %s%s" % [emotion_icons.get(emotion, "·"), pet_name, template_tag]
+	header.add_theme_font_size_override("font_size", 11)
+	header.add_theme_color_override("font_color", Color(0.6, 0.65, 0.8))
+	content.add_child(header)
+
+	# メッセージ本文
+	var body: Label = Label.new()
+	body.text = text
+	body.add_theme_font_size_override("font_size", 13)
+	body.add_theme_color_override("font_color", Color(0.85, 0.85, 0.9))
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD
+	content.add_child(body)

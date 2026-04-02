@@ -159,6 +159,11 @@ custom_minimum_size = Vector2(90, 48)
 layout_mode = 2
 text = "⚽ Play"
 
+[node name="ChatButton" type="Button" parent="UIPanel/VBox/ActionButtons"]
+custom_minimum_size = Vector2(90, 48)
+layout_mode = 2
+text = "💬 Chat"
+
 [node name="PetBookButton" type="Button" parent="UIPanel/VBox/ActionButtons"]
 custom_minimum_size = Vector2(90, 48)
 layout_mode = 2
