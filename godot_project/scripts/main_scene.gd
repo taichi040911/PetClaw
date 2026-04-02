@@ -186,6 +186,16 @@ func _connect_game_signals() -> void:
 				_on_conversation_message
 			)
 
+	# 言語進化通知（メイン画面でもライブ表示）
+	if GameManager.instance.original_language:
+		if GameManager.instance.original_language.has_signal("word_invented"):
+			GameManager.instance.original_language.word_invented.connect(_on_word_invented)
+		if GameManager.instance.original_language.has_signal("language_stage_advanced"):
+			GameManager.instance.original_language.language_stage_advanced.connect(_on_language_stage_up)
+	if GameManager.language_evolution:
+		if GameManager.language_evolution.has_signal("suffix_created"):
+			GameManager.language_evolution.suffix_created.connect(_on_suffix_created)
+
 	# 死亡シグナル
 	if GameManager.instance.life_death:
 		if GameManager.instance.life_death.has_signal("pet_died"):
@@ -570,14 +580,55 @@ func _on_conversation_message(pet_id: int, message: String, metadata: Dictionary
 	if GameManager.instance and GameManager.instance.pets.has(pet_id):
 		pet_name = GameManager.instance.pets[pet_id].pet_name
 
-	var is_left: bool = metadata.get("turn_index", 0) % 2 == 0
+	var turn_num: int = metadata.get("turn", metadata.get("turn_index", 0))
+	var is_left: bool = turn_num % 2 == 0
+	var display_name: String = pet_name
+	if metadata.get("is_template", false):
+		display_name += " [T]"
 
 	_conversation_bubble.show_conversation([{
-		"pet_name": pet_name,
+		"pet_name": display_name,
 		"text": message,
 		"emotion": metadata.get("emotion", "neutral"),
 		"is_left": is_left,
 	}])
+
+
+# === Language Evolution Notifications ===
+
+func _on_word_invented(word_data: Dictionary) -> void:
+	var ai_term: String = word_data.get("ai_term", "???")
+	var human_word: String = word_data.get("human_word", "???")
+	_show_language_toast("✨ New word: %s = '%s'" % [ai_term, human_word], Color(0.7, 0.6, 1.0))
+
+
+func _on_language_stage_up(new_stage: int, stage_name: String) -> void:
+	_show_language_toast("🎉 Language Stage %d: %s!" % [new_stage + 1, stage_name], Color(1.0, 0.85, 0.3))
+
+
+func _on_suffix_created(suffix: String, _context: String, _reason: String) -> void:
+	_show_language_toast("🔤 New suffix: %s" % suffix, Color(0.5, 0.8, 0.5))
+
+
+func _show_language_toast(text: String, color: Color) -> void:
+	var toast: Label = Label.new()
+	toast.text = text
+	toast.add_theme_font_size_override("font_size", 13)
+	toast.add_theme_color_override("font_color", color)
+	toast.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	toast.set_anchors_preset(PRESET_TOP_WIDE)
+	toast.offset_top = 8
+	toast.offset_left = 16
+	toast.offset_right = -16
+	toast.modulate.a = 0.0
+	add_child(toast)
+
+	# フェードイン → 表示 → フェードアウト → 削除
+	var tween: Tween = create_tween()
+	tween.tween_property(toast, "modulate:a", 1.0, 0.3)
+	tween.tween_interval(2.5)
+	tween.tween_property(toast, "modulate:a", 0.0, 0.5)
+	tween.tween_callback(toast.queue_free)
 
 
 # === Pet Death ===
