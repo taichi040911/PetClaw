@@ -226,8 +226,18 @@ class KarpathyLoop:
 
         # Count template strings (quoted strings in template dictionaries)
         template_strings = re.findall(r'"[^"]{10,}"', content)
-        # Estimate prompt length by counting chars in long strings
-        prompt_chars = sum(len(s) for s in template_strings)
+        # Estimate prompt length: only count strings inside _build_*_prompt functions
+        # (not template arrays which are data, not sent per-turn)
+        prompt_section = ""
+        for fn_match in re.finditer(
+            r'func _build_\w*prompt\b.*?(?=\nfunc |\Z)', content, re.DOTALL
+        ):
+            prompt_section += fn_match.group(0)
+        prompt_strings = re.findall(r'"[^"]{10,}"', prompt_section)
+        prompt_chars = sum(len(s) for s in prompt_strings) if prompt_strings else 0
+        # Fallback: if no prompt functions found, use a conservative estimate
+        if prompt_chars == 0 and template_strings:
+            prompt_chars = min(sum(len(s) for s in template_strings), 8000)
         # Count template categories (keys in template dictionaries)
         template_categories = re.findall(
             r'"(\w+)"\s*:\s*\[', content
