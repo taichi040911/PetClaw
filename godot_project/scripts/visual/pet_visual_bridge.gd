@@ -25,6 +25,7 @@ var _is_blinking: bool = false
 # === Sprite Cache ===
 var _current_form_id: String = ""
 var _expression_textures: Dictionary = {}  # "eyes_happy" → Texture2D etc.
+var _current_expression: String = "neutral"  # 現在の表情
 
 # === Color Mapping (感情→ペットの色味変化) ===
 const EMOTION_COLORS: Dictionary = {
@@ -307,6 +308,9 @@ func _update_emotion_visuals() -> void:
 		var eye_tint: Color = target_color.lerp(Color.WHITE, 0.7)
 		eyes_sprite.modulate = eyes_sprite.modulate.lerp(eye_tint, 0.08)
 
+	# 表情テクスチャの更新（感情に応じた目と口）
+	_update_expression(dominant_emotion)
+
 	# パーティクルの制御 — 感情が強い時に放出
 	if emotion_particles:
 		if max_intensity > 0.6:
@@ -320,6 +324,35 @@ func _update_emotion_visuals() -> void:
 			emotion_particles.emitting = true
 		else:
 			emotion_particles.emitting = false
+
+
+func _update_expression(dominant_emotion: String) -> void:
+	# 夜間は眠い表情にオーバーライド
+	var target_expression: String = dominant_emotion
+	if DayNightCycle.instance and DayNightCycle.instance.is_sleepy_time():
+		target_expression = "sleepy"
+
+	if target_expression == _current_expression:
+		return
+	_current_expression = target_expression
+
+	# 目テクスチャ更新
+	if eyes_sprite:
+		if target_expression == "sleepy":
+			eyes_sprite.texture = ExpressionGenerator.get_sleepy_eye_texture()
+		else:
+			eyes_sprite.texture = ExpressionGenerator.get_eye_texture(dominant_emotion)
+		eyes_sprite.visible = true
+		eyes_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+
+	# 口テクスチャ更新
+	if mouth_sprite:
+		if target_expression == "sleepy":
+			mouth_sprite.texture = ExpressionGenerator.get_sleepy_mouth_texture()
+		else:
+			mouth_sprite.texture = ExpressionGenerator.get_mouth_texture(dominant_emotion)
+		mouth_sprite.visible = true
+		mouth_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 
 
 func _on_emotion_changed(emotion: String, intensity: float) -> void:
