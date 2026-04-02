@@ -160,11 +160,16 @@ func _update_status() -> void:
 	var status: Dictionary = a2a.get_conversation_status()
 
 	var active_text: String = "🟢 Active" if status["is_active"] else "⚪ Idle"
-	_status_label.text = "%s | Budget: $%.2f | Today: %d/%d" % [
+	var compliance: float = status.get("avg_compliance", 0.0)
+	var compliance_text: String = ""
+	if compliance > 0.0:
+		compliance_text = " | Lang: %.0f%%" % (compliance * 100.0)
+	_status_label.text = "%s | $%.2f | %d/%d%s" % [
 		active_text,
 		status["budget_remaining"],
 		status["daily_count"],
 		status["max_daily"],
+		compliance_text,
 	]
 
 	# 会話中はボタンを無効化
@@ -275,8 +280,15 @@ func _add_message_bubble(msg: Dictionary) -> void:
 		"sadness": "💧", "fear": "👁", "neutral": "·",
 	}
 	var header: Label = Label.new()
-	var template_tag: String = " [template]" if is_template else ""
-	header.text = "%s %s%s" % [emotion_icons.get(emotion, "·"), pet_name, template_tag]
+	var tag: String = ""
+	if is_template:
+		tag = " [T]"
+	else:
+		var compliance: Dictionary = msg.get("language_compliance", {})
+		var score: float = compliance.get("score", -1.0)
+		if score >= 0.0:
+			tag = " [%.0f%%]" % (score * 100.0)
+	header.text = "%s %s%s" % [emotion_icons.get(emotion, "·"), pet_name, tag]
 	header.add_theme_font_size_override("font_size", 11)
 	header.add_theme_color_override("font_color", Color(0.6, 0.65, 0.8))
 	content.add_child(header)
