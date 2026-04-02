@@ -453,15 +453,14 @@ func save_game() -> void:
 		"language": language_evolution.to_dict(),
 		"original_language": original_language.to_dict(),
 		"biological_memory": biological_memory.to_dict(),
-		"ecosystem": {
-			"environment": ecosystem.current_environment,
-			"climate": ecosystem.climate_intensity,
-		},
+		"ecosystem": ecosystem.to_dict(),
 		"ethical_safeguard": ethical_safeguard.to_dict(),
 		"evolution_mechanics": evolution_mechanics.to_dict(),
 		"pet_autonomy": pet_autonomy.to_dict(),
 		"lifecycle_fsm": lifecycle_fsm.to_dict(),
 		"pet_book": pet_book.to_dict(),
+		"breeding": breeding.to_dict(),
+		"life_death": life_death.to_dict(),
 	}
 
 	for pet_id in pets:
@@ -508,10 +507,14 @@ func _load_game_data() -> void:
 	# 生物模倣記憶復元（オフライン整理も自動実行）
 	biological_memory.from_dict(data.get("biological_memory", {}))
 
-	# 環境復元
+	# 環境復元（後方互換: 旧フォーマット対応）
 	var eco_data: Dictionary = data.get("ecosystem", {})
-	ecosystem.current_environment = eco_data.get("environment", "forest")
-	ecosystem.climate_intensity = eco_data.get("climate", 0.5)
+	if eco_data.has("current_environment"):
+		ecosystem.from_dict(eco_data)
+	else:
+		# 旧セーブ形式
+		ecosystem.current_environment = eco_data.get("environment", "forest")
+		ecosystem.climate_intensity = eco_data.get("climate", 0.5)
 
 	# 倫理セーフガード復元
 	ethical_safeguard.from_dict(data.get("ethical_safeguard", {}))
@@ -525,6 +528,10 @@ func _load_game_data() -> void:
 
 	# ラウンド5: PetBook復元
 	pet_book.from_dict(data.get("pet_book", {}))
+
+	# ラウンド23: Breeding + LifeDeath復元
+	breeding.from_dict(data.get("breeding", {}))
+	life_death.from_dict(data.get("life_death", {}))
 
 	# ペット復元
 	for pet_id_str in data.get("pets", {}):
