@@ -7,6 +7,7 @@ signal conversation_started(participants: Array[int])
 signal conversation_ended(participants: Array[int], summary: String)
 signal conversation_message(pet_id: int, message: String, metadata: Dictionary)
 signal evolution_triggered_by_conversation(evolution_type: String)
+signal relationship_changed(pet1_id: int, pet2_id: int, new_type: String)
 
 # === パラメータ ===
 var auto_conversation_interval: float = 180.0     # 自動会話間隔（秒）— demo mode で短縮可能
@@ -26,6 +27,19 @@ var is_conversation_active: bool = false
 var conversation_log: Array[Dictionary] = []       # 全会話ログ
 var current_conversation: Array[Dictionary] = []   # 現在進行中の会話
 var last_daily_reset: int = 0                      # 最後にリセットされた日付
+
+# === Relationship Tracking ===
+# Key: "petA_petB" (sorted IDs), Value: Dictionary with affinity, conversations_together, shared_words, relationship_type
+var pet_relationships: Dictionary = {}
+
+# === 会話記憶（ペットごとの永続的記憶） ===
+# { pet_id: { topics_discussed, favorite_partner, mood_history, invented_words_used, conversation_count } }
+var conversation_memory: Dictionary = {}
+
+# 記憶サイズ上限
+const MAX_MEMORY_TOPICS: int = 20
+const MAX_MEMORY_MOODS: int = 10
+const MAX_MEMORY_INVENTED_WORDS: int = 30
 
 # === References ===
 var claude_client: ClaudeAPIClient  # Claude API連携クラス
@@ -288,6 +302,7 @@ func start_conversation(pet1: PetEntity, pet2: PetEntity, trigger: String) -> vo
 			"turn": turn,
 			"emotion": _get_dominant_emotion(current_pet),
 			"word_order": grammar["word_order"],
+			"trigger": context.get("trigger", ""),
 		}
 		# 性格方言フィルター（性格に応じてメッセージを微修正）
 		response = _apply_personality_dialect(response, current_pet)
@@ -299,6 +314,9 @@ func start_conversation(pet1: PetEntity, pet2: PetEntity, trigger: String) -> vo
 
 		current_conversation.append(message)
 		conversation_message.emit(current_pet.pet_id, response, message)
+
+		# 会話記憶を更新
+		_update_conversation_memory(current_pet.pet_id, message)
 
 		# 感情反応
 		_process_conversation_emotion(current_pet, other_pet, response)
@@ -522,10 +540,16 @@ func _build_turn_prompt(
 		for ps: Variant in past_summaries:
 			past_context += "- %s\n" % str(ps)
 
+	# 関係性コンテキスト
+	var relationship_context := ""
+	var rel_str: String = _get_relationship_context(speaker.pet_id, listener.pet_id)
+	if not rel_str.is_empty():
+		relationship_context = "\n%s" % rel_str
+
 	return """You are %s. Your personality: %s. Your current emotions: %s.
 You're talking to %s in a %s environment.
 Topics around you: %s
-%s%s%s%s
+%s%s%s%s%s
 %s
 
 Respond naturally as %s. Weave your memories into conversation naturally.
@@ -539,6 +563,7 @@ Turn %d of the conversation.""" % [
 		shared_context,
 		field_context_str,
 		past_context,
+		relationship_context,
 		recent_messages if recent_messages else "(Start the conversation)",
 		speaker.pet_name, turn + 1,
 	]
@@ -1214,6 +1239,127 @@ func _process_conversation_emotion(speaker: PetEntity, listener: PetEntity, mess
 			listener.emotions[opposite] = maxf(0.0, current - contagion_amount * 0.5)
 
 
+# === 会話記憶の更新 ===
+func _update_conversation_memory(pet_id: int, msg: Dictionary) -> void:
+	## 会話ターンごとにペットの会話記憶を更新
+	var pid_key: String = str(pet_id)
+	if not conversation_memory.has(pid_key):
+		conversation_memory[pid_key] = {
+			"topics_discussed": [],
+			"favorite_partner": -1,
+			"mood_history": [],
+			"invented_words_used": [],
+			"conversation_count": 0,
+			"partner_counts": {},
+		}
+
+	var mem: Dictionary = conversation_memory[pid_key]
+
+	# トピック追加（triggerベース）
+	var topic: String = msg.get("trigger", "")
+	if not topic.is_empty():
+		var topics: Array = mem.get("topics_discussed", [])
+		if topic not in topics:
+			topics.append(topic)
+		while topics.size() > MAX_MEMORY_TOPICS:
+			topics.pop_front()
+		mem["topics_discussed"] = topics
+
+	# ムード履歴
+	var emotion: String = msg.get("emotion", "")
+	if not emotion.is_empty() and emotion != "neutral":
+		var moods: Array = mem.get("mood_history", [])
+		moods.append(emotion)
+		while moods.size() > MAX_MEMORY_MOODS:
+			moods.pop_front()
+		mem["mood_history"] = moods
+
+	# 発明語の使用検出
+	if GameManager.instance and GameManager.instance.original_language:
+		var vocab: Dictionary = GameManager.instance.original_language.get_full_vocabulary()
+		var text: String = msg.get("message", "")
+		var inv_words: Array = mem.get("invented_words_used", [])
+		for key: String in vocab:
+			var entry: Dictionary = vocab[key]
+			var ai_term: String = entry.get("ai_term", "")
+			if not ai_term.is_empty() and text.containsn(ai_term) and ai_term not in inv_words:
+				inv_words.append(ai_term)
+		while inv_words.size() > MAX_MEMORY_INVENTED_WORDS:
+			inv_words.pop_front()
+		mem["invented_words_used"] = inv_words
+
+	conversation_memory[pid_key] = mem
+
+
+func _increment_conversation_count(pet_id: int, partner_id: int) -> void:
+	## 会話完了時にカウントとfavorite_partnerを更新
+	var pid_key: String = str(pet_id)
+	if not conversation_memory.has(pid_key):
+		conversation_memory[pid_key] = {
+			"topics_discussed": [],
+			"favorite_partner": -1,
+			"mood_history": [],
+			"invented_words_used": [],
+			"conversation_count": 0,
+			"partner_counts": {},
+		}
+
+	var mem: Dictionary = conversation_memory[pid_key]
+	mem["conversation_count"] = mem.get("conversation_count", 0) + 1
+
+	# パートナーカウント更新
+	var partner_key: String = str(partner_id)
+	var pcounts: Dictionary = mem.get("partner_counts", {})
+	pcounts[partner_key] = pcounts.get(partner_key, 0) + 1
+	mem["partner_counts"] = pcounts
+
+	# favorite_partner を再計算（最多会話相手）
+	var best_partner: int = -1
+	var best_count: int = 0
+	for pk: String in pcounts:
+		if pcounts[pk] > best_count:
+			best_count = pcounts[pk]
+			best_partner = int(pk)
+	mem["favorite_partner"] = best_partner
+
+	conversation_memory[pid_key] = mem
+
+
+func _get_memory_context_sentence(pet_id: int, _partner_name: String) -> String:
+	## APIプロンプト注入用: 1-2文の記憶コンテキスト（最大約50トークン）
+	var pid_key: String = str(pet_id)
+	if not conversation_memory.has(pid_key):
+		return ""
+
+	var mem: Dictionary = conversation_memory[pid_key]
+	var parts: Array[String] = []
+
+	# トピック（最近3つ）
+	var topics: Array = mem.get("topics_discussed", [])
+	if topics.size() > 0:
+		var recent_topics: Array = topics.slice(-3)
+		parts.append("You've talked about %s before." % ", ".join(recent_topics))
+
+	# お気に入りパートナー
+	var fav_id: int = mem.get("favorite_partner", -1)
+	if fav_id >= 0 and GameManager.instance and GameManager.instance.pets.has(fav_id):
+		var fav_pet: Node = GameManager.instance.pets[fav_id]
+		if fav_pet is PetEntity:
+			parts.append("Your favorite conversation partner is %s." % fav_pet.pet_name)
+
+	# 最近の感情（最近3つ）
+	var moods: Array = mem.get("mood_history", [])
+	if moods.size() > 0:
+		var recent_moods: Array = moods.slice(-3)
+		parts.append("You recently felt %s." % ", ".join(recent_moods))
+
+	if parts.is_empty():
+		return ""
+
+	# 最大2文に制限（トークン予算を守る）
+	return " ".join(parts.slice(0, 2))
+
+
 # === 会話完了処理 ===
 func _finalize_conversation(pet1: PetEntity, pet2: PetEntity, trigger: String,
 		conv_context: Dictionary = {}) -> void:
@@ -1293,6 +1439,10 @@ func _finalize_conversation(pet1: PetEntity, pet2: PetEntity, trigger: String,
 	if GameManager.instance and GameManager.instance.has_method("queue_petbook_posts"):
 		for post in posts:
 			GameManager.instance.queue_petbook_posts(post)
+
+	# 関係性更新（会話品質 = 感情強度ベース）
+	var conversation_quality: float = clampf(emotion_intensity, 0.1, 1.0)
+	_update_relationship(pet1.pet_id, pet2.pet_id, conversation_quality)
 
 	# 傍観者リアクション（3匹以上いる場合）
 	_trigger_observer_reactions(pet1, pet2, dominant_emotion, current_conversation)
@@ -1385,6 +1535,116 @@ func _get_dominant_emotion(pet: PetEntity) -> String:
 	return max_emotion
 
 
+# === Relationship Dynamics ===
+func _get_relationship_key(pet1_id: int, pet2_id: int) -> String:
+	## ソート済みペアキーを生成
+	return "%d_%d" % [mini(pet1_id, pet2_id), maxi(pet1_id, pet2_id)]
+
+
+func _get_or_create_relationship(pet1_id: int, pet2_id: int) -> Dictionary:
+	## 関係データを取得。存在しなければ初期値で作成
+	var key: String = _get_relationship_key(pet1_id, pet2_id)
+	if not pet_relationships.has(key):
+		pet_relationships[key] = {
+			"affinity": 0.3,
+			"conversations_together": 0,
+			"shared_words": [],
+			"relationship_type": "acquaintances",
+		}
+	return pet_relationships[key]
+
+
+func _update_relationship(pet1_id: int, pet2_id: int, conversation_quality: float) -> void:
+	## 会話完了時に関係性を更新
+	var key: String = _get_relationship_key(pet1_id, pet2_id)
+	var rel: Dictionary = _get_or_create_relationship(pet1_id, pet2_id)
+
+	# 親密度を会話品質に応じて増加
+	rel["affinity"] = clampf(rel["affinity"] + 0.05 * conversation_quality, 0.0, 1.0)
+	rel["conversations_together"] = rel.get("conversations_together", 0) + 1
+
+	# 共有された独自語彙を追跡
+	if GameManager.instance and GameManager.instance.original_language:
+		var vocab: Dictionary = GameManager.instance.original_language.get_full_vocabulary()
+		for vocab_key: String in vocab:
+			var entry: Dictionary = vocab[vocab_key]
+			var ai_term: String = entry.get("ai_term", "")
+			if ai_term.is_empty():
+				continue
+			# 会話中に使われた語彙をチェック
+			var used_in_conv: bool = false
+			for msg: Dictionary in current_conversation:
+				if msg.get("message", "").containsn(ai_term):
+					used_in_conv = true
+					break
+			if used_in_conv:
+				var shared: Array = rel.get("shared_words", [])
+				if ai_term not in shared:
+					shared.append(ai_term)
+					# 最大10語まで保持
+					if shared.size() > 10:
+						shared = shared.slice(-10)
+					rel["shared_words"] = shared
+
+	# 関係タイプを親密度閾値に基づいて更新
+	var old_type: String = rel.get("relationship_type", "strangers")
+	var affinity: float = rel["affinity"]
+	var new_type: String = old_type
+
+	if affinity < 0.2:
+		new_type = "strangers"
+	elif affinity < 0.4:
+		new_type = "acquaintances"
+	elif affinity < 0.6:
+		new_type = "friends"
+	elif affinity < 0.8:
+		new_type = "close_friends"
+	else:
+		# >=0.8: ランダムで best_friends or rivals
+		if old_type == "best_friends" or old_type == "rivals":
+			new_type = old_type  # 一度決まったら維持
+		else:
+			new_type = "best_friends" if randf() < 0.7 else "rivals"
+
+	rel["relationship_type"] = new_type
+	pet_relationships[key] = rel
+
+	if new_type != old_type:
+		relationship_changed.emit(pet1_id, pet2_id, new_type)
+		print("[AtoA] Relationship changed: %d & %d → %s (affinity: %.2f)" % [pet1_id, pet2_id, new_type, affinity])
+
+
+func _get_relationship_context(pet1_id: int, pet2_id: int) -> String:
+	## 会話プロンプト用の関係性コンテキスト文を返す
+	var key: String = _get_relationship_key(pet1_id, pet2_id)
+	if not pet_relationships.has(key):
+		return ""
+
+	var rel: Dictionary = pet_relationships[key]
+	var rel_type: String = rel.get("relationship_type", "strangers")
+	var conv_count: int = rel.get("conversations_together", 0)
+	var shared: Array = rel.get("shared_words", [])
+
+	# 相手のペット名を取得
+	var pet2_name: String = "them"
+	if GameManager.instance:
+		var pet2_node: Node = GameManager.instance.get_pet_by_id(pet2_id)
+		if pet2_node:
+			pet2_name = pet2_node.get("pet_name") if pet2_node.get("pet_name") else "them"
+
+	var context: String = "You and %s are %s" % [pet2_name, rel_type.replace("_", " ")]
+
+	if conv_count > 1:
+		context += " who have talked %d times" % conv_count
+
+	if not shared.is_empty():
+		var word_sample: String = shared[randi() % shared.size()]
+		context += " and share the word '%s'" % word_sample
+
+	context += "."
+	return context
+
+
 # === セーブ・ロード（永続化） ===
 func to_dict() -> Dictionary:
 	## 会話システムの状態を保存
@@ -1393,6 +1653,7 @@ func to_dict() -> Dictionary:
 		"daily_cost": daily_conversation_cost,
 		"daily_count": daily_conversation_count,
 		"last_daily_reset": last_daily_reset,
+		"pet_relationships": pet_relationships,
 	}
 
 
@@ -1406,6 +1667,8 @@ func from_dict(data: Dictionary) -> void:
 		daily_conversation_count = data["daily_count"]
 	if data.has("last_daily_reset"):
 		last_daily_reset = data["last_daily_reset"]
+	if data.has("pet_relationships"):
+		pet_relationships = data["pet_relationships"]
 
 	# 日付が変わっていればリセット
 	var current_day := int(Time.get_unix_time_from_system() / 86400)
