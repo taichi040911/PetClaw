@@ -564,6 +564,8 @@ func _on_team_formed_log(team_id: String, members: Array[int], task: String) -> 
 
 func _on_team_completed(team_id: String, results: Dictionary) -> void:
 	print("[GameManager] Team %s completed: %s" % [team_id, str(results)])
+	if achievement_system and achievement_system.has_method("check_achievement"):
+		achievement_system.check_achievement("team_player")
 	# EVENT_PLANNING完了 → 文化イベントトリガー
 	if results.get("task_type", "") == "EVENT_PLANNING" and cultural_system:
 		var members: Array = results.get("members", [])
@@ -595,6 +597,8 @@ func _on_grief_stage_changed(pet_id: int, stage: String) -> void:
 
 func _on_dream_generated(pet_id: int, dream_content: String) -> void:
 	print("[GameManager] Pet %d dream: %s" % [pet_id, dream_content.left(60)])
+	if achievement_system and achievement_system.has_method("check_achievement"):
+		achievement_system.check_achievement("dreamer")
 	# 夢をPetBookに投稿
 	if pet_book:
 		var pet_name: String = "Pet"

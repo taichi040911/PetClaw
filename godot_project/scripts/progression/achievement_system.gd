@@ -12,6 +12,7 @@ const CATEGORY_LANGUAGE: StringName = &"language"
 const CATEGORY_SOCIAL: StringName = &"social"
 const CATEGORY_BATTLE: StringName = &"battle"
 const CATEGORY_CARE: StringName = &"care"
+const CATEGORY_CULTURE: StringName = &"culture"
 
 # === Achievement Data ===
 var _achievements: Dictionary = {}  # achievement_id → Dictionary
@@ -72,6 +73,28 @@ func _define_achievements() -> void:
 		CATEGORY_CARE, "grid")
 	_register("dedicated", "Dedicated", "Play for 24+ hours total.",
 		CATEGORY_CARE, "clock")
+
+	# --- Culture achievements (R120) ---
+	_register("culture_creator", "Culture Creator", "Create any cultural artifact.",
+		CATEGORY_CULTURE, "palette")
+	_register("tradition_keeper", "Tradition Keeper", "Establish a tradition (artifact survives 7 days).",
+		CATEGORY_CULTURE, "scroll_old")
+	_register("festival_host", "Festival Host", "Trigger a festival with 3+ joyful pets.",
+		CATEGORY_CULTURE, "sparkles")
+	_register("storyteller", "Storyteller", "Create 5 cultural stories.",
+		CATEGORY_CULTURE, "quill")
+	_register("songwriter", "Songwriter", "Create a song using invented language.",
+		CATEGORY_CULTURE, "music_note")
+	_register("team_player", "Team Player", "Complete a team mission.",
+		CATEGORY_CULTURE, "handshake")
+	_register("team_leader", "Team Leader", "Lead 5 successful teams.",
+		CATEGORY_CULTURE, "compass")
+	_register("grief_healer", "Grief Healer", "Process grief to acceptance stage.",
+		CATEGORY_CULTURE, "dove")
+	_register("dreamer", "Dreamer", "Generate a dream during sleep.",
+		CATEGORY_CULTURE, "moon")
+	_register("resilient", "Resilient", "Gain resilience through post-traumatic growth.",
+		CATEGORY_CULTURE, "shield_check")
 
 
 func _register(id: String, title: String, description: String,
@@ -223,6 +246,30 @@ func _evaluate_condition(id: String, context: Dictionary) -> bool:
 			return alive_count >= 5
 		"dedicated":
 			return _total_play_time >= 86400.0  # 24 hours in seconds
+
+		# --- Culture (R120) ---
+		"culture_creator":
+			return true  # Caller triggers on artifact creation
+		"tradition_keeper":
+			return true  # Caller triggers on tradition establishment
+		"festival_host":
+			return true  # Caller triggers on festival
+		"storyteller":
+			var story_count: int = context.get("story_count", 0)
+			return story_count >= 5
+		"songwriter":
+			return true  # Caller triggers on song creation
+		"team_player":
+			return true  # Caller triggers on team completion
+		"team_leader":
+			var teams_led: int = context.get("teams_led", 0)
+			return teams_led >= 5
+		"grief_healer":
+			return true  # Caller triggers on acceptance stage
+		"dreamer":
+			return true  # Caller triggers on dream generation
+		"resilient":
+			return true  # Caller triggers on post-traumatic growth
 
 	return false
 
