@@ -25,6 +25,7 @@ var pet_autonomy: Node  # PetAutonomySystem
 var lifecycle_fsm: RefCounted  # PetLifecycleFSM (extends RefCounted)
 var pet_book: Node  # PetBookCore
 var battle_system: Node  # LanguageBattleSystem
+var achievement_system: Node  # AchievementSystem
 
 # === Pet Registry ===
 var pets: Dictionary = {}  # pet_id → PetEntity
@@ -61,6 +62,10 @@ func _process(delta: float) -> void:
 
 	game_time += delta
 
+	# 実績プレイ時間更新
+	if achievement_system and achievement_system.has_method("update_play_time"):
+		achievement_system.update_play_time(delta)
+
 	# 自動セーブ
 	save_timer += delta
 	if save_timer >= AUTO_SAVE_INTERVAL:
@@ -96,6 +101,7 @@ func _initialize_systems() -> void:
 	lifecycle_fsm = fsm_script.new(0)  # default pet_id=0, reassigned on pet load
 	pet_book = _create_system("res://scripts/social/pet_book_core.gd", "PetBookCore")
 	battle_system = _create_system("res://scripts/battle/language_battle_system.gd", "LanguageBattleSystem")
+	achievement_system = _create_system("res://scripts/progression/achievement_system.gd", "AchievementSystem")
 
 
 func _create_pet_entity() -> Node:
@@ -168,6 +174,10 @@ func _connect_signals() -> void:
 		lifecycle_fsm.sleep_started.connect(_on_pet_sleep_started)
 		lifecycle_fsm.sleep_ended.connect(_on_pet_sleep_ended)
 
+	# === Achievement System: 関係性変化 ===
+	if a2a_system.has_signal("relationship_changed"):
+		a2a_system.relationship_changed.connect(_on_relationship_changed_for_achievement)
+
 	# === Battle System 統合接続 ===
 	battle_system.battle_ended.connect(_on_battle_ended)
 
@@ -239,6 +249,12 @@ func _on_grammar_milestone(milestone: String, details: Dictionary) -> void:
 
 func _on_word_invented(word: Dictionary) -> void:
 	print("[GameManager] New word invented: %s = %s" % [word.get("ai_term", "?"), word.get("semantic_field", "?")])
+	# Achievement checks: first_word, polyglot
+	if achievement_system and achievement_system.has_method("check_achievement"):
+		achievement_system.check_achievement("first_word")
+		if original_language and original_language.has_method("get_vocabulary_size"):
+			var vocab_size: int = original_language.get_vocabulary_size()
+			achievement_system.check_achievement("polyglot", {"vocab_size": vocab_size})
 
 
 func _on_language_stage_advanced(new_stage: int, stage_name: String) -> void:
@@ -346,6 +362,14 @@ func _check_care_misses() -> void:
 # --- Evolution ← Care/AtoA 統合ハンドラ ---
 func _on_a2a_for_evolution(participants: Array[int], _summary: String) -> void:
 	## AtoA会話が完了 → 両参加者の進化カウントを記録
+	# Achievement checks: first_conversation, chatterbox, group_chat
+	if achievement_system and achievement_system.has_method("check_achievement"):
+		achievement_system.check_achievement("first_conversation")
+		if a2a_system and a2a_system.has_method("get_total_conversations"):
+			var total: int = a2a_system.get_total_conversations()
+			achievement_system.check_achievement("chatterbox", {"total_conversations": total})
+		if participants.size() >= 3:
+			achievement_system.check_achievement("group_chat", {"participant_count": participants.size()})
 	for pet_id in participants:
 		evolution_mechanics.record_a2a_conversation(pet_id)
 	# 会話後に進化チェック
@@ -433,6 +457,25 @@ func _on_battle_ended(winner_id: int, final_scores: Dictionary) -> void:
 	var p1_total: float = final_scores.get("pet1_total", 0.0)
 	var p2_total: float = final_scores.get("pet2_total", 0.0)
 	print("[GameManager] Battle ended. Winner: %d (%.1f vs %.1f)" % [winner_id, p1_total, p2_total])
+	# Achievement checks: first_blood, champion, underdog, perfect_score, word_warrior
+	if achievement_system and achievement_system.has_method("check_achievement"):
+		achievement_system.check_achievement("first_blood")
+		var total_wins: int = final_scores.get("total_wins", 0)
+		achievement_system.check_achievement("champion", {"total_wins": total_wins})
+		var winner_vocab: int = final_scores.get("winner_vocab", 0)
+		var loser_vocab: int = final_scores.get("loser_vocab", 0)
+		achievement_system.check_achievement("underdog", {"winner_vocab": winner_vocab, "loser_vocab": loser_vocab})
+		var max_score: float = maxf(p1_total, p2_total)
+		achievement_system.check_achievement("perfect_score", {"score": max_score})
+		var unique_words: int = final_scores.get("unique_words_used", 0)
+		achievement_system.check_achievement("word_warrior", {"unique_words": unique_words})
+
+
+func _on_relationship_changed_for_achievement(_pet1_id: int, _pet2_id: int, new_type: String) -> void:
+	## 関係性変化 → 実績チェック
+	if achievement_system and achievement_system.has_method("check_achievement"):
+		achievement_system.check_achievement("best_friends", {"relationship": new_type})
+		achievement_system.check_achievement("rivalry", {"relationship": new_type})
 
 
 func queue_petbook_posts(post_data: Dictionary) -> void:
@@ -480,6 +523,7 @@ func save_game() -> void:
 		"breeding": breeding.to_dict(),
 		"life_death": life_death.to_dict(),
 		"battle_system": battle_system.to_dict(),
+		"achievement_system": achievement_system.to_dict(),
 	}
 
 	for pet_id in pets:
@@ -554,6 +598,9 @@ func _load_game_data() -> void:
 
 	# Battle System復元
 	battle_system.from_dict(data.get("battle_system", {}))
+
+	# Achievement System復元
+	achievement_system.from_dict(data.get("achievement_system", {}))
 
 	# ペット復元
 	for pet_id_str in data.get("pets", {}):
