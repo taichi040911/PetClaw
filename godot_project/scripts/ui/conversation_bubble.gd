@@ -1,5 +1,6 @@
 ## ConversationBubble — AtoA会話の吹き出し表示
 ## ペット同士の会話をリアルタイムで画面に表示する
+## タイピングアニメーション付き、感情アイコン表示
 class_name ConversationBubble
 extends Control
 
@@ -9,17 +10,43 @@ var _bubble_container: VBoxContainer
 var _messages: Array[Dictionary] = []  # {pet_name, text, emotion, is_left}
 var _current_index: int = 0
 var _auto_advance_timer: float = 0.0
-const AUTO_ADVANCE_DELAY: float = 3.0
+const AUTO_ADVANCE_DELAY: float = 3.5
 const MAX_VISIBLE_MESSAGES: int = 4
+
+## 感情アイコン
+const EMOTION_ICONS: Dictionary = {
+	"joy": "☀",
+	"love": "♥",
+	"excitement": "⚡",
+	"sadness": "💧",
+	"fear": "👁",
+	"neutral": "💬",
+}
+
+## タップで早送り対応
+var _tap_to_advance: bool = true
 
 
 func _ready() -> void:
 	_build_ui()
-	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	mouse_filter = Control.MOUSE_FILTER_STOP
+	gui_input.connect(_on_gui_input)
+
+
+func _on_gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.pressed and _tap_to_advance:
+		_auto_advance_timer = AUTO_ADVANCE_DELAY  # 即座に次へ
 
 
 func _build_ui() -> void:
 	set_anchors_preset(PRESET_FULL_RECT)
+
+	# 半透明背景
+	var overlay: ColorRect = ColorRect.new()
+	overlay.color = Color(0.0, 0.0, 0.0, 0.3)
+	overlay.set_anchors_preset(PRESET_FULL_RECT)
+	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(overlay)
 
 	_bubble_container = VBoxContainer.new()
 	_bubble_container.set_anchors_preset(PRESET_TOP_WIDE)
@@ -29,6 +56,17 @@ func _build_ui() -> void:
 	_bubble_container.offset_right = -16
 	_bubble_container.add_theme_constant_override("separation", 8)
 	add_child(_bubble_container)
+
+	# ヒントテキスト
+	var hint: Label = Label.new()
+	hint.text = "Tap to advance"
+	hint.add_theme_font_size_override("font_size", 11)
+	hint.add_theme_color_override("font_color", Color(0.5, 0.5, 0.6, 0.5))
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	hint.set_anchors_preset(PRESET_BOTTOM_WIDE)
+	hint.offset_top = -25
+	hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(hint)
 
 
 func show_conversation(messages: Array[Dictionary]) -> void:
@@ -77,6 +115,10 @@ func _show_next_message() -> void:
 
 	_bubble_container.add_child(bubble)
 
+	# SFX
+	if SfxManager.instance:
+		SfxManager.instance.play(SfxManager.SfxType.TAP)
+
 	# 入場アニメーション
 	bubble.modulate.a = 0.0
 	bubble.position.y += 20
@@ -113,10 +155,11 @@ func _create_bubble(pet_name: String, text: String, emotion: String, is_left: bo
 	var vbox: VBoxContainer = VBoxContainer.new()
 	panel.add_child(vbox)
 
-	# 名前
+	# 名前 + 感情アイコン
+	var emotion_icon: String = EMOTION_ICONS.get(emotion, "💬")
 	var name_label: Label = Label.new()
-	name_label.text = pet_name
-	name_label.add_theme_font_size_override("font_size", 11)
+	name_label.text = "%s %s" % [emotion_icon, pet_name]
+	name_label.add_theme_font_size_override("font_size", 12)
 	name_label.add_theme_color_override("font_color", Color(0.6, 0.7, 0.9))
 	vbox.add_child(name_label)
 
