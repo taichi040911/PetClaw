@@ -27,38 +27,43 @@ const NOTIFY_DATA: Dictionary = {
 		"icon": "🍖",
 		"text": "Your pet is hungry!",
 		"color": Color(0.9, 0.5, 0.2),
+		"duration": 4.0,
 	},
 	NotifyType.LOW_HEALTH: {
 		"icon": "💊",
 		"text": "Your pet feels sick...",
 		"color": Color(0.9, 0.3, 0.3),
+		"duration": 4.0,
 	},
 	NotifyType.LOW_ENERGY: {
 		"icon": "😴",
 		"text": "Your pet is tired",
 		"color": Color(0.5, 0.5, 0.8),
+		"duration": 4.0,
 	},
 	NotifyType.SAD: {
 		"icon": "💧",
 		"text": "Your pet is sad...",
 		"color": Color(0.4, 0.6, 0.9),
+		"duration": 4.0,
 	},
 	NotifyType.LONELY: {
 		"icon": "💔",
 		"text": "Your pet misses you!",
 		"color": Color(0.8, 0.4, 0.6),
+		"duration": 4.0,
 	},
 	NotifyType.CONVERSATION: {
 		"icon": "🗣️",
 		"text": "",  # 動的に設定
 		"color": Color(0.3, 0.7, 0.5),
-		"duration": DISPLAY_DURATION,
+		"duration": 4.0,
 	},
 	NotifyType.NEW_WORD: {
 		"icon": "📚",
 		"text": "",  # 動的に設定
 		"color": Color(0.6, 0.4, 0.8),
-		"duration": DISPLAY_DURATION,
+		"duration": 4.0,
 	},
 	NotifyType.RELATIONSHIP_UPGRADE: {
 		"icon": "💕",
@@ -70,7 +75,7 @@ const NOTIFY_DATA: Dictionary = {
 		"icon": "🎓",
 		"text": "",  # 動的に設定
 		"color": Color(0.4, 0.65, 0.85),
-		"duration": DISPLAY_DURATION,
+		"duration": 4.0,
 	},
 	NotifyType.LANDMARK_CONVERSATION: {
 		"icon": "⭐",
@@ -84,6 +89,24 @@ const NOTIFY_DATA: Dictionary = {
 		"color": Color(0.3, 0.8, 0.45),
 		"duration": 6.0,
 	},
+}
+
+## AtoA通知タイプ名 → NotifyType マッピング
+const A2A_TYPE_MAP: Dictionary = {
+	"relationship_upgrade": NotifyType.RELATIONSHIP_UPGRADE,
+	"word_taught": NotifyType.WORD_TAUGHT,
+	"landmark_conversation": NotifyType.LANDMARK_CONVERSATION,
+	"language_milestone": NotifyType.LANGUAGE_MILESTONE,
+	"conversation": NotifyType.CONVERSATION,
+	"new_word": NotifyType.NEW_WORD,
+}
+
+## AtoA通知テキストテンプレート
+const A2A_TEXT_TEMPLATES: Dictionary = {
+	"relationship_upgrade": "%s and %s are now %s!",
+	"word_taught": "%s taught %s a new word!",
+	"landmark_conversation": "Amazing conversation between %s and %s!",
+	"language_milestone": "Language evolved to stage: %s!",
 }
 
 ## 状態
@@ -187,6 +210,32 @@ func _show_notification(notify_type: NotifyType) -> void:
 	_cooldowns[notify_type] = COOLDOWN_DURATION
 
 	# 通知パネル作成
+	var panel: PanelContainer = _create_notification_panel(data, data["text"])
+
+	# タッチ対応
+	panel.gui_input.connect(func(event: InputEvent) -> void:
+		if event is InputEventMouseButton and event.pressed:
+			notification_tapped.emit(NOTIFY_DATA[notify_type]["text"])
+			_dismiss_notification(notify_type, panel)
+	)
+
+	_animate_in(notify_type, panel, data)
+
+
+func _dismiss_notification(notify_type: NotifyType, panel: PanelContainer) -> void:
+	if not is_instance_valid(panel):
+		_active_notifications.erase(notify_type)
+		return
+
+	_active_notifications.erase(notify_type)
+	var tween: Tween = create_tween()
+	tween.tween_property(panel, "modulate:a", 0.0, 0.2)
+	tween.tween_callback(panel.queue_free)
+
+
+## --- 通知パネル共通生成 ---
+
+func _create_notification_panel(data: Dictionary, text: String) -> PanelContainer:
 	var panel: PanelContainer = PanelContainer.new()
 	var style: StyleBoxFlat = StyleBoxFlat.new()
 	style.bg_color = Color(data["color"].r, data["color"].g, data["color"].b, 0.85)
@@ -201,20 +250,17 @@ func _show_notification(notify_type: NotifyType) -> void:
 	panel.add_theme_stylebox_override("panel", style)
 
 	var label: Label = Label.new()
-	label.text = "%s %s" % [data["icon"], data["text"]]
+	label.text = "%s %s" % [data["icon"], text]
 	label.add_theme_font_size_override("font_size", 16)
 	label.add_theme_color_override("font_color", Color.WHITE)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	panel.add_child(label)
 
-	# タッチ対応
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
-	panel.gui_input.connect(func(event: InputEvent) -> void:
-		if event is InputEventMouseButton and event.pressed:
-			notification_tapped.emit(NOTIFY_DATA[notify_type]["text"])
-			_dismiss_notification(notify_type, panel)
-	)
+	return panel
 
+
+func _animate_in(notify_type: NotifyType, panel: PanelContainer, data: Dictionary) -> void:
 	_container.add_child(panel)
 	_active_notifications[notify_type] = panel
 
@@ -225,22 +271,11 @@ func _show_notification(notify_type: NotifyType) -> void:
 	tween.tween_property(panel, "modulate:a", 1.0, SLIDE_DURATION)
 	tween.tween_property(panel, "position:y", 0.0, SLIDE_DURATION).set_trans(Tween.TRANS_BACK)
 
-	# 自動消去
-	await get_tree().create_timer(DISPLAY_DURATION).timeout
+	# 自動消去（タイプ別の表示時間を使用）
+	var display_time: float = data.get("duration", DISPLAY_DURATION) as float
+	await get_tree().create_timer(display_time).timeout
 	if _active_notifications.has(notify_type):
 		_dismiss_notification(notify_type, panel)
-
-
-func _dismiss_notification(notify_type: NotifyType, panel: PanelContainer) -> void:
-
-	if not is_instance_valid(panel):
-		_active_notifications.erase(notify_type)
-		return
-
-	_active_notifications.erase(notify_type)
-	var tween: Tween = create_tween()
-	tween.tween_property(panel, "modulate:a", 0.0, 0.2)
-	tween.tween_callback(panel.queue_free)
 
 
 ## --- 外部シグナル接続 ---
@@ -249,7 +284,7 @@ func _connect_external_signals() -> void:
 	if not GameManager.instance:
 		return
 
-	# AtoAConversationSystem の conversation_ended に接続
+	# AtoAConversationSystem のシグナルに接続
 	var a2a_system: Node = _find_system_node("AtoAConversationSystem")
 	if a2a_system:
 		if a2a_system.has_signal("conversation_ended"):
@@ -259,7 +294,7 @@ func _connect_external_signals() -> void:
 		if a2a_system.has_signal("word_taught"):
 			a2a_system.word_taught.connect(_on_word_taught)
 
-	# OriginalLanguageEngine の word_invented に接続
+	# OriginalLanguageEngine のシグナルに接続
 	var lang_engine: Node = _find_system_node("OriginalLanguageEngine")
 	if lang_engine:
 		if lang_engine.has_signal("word_invented"):
@@ -296,6 +331,32 @@ func _on_conversation_ended(participants: Array[int], _summary: String) -> void:
 	show_dynamic_notification(NotifyType.CONVERSATION, text)
 
 
+## --- 関係性変化通知 ---
+
+func _on_relationship_changed(pet1_id: int, pet2_id: int, new_type: String) -> void:
+	var name_a: String = _get_pet_name(pet1_id)
+	var name_b: String = _get_pet_name(pet2_id)
+	var display_type: String = new_type.replace("_", " ")
+	var text: String = A2A_TEXT_TEMPLATES["relationship_upgrade"] % [name_a, name_b, display_type]
+	show_dynamic_notification(NotifyType.RELATIONSHIP_UPGRADE, text)
+
+
+## --- 言葉を教えた通知 ---
+
+func _on_word_taught(speaker_id: int, listener_id: int, _words: Array[String]) -> void:
+	var speaker_name: String = _get_pet_name(speaker_id)
+	var listener_name: String = _get_pet_name(listener_id)
+	var text: String = A2A_TEXT_TEMPLATES["word_taught"] % [speaker_name, listener_name]
+	show_dynamic_notification(NotifyType.WORD_TAUGHT, text)
+
+
+## --- 言語ステージ進化通知 ---
+
+func _on_language_stage_advanced(_new_stage: int, stage_name: String) -> void:
+	var text: String = A2A_TEXT_TEMPLATES["language_milestone"] % [stage_name]
+	show_dynamic_notification(NotifyType.LANGUAGE_MILESTONE, text)
+
+
 func _get_pet_name(pet_id: int) -> String:
 	if not GameManager.instance:
 		return "Pet"
@@ -314,6 +375,107 @@ func _on_word_invented(word_data: Dictionary) -> void:
 	show_dynamic_notification(NotifyType.NEW_WORD, text)
 
 
+## --- AtoAイベント定期ポーリング ---
+
+func _poll_a2a_events() -> void:
+	if not GameManager.instance:
+		return
+
+	var a2a_system: Node = _find_system_node("AtoAConversationSystem")
+	if a2a_system:
+		_poll_conversation_count(a2a_system)
+		_poll_relationship_changes(a2a_system)
+
+	var lang_engine: Node = _find_system_node("OriginalLanguageEngine")
+	if lang_engine:
+		_poll_language_stage(lang_engine)
+
+
+func _poll_conversation_count(a2a_system: Node) -> void:
+	## 会話数が増えていたら landmark チェック
+	if not "conversation_log" in a2a_system:
+		return
+	var log: Array = a2a_system.conversation_log as Array
+	var current_count: int = log.size()
+	if current_count > _last_known_conversation_count and _last_known_conversation_count > 0:
+		# 最新の会話をチェック — 高スコア会話を検出
+		for i: int in range(_last_known_conversation_count, current_count):
+			if i < log.size():
+				var entry: Dictionary = log[i] as Dictionary
+				var score: float = entry.get("quality_score", 0.0) as float
+				if score >= 0.8:
+					var participants: Array = entry.get("participants", []) as Array
+					if participants.size() >= 2:
+						var name_a: String = _get_pet_name(participants[0] as int)
+						var name_b: String = _get_pet_name(participants[1] as int)
+						var text: String = A2A_TEXT_TEMPLATES["landmark_conversation"] % [name_a, name_b]
+						show_dynamic_notification(NotifyType.LANDMARK_CONVERSATION, text)
+						break  # 1ポーリングにつき1通知まで
+	_last_known_conversation_count = current_count
+
+
+func _poll_relationship_changes(a2a_system: Node) -> void:
+	## 関係性タイプの変化を検出
+	if not "pet_relationships" in a2a_system:
+		return
+	var relationships: Dictionary = a2a_system.pet_relationships as Dictionary
+	for key: String in relationships:
+		var rel: Dictionary = relationships[key] as Dictionary
+		var rel_type: String = rel.get("relationship_type", "acquaintance") as String
+		var old_type: String = _last_known_relationship_types.get(key, "acquaintance") as String
+		if rel_type != old_type and old_type != "":
+			# 関係がアップグレードされた（acquaintance → friend → close_friend）
+			if _is_relationship_upgrade(old_type, rel_type):
+				var ids: PackedStringArray = key.split("_")
+				if ids.size() >= 2:
+					var name_a: String = _get_pet_name(ids[0].to_int())
+					var name_b: String = _get_pet_name(ids[1].to_int())
+					var display_type: String = rel_type.replace("_", " ")
+					var text: String = A2A_TEXT_TEMPLATES["relationship_upgrade"] % [name_a, name_b, display_type]
+					show_dynamic_notification(NotifyType.RELATIONSHIP_UPGRADE, text)
+					break  # 1ポーリングにつき1通知まで
+	# 現在の関係性を記録
+	for key: String in relationships:
+		var rel: Dictionary = relationships[key] as Dictionary
+		_last_known_relationship_types[key] = rel.get("relationship_type", "acquaintance")
+
+
+func _is_relationship_upgrade(old_type: String, new_type: String) -> bool:
+	## 関係性ランクの比較
+	const RANK: Dictionary = {
+		"acquaintance": 0,
+		"friend": 1,
+		"friends": 1,
+		"close_friend": 2,
+		"close_friends": 2,
+		"best_friend": 3,
+		"best_friends": 3,
+	}
+	var old_rank: int = RANK.get(old_type, 0) as int
+	var new_rank: int = RANK.get(new_type, 0) as int
+	return new_rank > old_rank
+
+
+func _poll_language_stage(lang_engine: Node) -> void:
+	## 言語ステージの変化を検出
+	if not "current_stage" in lang_engine:
+		return
+	var current_stage: int = lang_engine.current_stage as int
+	if _last_known_language_stage == -1:
+		# 初回は記録のみ
+		_last_known_language_stage = current_stage
+		return
+	if current_stage > _last_known_language_stage:
+		var stage_name: String = "Stage %d" % current_stage
+		# get_language_stage() があればステージ名を取得
+		if lang_engine.has_method("get_language_stage"):
+			var stage_info: Dictionary = lang_engine.get_language_stage() as Dictionary
+			stage_name = stage_info.get("name", stage_name) as String
+		var text: String = A2A_TEXT_TEMPLATES["language_milestone"] % [stage_name]
+		show_dynamic_notification(NotifyType.LANGUAGE_MILESTONE, text)
+	_last_known_language_stage = current_stage
+
+
 ## --- 動的テキスト通知（公開API） ---
 
 ## AtoA会話が発生したことを通知する
@@ -326,6 +488,45 @@ func notify_conversation(pet_name_a: String, pet_name_b: String) -> void:
 func notify_new_word(word: String) -> void:
 	var text: String = "New word invented: %s!" % word
 	show_dynamic_notification(NotifyType.NEW_WORD, text)
+
+
+## AtoAイベント通知を表示する（公開API）
+## type: "relationship_upgrade", "word_taught", "landmark_conversation", "language_milestone"
+## data: イベント固有のデータ辞書
+##   relationship_upgrade: { "pet1_name": String, "pet2_name": String, "type": String }
+##   word_taught: { "speaker_name": String, "listener_name": String }
+##   landmark_conversation: { "pet1_name": String, "pet2_name": String }
+##   language_milestone: { "stage_name": String }
+func show_a2a_notification(type: String, data: Dictionary) -> void:
+	if not A2A_TYPE_MAP.has(type):
+		push_warning("CareNotification: Unknown AtoA notification type: %s" % type)
+		return
+
+	var notify_type: int = A2A_TYPE_MAP[type] as int
+	var text: String = ""
+
+	match type:
+		"relationship_upgrade":
+			var pet1_name: String = data.get("pet1_name", "Pet") as String
+			var pet2_name: String = data.get("pet2_name", "Pet") as String
+			var rel_type: String = data.get("type", "friends") as String
+			text = A2A_TEXT_TEMPLATES["relationship_upgrade"] % [pet1_name, pet2_name, rel_type.replace("_", " ")]
+		"word_taught":
+			var speaker: String = data.get("speaker_name", "Pet") as String
+			var listener: String = data.get("listener_name", "Pet") as String
+			text = A2A_TEXT_TEMPLATES["word_taught"] % [speaker, listener]
+		"landmark_conversation":
+			var pet1_name: String = data.get("pet1_name", "Pet") as String
+			var pet2_name: String = data.get("pet2_name", "Pet") as String
+			text = A2A_TEXT_TEMPLATES["landmark_conversation"] % [pet1_name, pet2_name]
+		"language_milestone":
+			var stage_name: String = data.get("stage_name", "Unknown") as String
+			text = A2A_TEXT_TEMPLATES["language_milestone"] % [stage_name]
+
+	if text.is_empty():
+		return
+
+	show_dynamic_notification(notify_type as NotifyType, text)
 
 
 ## 動的テキストを持つ通知を表示する
@@ -341,45 +542,13 @@ func show_dynamic_notification(notify_type: NotifyType, dynamic_text: String) ->
 	_cooldowns[notify_type] = COOLDOWN_DURATION
 
 	# 通知パネル作成
-	var panel: PanelContainer = PanelContainer.new()
-	var style: StyleBoxFlat = StyleBoxFlat.new()
-	style.bg_color = Color(data["color"].r, data["color"].g, data["color"].b, 0.85)
-	style.corner_radius_top_left = 10
-	style.corner_radius_top_right = 10
-	style.corner_radius_bottom_left = 10
-	style.corner_radius_bottom_right = 10
-	style.content_margin_left = 12
-	style.content_margin_right = 12
-	style.content_margin_top = 8
-	style.content_margin_bottom = 8
-	panel.add_theme_stylebox_override("panel", style)
-
-	var label: Label = Label.new()
-	label.text = "%s %s" % [data["icon"], dynamic_text]
-	label.add_theme_font_size_override("font_size", 16)
-	label.add_theme_color_override("font_color", Color.WHITE)
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	panel.add_child(label)
+	var panel: PanelContainer = _create_notification_panel(data, dynamic_text)
 
 	# タッチ対応
-	panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	panel.gui_input.connect(func(event: InputEvent) -> void:
 		if event is InputEventMouseButton and event.pressed:
 			notification_tapped.emit(dynamic_text)
 			_dismiss_notification(notify_type, panel)
 	)
 
-	_container.add_child(panel)
-	_active_notifications[notify_type] = panel
-
-	# スライドインアニメーション
-	panel.modulate.a = 0.0
-	panel.position.y = -30
-	var tween: Tween = create_tween().set_parallel(true)
-	tween.tween_property(panel, "modulate:a", 1.0, SLIDE_DURATION)
-	tween.tween_property(panel, "position:y", 0.0, SLIDE_DURATION).set_trans(Tween.TRANS_BACK)
-
-	# 自動消去
-	await get_tree().create_timer(DISPLAY_DURATION).timeout
-	if _active_notifications.has(notify_type):
-		_dismiss_notification(notify_type, panel)
+	_animate_in(notify_type, panel, data)
