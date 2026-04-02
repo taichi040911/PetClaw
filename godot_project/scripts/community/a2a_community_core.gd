@@ -382,6 +382,16 @@ func _register_cultural_artifact(topic: String) -> void:
 	cultural_artifacts.append(new_artifact)
 	culture_evolved.emit("new_interest", topic)
 
+	# R119: CulturalEmergenceSystemにも通知 — コミュニティの関心がリチュアルに昇格
+	if GameManager.instance and GameManager.instance.get("cultural_system"):
+		var cs: Node = GameManager.instance.cultural_system
+		var alive: Array[PetEntity] = _get_alive_pets()
+		if alive.size() >= 2 and cs.has_method("record_interaction_pattern"):
+			var pet_ids: Array[int] = []
+			for p: PetEntity in alive.slice(0, 3):
+				pet_ids.append(p.pet_id)
+			cs.record_interaction_pattern(pet_ids, topic)
+
 
 func _check_faction_formation() -> void:
 	# 性格の類似したペット同士が自然に派閥を形成
@@ -410,12 +420,25 @@ func _check_faction_formation() -> void:
 	if brave_faction.size() >= 2 and "warriors" not in factions:
 		factions["warriors"] = brave_faction
 		faction_formed.emit("warriors", brave_faction)
+		_notify_faction_to_team_orchestrator("warriors", brave_faction)
 	if curious_faction.size() >= 2 and "explorers" not in factions:
 		factions["explorers"] = curious_faction
 		faction_formed.emit("explorers", curious_faction)
+		_notify_faction_to_team_orchestrator("explorers", curious_faction)
 	if gentle_faction.size() >= 2 and "healers" not in factions:
 		factions["healers"] = gentle_faction
 		faction_formed.emit("healers", gentle_faction)
+		_notify_faction_to_team_orchestrator("healers", gentle_faction)
+
+
+func _notify_faction_to_team_orchestrator(faction_name: String, members: Array[int]) -> void:
+	## R119: 派閥形成をTeamOrchestratorに通知 — 派閥メンバーがチームを組みやすくなる
+	if not GameManager.instance or not GameManager.instance.get("team_orchestrator"):
+		return
+	var to: Node = GameManager.instance.team_orchestrator
+	if to.has_method("register_faction_preference"):
+		to.register_faction_preference(faction_name, members)
+	print("[Community] Faction '%s' notified to team orchestrator (%d members)" % [faction_name, members.size()])
 
 
 # ============================

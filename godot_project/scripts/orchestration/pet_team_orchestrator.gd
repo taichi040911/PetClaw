@@ -352,6 +352,28 @@ func get_pet_team(pet_id: int) -> Dictionary:
 	return {}
 
 
+# === Faction Preferences (R119) ===
+var faction_preferences: Dictionary = {}  # faction_name → Array[int] members
+
+func register_faction_preference(faction_name: String, members: Array[int]) -> void:
+	## R119: 派閥メンバーはチーム編成時に優先的にグループ化される
+	faction_preferences[faction_name] = members.duplicate()
+	print("[TeamOrch] Registered faction preference: %s (%d members)" % [faction_name, members.size()])
+
+
+func get_faction_members_for_teaming(pet_id: int) -> Array[int]:
+	## 指定ペットと同じ派閥のメンバーを返す
+	for faction_name: String in faction_preferences:
+		var members: Array = faction_preferences[faction_name]
+		if pet_id in members:
+			var teammates: Array[int] = []
+			for m: Variant in members:
+				if m as int != pet_id:
+					teammates.append(m as int)
+			return teammates
+	return []
+
+
 # === Persistence ===
 
 func to_dict() -> Dictionary:
@@ -361,6 +383,7 @@ func to_dict() -> Dictionary:
 		"next_team_id": _next_team_id,
 		"daily_formation_count": _daily_formation_count,
 		"last_reset_day": _last_reset_day,
+		"faction_preferences": faction_preferences.duplicate(true),
 	}
 
 
@@ -370,3 +393,4 @@ func from_dict(data: Dictionary) -> void:
 	_next_team_id = data.get("next_team_id", 0)
 	_daily_formation_count = data.get("daily_formation_count", 0)
 	_last_reset_day = data.get("last_reset_day", "")
+	faction_preferences = data.get("faction_preferences", {})
