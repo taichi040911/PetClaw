@@ -320,10 +320,14 @@ class KarpathyLoop:
         if not content:
             return {"available": False}
 
-        # Score category maximums
-        score_cats = re.findall(
-            r"const\s+MAX_(\w+)_SCORE.*?=\s*([\d.]+)", content
-        )
+        # Score category maximums (exclude ROUND which is the total, not a category)
+        score_cats = [
+            (cat, val)
+            for cat, val in re.findall(
+                r"const\s+MAX_(\w+)_SCORE.*?=\s*([\d.]+)", content
+            )
+            if cat != "ROUND"
+        ]
         # Total templates per theme
         themes = re.findall(r"RoundTheme\.(\w+)\s*:\s*\[", content)
         template_blocks = re.split(r"RoundTheme\.\w+\s*:\s*\[", content)[1:]
