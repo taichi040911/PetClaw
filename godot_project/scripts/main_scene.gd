@@ -185,6 +185,10 @@ func _connect_game_signals() -> void:
 			GameManager.instance.a2a_system.conversation_message.connect(
 				_on_conversation_message
 			)
+		if GameManager.instance.a2a_system.has_signal("conversation_ended"):
+			GameManager.instance.a2a_system.conversation_ended.connect(
+				_on_conversation_ended
+			)
 
 	# 言語進化通知（メイン画面でもライブ表示）
 	if GameManager.instance.original_language:
@@ -592,6 +596,11 @@ func _on_conversation_message(pet_id: int, message: String, metadata: Dictionary
 		"emotion": metadata.get("emotion", "neutral"),
 		"is_left": is_left,
 	}])
+
+
+func _on_conversation_ended(participants: Array, summary: String) -> void:
+	# 会話終了時のサマリー通知
+	_show_language_toast("🗣️ %s" % summary, Color(0.5, 0.7, 0.9))
 
 
 # === Language Evolution Notifications ===
