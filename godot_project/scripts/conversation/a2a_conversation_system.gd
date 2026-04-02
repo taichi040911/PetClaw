@@ -5,6 +5,7 @@ extends Node
 
 signal conversation_started(participants: Array[int])
 signal conversation_ended(participants: Array[int], summary: String)
+signal group_conversation_started(participants: Array[int])
 signal conversation_message(pet_id: int, message: String, metadata: Dictionary)
 signal evolution_triggered_by_conversation(evolution_type: String)
 signal relationship_changed(pet1_id: int, pet2_id: int, new_type: String)
@@ -13,6 +14,9 @@ signal word_taught(speaker_id: int, listener_id: int, words: Array[String])
 # === パラメータ ===
 var auto_conversation_interval: float = 180.0     # 自動会話間隔（秒）— demo mode で短縮可能
 const MAX_TURNS_PER_CONVERSATION: int = 6          # 1会話の最大ターン数
+const MAX_TURNS_GROUP_CONVERSATION: int = 6        # グループ会話の最大ターン数（3人で4-6ターン）
+const MIN_TURNS_GROUP_CONVERSATION: int = 4        # グループ会話の最小ターン数
+const GROUP_CONVERSATION_CHANCE: float = 0.20      # 3匹以上いる場合にグループ会話になる確率
 const MIN_EMOTION_FOR_SPONTANEOUS: float = 0.4     # 自発的会話の最低感情強度
 
 # === コスト管理（P2原則） ===
@@ -146,6 +150,50 @@ const TEMPLATE_CONVERSATIONS: Array[Dictionary] = [
 	},
 ]
 
+# === グループ会話テンプレート（3匹用） ===
+# speaker_index: 0=pet1, 1=pet2, 2=pet3
+const GROUP_TEMPLATE_CONVERSATIONS: Array[Dictionary] = [
+	{
+		"trigger": "gathering",
+		"entries": [
+			{"speaker_index": 0, "template": "{pet1} looked at {pet2} and {pet3}-{suffix}. 'Everyone is here-{suffix}!'"},
+			{"speaker_index": 1, "template": "{pet2} bounced happily-{suffix}. 'A gathering-{suffix}! How exciting-{suffix}!'"},
+			{"speaker_index": 2, "template": "{pet3} nodded shyly-{suffix}. 'It's nice when we're all together-{suffix}.'"},
+			{"speaker_index": 0, "template": "{pet1} sat between them-{suffix}. 'Let's share stories-{suffix}!'"},
+			{"speaker_index": 1, "template": "{pet2} tilted their head-{suffix}. 'I have one-{suffix}! About the time I found a strange berry-{suffix}.'"},
+		]
+	},
+	{
+		"trigger": "debate",
+		"entries": [
+			{"speaker_index": 0, "template": "{pet1} raised a question-{suffix}. 'Which is better-{suffix}... sunshine or rain-{suffix}?'"},
+			{"speaker_index": 1, "template": "{pet2} declared loudly-{suffix}. 'Sunshine-{suffix}! Obviously-{suffix}!'"},
+			{"speaker_index": 2, "template": "{pet3} disagreed gently-{suffix}. 'Rain makes everything grow-{suffix}...'"},
+			{"speaker_index": 0, "template": "{pet1} laughed-{suffix}. 'Maybe we need both-{suffix}?'"},
+		]
+	},
+	{
+		"trigger": "storytelling",
+		"entries": [
+			{"speaker_index": 2, "template": "{pet3} sat down-{suffix}. 'I want to tell you both something-{suffix}.'"},
+			{"speaker_index": 0, "template": "{pet1} leaned in curiously-{suffix}. 'What is it-{suffix}?'"},
+			{"speaker_index": 2, "template": "{pet3} closed their eyes-{suffix}. 'Last night I dreamed of a place where words float-{suffix}...'"},
+			{"speaker_index": 1, "template": "{pet2} gasped-{suffix}. 'I had that dream too-{suffix}!'"},
+			{"speaker_index": 0, "template": "{pet1} whispered-{suffix}. 'Maybe our words are connected-{suffix}... even in dreams-{suffix}.'"},
+		]
+	},
+	{
+		"trigger": "comfort_group",
+		"entries": [
+			{"speaker_index": 0, "template": "{pet1} noticed {pet3} looking down-{suffix}. 'Are you okay-{suffix}?'"},
+			{"speaker_index": 2, "template": "{pet3} sighed quietly-{suffix}. 'Just feeling a little lost-{suffix}...'"},
+			{"speaker_index": 1, "template": "{pet2} moved closer to {pet3}-{suffix}. 'We're here for you-{suffix}.'"},
+			{"speaker_index": 0, "template": "{pet1} nuzzled {pet3}-{suffix}. 'You're never alone-{suffix}. We promise-{suffix}.'"},
+			{"speaker_index": 2, "template": "*{pet3} smiled softly-{suffix}* 'Thank you-{suffix}... both of you-{suffix}.'"},
+		]
+	},
+]
+
 
 func _ready() -> void:
 	claude_client = ClaudeAPIClient.new()
@@ -184,6 +232,19 @@ func _try_auto_conversation() -> void:
 			alive_pets.append(pet)
 
 	if alive_pets.size() < 2:
+		return
+
+	# グループ会話を試行（3匹以上いる場合、20%の確率）
+	var group_pets: Array[PetEntity] = _select_group_participants(alive_pets)
+	if group_pets.size() == 3:
+		if _get_emotion_intensity(group_pets[0]) < MIN_EMOTION_FOR_SPONTANEOUS:
+			return
+		var trigger: String = _select_conversation_topic(group_pets[0], group_pets[1])
+		if not _check_budget():
+			print("[AtoA] Budget exhausted — falling back to group template conversation")
+			_run_group_template_conversation(group_pets, trigger)
+			return
+		await start_group_conversation(group_pets, trigger)
 		return
 
 	# 最も感情的な2匹を選択
@@ -262,6 +323,44 @@ func _get_emotion_intensity(pet: PetEntity) -> float:
 	for emotion in pet.emotions:
 		max_intensity = maxf(max_intensity, pet.emotions[emotion])
 	return max_intensity
+
+
+# === グループ参加者選択（3匹） ===
+func _select_group_participants(alive_pets: Array[PetEntity]) -> Array[PetEntity]:
+	## 3匹以上のペットからグループ会話参加者を選択する
+	## 20%の確率で3匹を返す。それ以外は空配列（呼び出し元で2匹パスにフォールバック）
+	if alive_pets.size() < 3:
+		return [] as Array[PetEntity]
+
+	if randf() >= GROUP_CONVERSATION_CHANCE:
+		return [] as Array[PetEntity]
+
+	# 最も感情的な2匹をまず選択（既存ロジックと同様）
+	var sorted_pets: Array[PetEntity] = alive_pets.duplicate()
+	sorted_pets.sort_custom(func(a: Variant, b: Variant) -> bool:
+		return _get_emotion_intensity(a) > _get_emotion_intensity(b)
+	)
+
+	var pet1: PetEntity = sorted_pets[0]
+	var pet2: PetEntity = sorted_pets[1]
+
+	# 3匹目: pet1またはpet2との関係性affinityが最も高いペットを選ぶ
+	var best_third: PetEntity = null
+	var best_affinity: float = -1.0
+	for i: int in range(2, sorted_pets.size()):
+		var candidate: PetEntity = sorted_pets[i]
+		var rel_a: Dictionary = _get_or_create_relationship(candidate.pet_id, pet1.pet_id)
+		var rel_b: Dictionary = _get_or_create_relationship(candidate.pet_id, pet2.pet_id)
+		var max_aff: float = maxf(rel_a.get("affinity", 0.0), rel_b.get("affinity", 0.0))
+		if max_aff > best_affinity:
+			best_affinity = max_aff
+			best_third = candidate
+
+	if best_third == null:
+		return [] as Array[PetEntity]
+
+	var result: Array[PetEntity] = [pet1, pet2, best_third]
+	return result
 
 
 # === 会話ムードシステム ===
@@ -423,6 +522,296 @@ func start_conversation(pet1: PetEntity, pet2: PetEntity, trigger: String) -> vo
 
 	# 会話完了処理（contextを渡してHebbian強化に使う）
 	_finalize_conversation(pet1, pet2, trigger, context)
+
+
+# === グループ会話（3匹） ===
+func start_group_conversation(pets: Array[PetEntity], trigger: String) -> void:
+	## 3匹のペットによるグループ会話（API経路）
+	if is_conversation_active:
+		return
+	if pets.size() < 3:
+		push_warning("[AtoA] Group conversation requires 3 pets")
+		return
+
+	# 倫理セーフガード
+	if GameManager.instance and GameManager.instance.ethical_safeguard:
+		if not GameManager.instance.ethical_safeguard.record_a2a_conversation():
+			print("[AtoA] Daily conversation limit reached — skipping group")
+			return
+
+	is_conversation_active = true
+	current_conversation = []
+
+	var pet_ids: Array[int] = []
+	for p: PetEntity in pets:
+		pet_ids.append(p.pet_id)
+	conversation_started.emit(pet_ids)
+	group_conversation_started.emit(pet_ids)
+
+	# 言語進化の現在の文法を取得
+	var grammar: Dictionary = GameManager.language_evolution.get_current_grammar()
+	var system_prompt := _build_system_prompt(grammar)
+	var context := _build_conversation_context(pets[0], pets[1], trigger)
+	# グループ用追加コンテキスト
+	context["is_group"] = true
+	context["pet3_id"] = pets[2].pet_id
+	context["pet3_personality"] = pets[2].personality
+	context["pet3_emotions"] = pets[2].emotions
+
+	# 会話ムード計算（最初の2匹ベース）
+	var conv_mood: Dictionary = _calculate_conversation_mood(pets[0], pets[1])
+	context["conversation_mood"] = conv_mood
+
+	# グループ会話ターン数: 4-6
+	var max_turns: int = randi_range(MIN_TURNS_GROUP_CONVERSATION, MAX_TURNS_GROUP_CONVERSATION)
+	var turn := 0
+
+	while turn < max_turns:
+		# ラウンドロビン: pet1 → pet2 → pet3 → pet1 → ...
+		var speaker_idx: int = turn % 3
+		var prev_idx: int = (turn - 1) % 3 if turn > 0 else 2
+		var current_pet: PetEntity = pets[speaker_idx]
+		var prev_pet: PetEntity = pets[prev_idx]
+
+		# グループ用のターンプロンプトを構築
+		var prompt := _build_group_turn_prompt(current_pet, prev_pet, pets, context, turn)
+		var response: String = await claude_client.generate(system_prompt, prompt)
+
+		var message := {
+			"pet_id": current_pet.pet_id,
+			"pet_name": current_pet.pet_name,
+			"message": response,
+			"turn": turn,
+			"emotion": _get_dominant_emotion(current_pet),
+			"word_order": grammar["word_order"],
+			"trigger": context.get("trigger", ""),
+			"is_group": true,
+		}
+		# 性格方言フィルター
+		response = _apply_personality_dialect(response, current_pet)
+		var compliance: Dictionary = _check_language_compliance(response, grammar)
+		message["language_compliance"] = compliance
+		message["message"] = response
+
+		current_conversation.append(message)
+		conversation_message.emit(current_pet.pet_id, response, message)
+
+		# 全他参加者への感情反応
+		for other: PetEntity in pets:
+			if other.pet_id != current_pet.pet_id:
+				_process_conversation_emotion(current_pet, other, response)
+
+		# 会話記憶を更新
+		_update_conversation_memory(current_pet.pet_id, message)
+
+		turn += 1
+
+		# 自然終了チェック
+		if response.length() < 20 and turn >= MIN_TURNS_GROUP_CONVERSATION:
+			break
+
+	# 会話完了処理（全ペアの関係性を更新）
+	_finalize_group_conversation(pets, trigger, context)
+
+
+func _build_group_turn_prompt(
+	speaker: PetEntity, prev_speaker: PetEntity,
+	all_pets: Array[PetEntity], context: Dictionary, turn: int
+) -> String:
+	## グループ会話用のターンプロンプト（2匹用と同程度のトークン長を維持）
+	var recent_messages := ""
+	for msg in current_conversation.slice(-3):
+		recent_messages += "%s: %s\n" % [msg["pet_name"], msg["message"]]
+
+	# 他の参加者名一覧
+	var other_names: Array[String] = []
+	for p: PetEntity in all_pets:
+		if p.pet_id != speaker.pet_id:
+			other_names.append(p.pet_name)
+
+	var personality_desc := _describe_personality_vividly(speaker.personality)
+	var emotion_desc := _describe_emotions_with_intensity(speaker.emotions)
+
+	# 会話ムードコンテキスト
+	var mood_context := ""
+	var conv_mood: Dictionary = context.get("conversation_mood", {})
+	if not conv_mood.is_empty():
+		mood_context = "\nThe mood of this conversation is %s." % conv_mood.get("mood", "curious")
+
+	# 前の発言者への言及
+	var address_hint := ""
+	if turn > 0:
+		address_hint = "\n%s just spoke. You may respond to them or address the group." % prev_speaker.pet_name
+
+	return """You are %s. %s. Right now you feel: %s.
+You're in a group conversation with %s in a %s environment.%s%s
+%s
+
+Respond naturally as %s. Keep it short (1-2 sentences).
+Turn %d of a group conversation.""" % [
+		speaker.pet_name, personality_desc, emotion_desc,
+		" and ".join(other_names), context["environment"],
+		mood_context, address_hint,
+		recent_messages if recent_messages else "(Start the conversation)",
+		speaker.pet_name, turn + 1,
+	]
+
+
+func _finalize_group_conversation(pets: Array[PetEntity], trigger: String,
+		conv_context: Dictionary = {}) -> void:
+	## グループ会話の完了処理 — 全ペアの関係性を更新
+	is_conversation_active = false
+
+	# 会話スレッドID
+	var conv_id: int = _next_conversation_id
+	_next_conversation_id += 1
+	for msg: Dictionary in current_conversation:
+		msg["conversation_id"] = conv_id
+
+	# ムードをログに付与
+	var conv_mood: Dictionary = conv_context.get("conversation_mood", {})
+	for msg: Dictionary in current_conversation:
+		if not conv_mood.is_empty():
+			msg["conversation_mood"] = conv_mood.get("mood", "")
+			msg["conversation_mood_intensity"] = conv_mood.get("intensity", 0.0)
+
+	# サマリー生成
+	var pet_names: Array[String] = []
+	for p: PetEntity in pets:
+		pet_names.append(p.pet_name)
+	var conv_summary: String = "%s group talked about %s (%d turns)" % [
+		" & ".join(pet_names), trigger, current_conversation.size()]
+	for msg: Dictionary in current_conversation:
+		msg["summary"] = conv_summary
+
+	# ログに保存
+	conversation_log.append_array(current_conversation)
+
+	# コスト記録
+	_record_conversation_cost(current_conversation.size())
+
+	# 全ペア間の関係性更新
+	for i: int in range(pets.size()):
+		for j: int in range(i + 1, pets.size()):
+			_increment_conversation_count(pets[i].pet_id, pets[j].pet_id)
+			_increment_conversation_count(pets[j].pet_id, pets[i].pet_id)
+			var quality: float = clampf(_get_emotion_intensity(pets[i]), 0.1, 1.0)
+			_update_relationship(pets[i].pet_id, pets[j].pet_id, quality)
+
+			# PersistentField: 関係性スコア更新
+			if GameManager.instance and GameManager.instance.persistent_field:
+				var rel_boost: float = 0.02 + _get_emotion_intensity(pets[i]) * 0.03
+				GameManager.instance.persistent_field.update_relationship(
+					pets[i].pet_id, pets[j].pet_id, rel_boost)
+
+	# 言語進化に通知
+	var dominant_emotion := _get_dominant_emotion(pets[0])
+	var emotion_intensity := _get_emotion_intensity(pets[0])
+	var avg_personality := {}
+	for t_name in pets[0].personality:
+		var total: float = 0.0
+		for p: PetEntity in pets:
+			total += p.personality.get(t_name, 0.0)
+		avg_personality[t_name] = total / float(pets.size())
+
+	var lang_context := {
+		"dominant_emotion": dominant_emotion,
+		"emotion_intensity": emotion_intensity,
+		"avg_personality": avg_personality,
+		"environment": pets[0].current_environment,
+		"topics": GameManager.ecosystem.get_a2a_topics(),
+		"trigger": trigger,
+		"turn_count": current_conversation.size(),
+		"is_group": true,
+	}
+	GameManager.language_evolution.on_conversation_completed(lang_context)
+
+	# 進化トリガー
+	evolution_triggered_by_conversation.emit(trigger)
+
+	# 言語進化処理
+	_process_language_evolution(current_conversation)
+
+	# 全ペットの記憶に追加
+	var pet_ids: Array[int] = []
+	for p: PetEntity in pets:
+		pet_ids.append(p.pet_id)
+		var others: Array[String] = []
+		for q: PetEntity in pets:
+			if q.pet_id != p.pet_id:
+				others.append(q.pet_name)
+		p.add_memory({"type": "group_conversation", "with": pet_ids.duplicate(),
+			"trigger": trigger, "turn_count": current_conversation.size()})
+		_register_conversation_memory(p, current_conversation, " & ".join(others))
+
+	# BiologicalMemorySystem: Hebbian強化
+	if GameManager.instance and GameManager.instance.biological_memory:
+		var bio_mem: Node = GameManager.instance.biological_memory
+		for mem in conv_context.get("bio_memories_1", []):
+			bio_mem.strengthen_related_memories(pets[0].pet_id, mem)
+		for mem in conv_context.get("bio_memories_2", []):
+			bio_mem.strengthen_related_memories(pets[1].pet_id, mem)
+
+	# PersistentField: 共有イベント記録
+	if GameManager.instance and GameManager.instance.persistent_field:
+		GameManager.instance.persistent_field.record_shared_event({
+			"type": "a2a_group_conversation",
+			"participants": pet_ids,
+			"trigger": trigger,
+			"turn_count": current_conversation.size(),
+			"environment": pets[0].current_environment,
+			"dominant_emotion": dominant_emotion,
+		})
+
+	# 会話ハイライトスコア
+	var highlight_data: Dictionary = _score_conversation(current_conversation, pets[0], pets[1])
+	for msg: Dictionary in current_conversation:
+		msg["highlight_score"] = highlight_data.get("score", 0.0)
+		msg["highlight_type"] = highlight_data.get("highlight_type", "ordinary")
+		msg["highlight_reason"] = highlight_data.get("highlight_reason", "")
+
+	# PetBook投稿
+	var posts := _generate_conversation_posts(pets[0], pets[1], current_conversation, trigger, highlight_data)
+	if GameManager.instance and GameManager.instance.has_method("queue_petbook_posts"):
+		for post in posts:
+			GameManager.instance.queue_petbook_posts(post)
+
+	# 傍観者リアクション（グループ参加者以外）
+	_trigger_group_observer_reactions(pets, dominant_emotion, current_conversation)
+
+	conversation_ended.emit(pet_ids, conv_summary)
+	current_conversation = []
+
+
+func _trigger_group_observer_reactions(participants: Array[PetEntity],
+		dominant_emotion: String, conversation: Array[Dictionary]) -> void:
+	## グループ会話の傍観者リアクション（参加者以外のペット）
+	var participant_ids: Array[int] = []
+	for p: PetEntity in participants:
+		participant_ids.append(p.pet_id)
+
+	var all_pets: Array = GameManager.get_all_pets()
+	for pet: Variant in all_pets:
+		if pet is PetEntity and pet.is_alive and pet.pet_id not in participant_ids:
+			# 感情伝染
+			if dominant_emotion != "neutral":
+				GameManager.emotion_system.stimulate(pet, dominant_emotion, 0.1, "observed_group_conversation")
+			# 15%の確率でリアクション
+			if randf() < 0.15 and conversation.size() >= 2:
+				var reaction: String = _generate_observer_reaction(
+					pet, participants[0], participants[1], dominant_emotion)
+				if not reaction.is_empty():
+					var msg: Dictionary = {
+						"pet_id": pet.pet_id,
+						"pet_name": pet.pet_name,
+						"message": reaction,
+						"emotion": _get_dominant_emotion(pet),
+						"is_template": true,
+						"is_observer": true,
+						"is_group": true,
+					}
+					conversation_log.append(msg)
+					conversation_message.emit(pet.pet_id, reaction, msg)
 
 
 # === リアクション会話（死亡・蘇生・交配時など） ===
@@ -1353,6 +1742,139 @@ func _run_template_conversation(pet1: PetEntity, pet2: PetEntity, trigger: Strin
 	# 完了処理（テンプレートでも言語進化に寄与、ムードコンテキストを渡す）
 	_finalize_conversation(pet1, pet2, trigger, {"conversation_mood": conv_mood})
 	print("[AtoA] Template conversation completed (%d turns, mood: %s)" % [template_messages.size(), conv_mood.get("mood", "unknown")])
+
+
+# === グループテンプレート会話実行 ===
+func _run_group_template_conversation(pets: Array[PetEntity], trigger: String) -> void:
+	## 予算切れ時にテンプレートでグループ会話を生成・再生する
+	if pets.size() < 3:
+		return
+	is_conversation_active = true
+	current_conversation = []
+
+	var conv_mood: Dictionary = _calculate_conversation_mood(pets[0], pets[1])
+	var template_messages: Array[Dictionary] = _generate_group_template_conversation(pets, trigger, conv_mood)
+
+	for msg: Dictionary in template_messages:
+		current_conversation.append(msg)
+		conversation_message.emit(msg["pet_id"], msg["message"], msg)
+
+		# 感情反応（全他参加者へ）
+		var speaker: PetEntity = null
+		for p: PetEntity in pets:
+			if p.pet_id == msg["pet_id"]:
+				speaker = p
+				break
+		if speaker != null:
+			for other: PetEntity in pets:
+				if other.pet_id != speaker.pet_id:
+					_process_conversation_emotion(speaker, other, msg["message"])
+
+	# グループ完了処理
+	_finalize_group_conversation(pets, trigger, {"conversation_mood": conv_mood})
+	print("[AtoA] Group template conversation completed (%d turns, mood: %s)" % [
+		template_messages.size(), conv_mood.get("mood", "unknown")])
+
+
+func _generate_group_template_conversation(pets: Array[PetEntity], trigger: String,
+		conv_mood: Dictionary = {}) -> Array[Dictionary]:
+	## 3匹用テンプレート会話を生成
+	var result: Array[Dictionary] = []
+
+	# トリガーに合致するグループテンプレートを探す
+	var matching_entries: Array = []
+	for tpl: Dictionary in GROUP_TEMPLATE_CONVERSATIONS:
+		if tpl.get("trigger", "") == trigger:
+			matching_entries = tpl.get("entries", [])
+			break
+
+	# マッチしない場合はムードに基づいてフォールバック
+	if matching_entries.is_empty():
+		var mood_name: String = conv_mood.get("mood", "")
+		# ムードからグループトリガーを推薦
+		var mood_group_map: Dictionary = {
+			"playful": "gathering",
+			"competitive": "debate",
+			"nostalgic": "storytelling",
+			"supportive": "comfort_group",
+			"serious": "comfort_group",
+			"curious": "debate",
+		}
+		var preferred: String = mood_group_map.get(mood_name, "")
+		if not preferred.is_empty():
+			for tpl: Dictionary in GROUP_TEMPLATE_CONVERSATIONS:
+				if tpl.get("trigger", "") == preferred:
+					matching_entries = tpl.get("entries", [])
+					break
+
+	# 最終フォールバック: ランダム
+	if matching_entries.is_empty() and not GROUP_TEMPLATE_CONVERSATIONS.is_empty():
+		matching_entries = GROUP_TEMPLATE_CONVERSATIONS[randi() % GROUP_TEMPLATE_CONVERSATIONS.size()].get("entries", [])
+
+	if matching_entries.is_empty():
+		return result
+
+	# 文法・接尾辞を取得
+	var grammar: Dictionary = GameManager.language_evolution.get_current_grammar()
+	var suffix_list: Array = []
+	var suffixes_raw: Variant = grammar.get("suffixes", [])
+	if suffixes_raw is Array:
+		suffix_list = suffixes_raw
+	elif suffixes_raw is Dictionary:
+		for key: String in suffixes_raw:
+			suffix_list.append(str(suffixes_raw[key]))
+
+	# 語彙マップ
+	var vocab_replacements: Dictionary = {}
+	if GameManager.instance and GameManager.instance.original_language:
+		var vocab: Dictionary = GameManager.instance.original_language.get_full_vocabulary()
+		for key: String in vocab:
+			var entry: Dictionary = vocab[key]
+			if entry.get("strength", 0.0) > 0.3:
+				vocab_replacements[entry.get("human_word", "")] = entry.get("ai_term", "")
+
+	var lang_stage: int = 0
+	if GameManager.instance and GameManager.instance.original_language:
+		lang_stage = GameManager.instance.original_language.get_language_stage().get("stage", 0)
+
+	var turn := 0
+	for entry: Variant in matching_entries:
+		var entry_dict: Dictionary = entry as Dictionary
+		var speaker_idx: int = entry_dict.get("speaker_index", 0)
+		if speaker_idx >= pets.size():
+			speaker_idx = 0
+		var current_pet: PetEntity = pets[speaker_idx]
+
+		var selected_suffix: String = suffix_list[randi() % suffix_list.size()] if not suffix_list.is_empty() else "-mii"
+
+		var message: String = entry_dict.get("template", "")
+		message = message.replace("{pet1}", pets[0].pet_name)
+		message = message.replace("{pet2}", pets[1].pet_name)
+		message = message.replace("{pet3}", pets[2].pet_name)
+		message = message.replace("{suffix}", selected_suffix)
+		message = message.replace("{greeting}", ["hello", "hi", "hey"][randi() % 3])
+
+		# 独自語彙注入
+		if lang_stage >= 1 and not vocab_replacements.is_empty():
+			for human_word: String in vocab_replacements:
+				if message.containsn(human_word) and randf() < 0.6:
+					message = message.replacen(human_word, vocab_replacements[human_word])
+
+		result.append({
+			"pet_id": current_pet.pet_id,
+			"pet_name": current_pet.pet_name,
+			"message": message,
+			"turn": turn,
+			"emotion": _get_dominant_emotion(current_pet),
+			"emotion_intensity": randf_range(0.2, 0.5),
+			"is_template": true,
+			"is_group": true,
+			"environment": current_pet.current_environment,
+			"reactions": [] as Array[Dictionary],
+		})
+		turn += 1
+
+	return result
 
 
 # === 会話レスポンスの言語進化処理 ===
@@ -2487,6 +3009,18 @@ func trigger_conversation_now() -> void:
 
 	if alive_pets.size() < 2:
 		push_warning("[AtoA] Need at least 2 alive pets for conversation")
+		return
+
+	# グループ会話を試行（手動でも20%の確率）
+	var group_pets: Array[PetEntity] = _select_group_participants(alive_pets)
+	if group_pets.size() == 3:
+		if not _check_budget():
+			print("[AtoA] Manual trigger: budget exhausted — using group template")
+			_run_group_template_conversation(group_pets, "player_triggered")
+			return
+		print("[AtoA] Manual trigger: starting group conversation with %s, %s, %s" % [
+			group_pets[0].pet_name, group_pets[1].pet_name, group_pets[2].pet_name])
+		await start_group_conversation(group_pets, "player_triggered")
 		return
 
 	# 感情が最も高い2匹を選択（閾値なし）
