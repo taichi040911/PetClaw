@@ -110,8 +110,11 @@ func _try_api_call(system_prompt: String, user_prompt: String) -> String:
 	if parse_result != OK:
 		return ""
 
+	if not json.data is Dictionary:
+		push_warning("ClaudeAPIClient: unexpected JSON type: %s" % typeof(json.data))
+		return ""
 	var data: Dictionary = json.data
-	if data.has("content") and data["content"].size() > 0:
+	if data.has("content") and data["content"] is Array and data["content"].size() > 0:
 		return data["content"][0].get("text", "")
 
 	return ""
