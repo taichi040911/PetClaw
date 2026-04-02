@@ -28,6 +28,7 @@ var is_conversation_active: bool = false
 var conversation_log: Array[Dictionary] = []       # 全会話ログ
 var current_conversation: Array[Dictionary] = []   # 現在進行中の会話
 var last_daily_reset: int = 0                      # 最後にリセットされた日付
+var _next_conversation_id: int = 0                 # 会話スレッドID（自動インクリメント）
 
 # === Relationship Tracking ===
 # Key: "petA_petB" (sorted IDs), Value: Dictionary with affinity, conversations_together, shared_words, relationship_type
@@ -834,10 +835,72 @@ func _register_conversation_memory(pet: PetEntity, conversation: Array[Dictionar
 		bio_mem.record_memory(pet.pet_id, memory_entry)
 
 
-func _generate_conversation_posts(pet1: PetEntity, pet2: PetEntity, conversation: Array[Dictionary]) -> Array[Dictionary]:
-	## 会話からPetBook投稿を生成
-	## 各ペットが会話について投稿する可能性
-	## 投稿タイプは会話内容に依存
+## テンプレート: recap（会話の要約）
+const RECAP_TEMPLATES: Array[String] = [
+	"Just had the best talk with {partner}! We talked about {topic} {suffix}",
+	"Me and {partner} just chatted about {topic}. Good vibes {suffix}",
+	"Had a long conversation with {partner} about {topic}... still thinking about it {suffix}",
+	"{partner} and I discussed {topic} today. So much to unpack {suffix}",
+	"Spent some quality time talking with {partner} about {topic} {suffix}",
+	"Can't believe how much we covered! {partner} and I went deep on {topic} {suffix}",
+	"Just got done chatting with {partner}. {topic} is such a fascinating subject {suffix}",
+]
+
+## テンプレート: quote（会話中の印象的な発言）
+const QUOTE_TEMPLATES: Array[String] = [
+	"'{quote}' - best thing I heard today {suffix}",
+	"{partner} said '{quote}' and I can't stop thinking about it {suffix}",
+	"'{quote}' ...wow. Just wow {suffix}",
+	"Memorable words from {partner}: '{quote}' {suffix}",
+	"Quote of the day: '{quote}' - {partner} {suffix}",
+	"'{quote}' - {partner} really knows how to say things {suffix}",
+]
+
+## テンプレート: feeling（会話後の気持ち）
+const FEELING_TEMPLATES: Array[String] = [
+	"Feeling {emotion} after chatting with {partner} {suffix}",
+	"That talk with {partner} left me feeling so {emotion} {suffix}",
+	"Is it normal to feel this {emotion} after a conversation? Thanks {partner} {suffix}",
+	"My heart is full of {emotion} right now. {partner} always does this to me {suffix}",
+	"Conversations with {partner} always make me feel {emotion} {suffix}",
+	"{emotion}... that's the word. Thanks for the talk, {partner} {suffix}",
+]
+
+## 関係性に基づくパートナー呼称テンプレート
+const PARTNER_LABEL_FRIEND: Array[String] = [
+	"my friend {name}",
+	"my buddy {name}",
+	"bestie {name}",
+	"good pal {name}",
+]
+const PARTNER_LABEL_ACQUAINTANCE: Array[String] = [
+	"{name}",
+	"someone called {name}",
+]
+
+## トピック表示名マップ
+const TOPIC_DISPLAY_NAMES: Dictionary = {
+	"spontaneous": "life",
+	"night": "the night sky",
+	"dream": "dreams",
+	"greeting": "how our day started",
+	"food": "food",
+	"comfort": "feelings",
+	"play": "games and fun",
+	"curiosity": "the unknown",
+	"memory": "old memories",
+	"language": "our secret words",
+	"weather": "the weather",
+}
+
+
+func _generate_conversation_posts(
+	pet1: PetEntity, pet2: PetEntity,
+	conversation: Array[Dictionary],
+	topic: String, highlight_data: Dictionary
+) -> Array[Dictionary]:
+	## 会話からPetBook投稿を1〜3件生成（テンプレートベース、API呼び出しなし）
+	## 投稿タイプ: recap（要約）, quote（引用）, feeling（感想）
 
 	var posts: Array[Dictionary] = []
 
@@ -845,20 +908,27 @@ func _generate_conversation_posts(pet1: PetEntity, pet2: PetEntity, conversation
 		return posts
 
 	# 会話全体の感情トーン分析
-	var dominant_emotion := _analyze_conversation_tone(conversation)
-	var intensity := _analyze_conversation_intensity(conversation)
+	var dominant_emotion: String = _analyze_conversation_tone(conversation)
+	var intensity: float = _analyze_conversation_intensity(conversation)
+	var highlight_score: float = highlight_data.get("score", 0.0)
 
-	# ペット1の投稿
-	if randf() < 0.4:  # 40%確率で投稿
-		var post1 := _create_post_from_conversation(pet1, pet2, conversation, dominant_emotion, intensity)
-		if post1:
-			posts.append(post1)
+	# 投稿する著者を決定（片方 or 両方）
+	# 各ペットが投稿する確率: 基本50%, ハイライトスコアが高いほどUP
+	var post_chance: float = 0.5 + clampf(highlight_score / 100.0, 0.0, 0.3)
 
-	# ペット2の投稿
-	if randf() < 0.4:
-		var post2 := _create_post_from_conversation(pet2, pet1, conversation, dominant_emotion, intensity)
-		if post2:
-			posts.append(post2)
+	# ペット1の投稿群を生成
+	if randf() < post_chance:
+		var pet1_posts: Array[Dictionary] = _create_multi_posts(
+			pet1, pet2, conversation, topic, dominant_emotion, intensity, highlight_score
+		)
+		posts.append_array(pet1_posts)
+
+	# ペット2の投稿群を生成
+	if randf() < post_chance:
+		var pet2_posts: Array[Dictionary] = _create_multi_posts(
+			pet2, pet1, conversation, topic, dominant_emotion, intensity, highlight_score
+		)
+		posts.append_array(pet2_posts)
 
 	return posts
 
@@ -866,14 +936,14 @@ func _generate_conversation_posts(pet1: PetEntity, pet2: PetEntity, conversation
 func _analyze_conversation_tone(conversation: Array[Dictionary]) -> String:
 	## 会話の全体的な感情トーンを分析
 	var emotion_counts: Dictionary = {}
-	for msg in conversation:
-		var emotion = msg.get("emotion", "neutral")
+	for msg: Dictionary in conversation:
+		var emotion: String = msg.get("emotion", "neutral")
 		emotion_counts[emotion] = emotion_counts.get(emotion, 0) + 1
 
 	# 最頻出の感情を返す
 	var dominant := "neutral"
 	var max_count := 0
-	for emotion in emotion_counts:
+	for emotion: String in emotion_counts:
 		if emotion_counts[emotion] > max_count:
 			max_count = emotion_counts[emotion]
 			dominant = emotion
@@ -887,37 +957,95 @@ func _analyze_conversation_intensity(conversation: Array[Dictionary]) -> float:
 		return 0.0
 
 	var total_intensity := 0.0
-	for msg in conversation:
+	for msg: Dictionary in conversation:
 		total_intensity += msg.get("emotion_intensity", 0.3)
 
 	return total_intensity / conversation.size()
 
 
-func _create_post_from_conversation(
+func _create_multi_posts(
 	author: PetEntity, partner: PetEntity,
 	conversation: Array[Dictionary],
+	topic: String, dominant_emotion: String,
+	intensity: float, highlight_score: float
+) -> Array[Dictionary]:
+	## 1ペットにつき1〜3件の投稿を生成（recap, quote, feeling から選択）
+	var result: Array[Dictionary] = []
+
+	# 関係性に基づくパートナー呼称
+	var partner_label: String = _get_partner_label(author.pet_id, partner)
+
+	# トピック表示名
+	var topic_display: String = TOPIC_DISPLAY_NAMES.get(topic, topic)
+
+	# 最も印象的なメッセージを抽出（quote用）
+	var best_quote: String = _pick_best_quote(conversation, author.pet_id)
+
+	# 投稿タイプの候補を決定
+	# recap は必ず候補に入る。quote は良い引用がある場合のみ。feeling は感情強度が一定以上。
+	var type_candidates: Array[String] = ["recap"]
+	if not best_quote.is_empty():
+		type_candidates.append("quote")
+	if intensity > 0.3:
+		type_candidates.append("feeling")
+
+	# 投稿数を決定: 1件（通常）、2件（強度高い or ハイライトスコア高い）、3件（両方高い）
+	var post_count: int = 1
+	if intensity > 0.5 or highlight_score > 40.0:
+		post_count = 2
+	if intensity > 0.7 and highlight_score > 60.0:
+		post_count = 3
+	post_count = mini(post_count, type_candidates.size())
+
+	# 候補をシャッフルして上位N件を選択
+	type_candidates.shuffle()
+	for i: int in range(post_count):
+		var ptype: String = type_candidates[i]
+		var post: Dictionary = _create_typed_post(
+			author, partner, ptype, partner_label, topic_display,
+			best_quote, dominant_emotion, intensity
+		)
+		if not post.is_empty():
+			result.append(post)
+
+	return result
+
+
+func _create_typed_post(
+	author: PetEntity, partner: PetEntity,
+	ptype: String, partner_label: String,
+	topic_display: String, best_quote: String,
 	dominant_emotion: String, intensity: float
 ) -> Dictionary:
-	## 個別の会話ベースポストを生成
+	## タイプ別テンプレートを選択して投稿Dictionaryを生成
 
-	# 投稿タイプを決定
-	var post_type := "DAILY"
-	match dominant_emotion:
-		"anger":
-			post_type = "REBEL" if intensity > 0.6 else "DAILY"
-		"sadness":
-			post_type = "MEMORIAL"
-		"joy":
+	var content: String = ""
+	var post_type: String = "DAILY"
+
+	match ptype:
+		"recap":
+			var templates: Array[String] = RECAP_TEMPLATES
+			var tpl: String = templates[randi() % templates.size()]
+			content = tpl.replace("{partner}", partner_label).replace("{topic}", topic_display).replace("{suffix}", "-{suffix}")
 			post_type = "DAILY"
-		"curiosity":
+		"quote":
+			var templates: Array[String] = QUOTE_TEMPLATES
+			var tpl: String = templates[randi() % templates.size()]
+			content = tpl.replace("{partner}", partner_label).replace("{quote}", best_quote).replace("{suffix}", "-{suffix}")
 			post_type = "EVENT"
+		"feeling":
+			var templates: Array[String] = FEELING_TEMPLATES
+			var tpl: String = templates[randi() % templates.size()]
+			var emotion_display: String = _emotion_to_display(dominant_emotion)
+			content = tpl.replace("{partner}", partner_label).replace("{emotion}", emotion_display).replace("{suffix}", "-{suffix}")
+			post_type = "DAILY"
 
-	# 投稿内容を構成
-	var content := "Talked with %s about... many things." % partner.pet_name
-	if intensity > 0.6:
-		content = "Had a deep conversation with %s-{suffix}. Lots of emotions." % partner.pet_name
-	elif intensity < 0.3:
-		content = "Saw %s today. Brief chat." % partner.pet_name
+	# 高強度の怒りは REBEL タイプに昇格
+	if dominant_emotion == "anger" and intensity > 0.6:
+		post_type = "REBEL"
+
+	if content.is_empty():
+		return {}
 
 	return {
 		"author_id": author.pet_id,
@@ -928,6 +1056,73 @@ func _create_post_from_conversation(
 		"partner_id": partner.pet_id,
 		"timestamp": Time.get_ticks_msec(),
 	}
+
+
+func _get_partner_label(author_id: int, partner: PetEntity) -> String:
+	## 関係性レベルに基づいてパートナーの呼び方を決定
+	var rel: Dictionary = _get_or_create_relationship(author_id, partner.pet_id)
+	var rel_type: String = rel.get("relationship_type", "acquaintances")
+	var affinity: float = rel.get("affinity", 0.3)
+
+	# friends / best_friends / rivals → 親しい呼び方
+	if affinity >= 0.6 or rel_type in ["friends", "best_friends", "companions"]:
+		var labels: Array[String] = PARTNER_LABEL_FRIEND
+		return labels[randi() % labels.size()].replace("{name}", partner.pet_name)
+	else:
+		var labels: Array[String] = PARTNER_LABEL_ACQUAINTANCE
+		return labels[randi() % labels.size()].replace("{name}", partner.pet_name)
+
+
+func _pick_best_quote(conversation: Array[Dictionary], exclude_pet_id: int) -> String:
+	## 会話から最も印象的なメッセージを選択（相手の発言から）
+	## 長すぎず短すぎない、感情強度の高いメッセージを優先
+	var best_msg: String = ""
+	var best_score: float = -1.0
+
+	for msg: Dictionary in conversation:
+		# 相手の発言のみ対象
+		if msg.get("pet_id", -1) == exclude_pet_id:
+			continue
+		var text: String = msg.get("message", "")
+		if text.length() < 10 or text.length() > 120:
+			continue
+		var msg_intensity: float = msg.get("emotion_intensity", 0.3)
+		# スコア = 感情強度 + 適切な長さボーナス
+		var length_bonus: float = 0.1 if text.length() >= 20 and text.length() <= 80 else 0.0
+		var score: float = msg_intensity + length_bonus
+		if score > best_score:
+			best_score = score
+			best_msg = text
+
+	# 80文字で切り詰め
+	if best_msg.length() > 80:
+		best_msg = best_msg.substr(0, 77) + "..."
+	return best_msg
+
+
+func _emotion_to_display(emotion: String) -> String:
+	## 感情名を投稿向けの表示文字列に変換
+	match emotion:
+		"joy":
+			return "happy"
+		"sadness":
+			return "a bit melancholy"
+		"anger":
+			return "fired up"
+		"fear":
+			return "uneasy"
+		"curiosity":
+			return "curious"
+		"love":
+			return "warm and fuzzy"
+		"excitement":
+			return "buzzing with energy"
+		"disgust":
+			return "unsettled"
+		"surprise":
+			return "amazed"
+		_:
+			return emotion
 
 
 # === コスト管理（P2原則） ===
@@ -1710,6 +1905,12 @@ func _finalize_conversation(pet1: PetEntity, pet2: PetEntity, trigger: String,
 		conv_context: Dictionary = {}) -> void:
 	is_conversation_active = false
 
+	# 会話スレッドIDを全メッセージに付与
+	var conv_id: int = _next_conversation_id
+	_next_conversation_id += 1
+	for msg: Dictionary in current_conversation:
+		msg["conversation_id"] = conv_id
+
 	# 会話ムードをログエントリに付与
 	var conv_mood: Dictionary = conv_context.get("conversation_mood", {})
 	for msg: Dictionary in current_conversation:
@@ -1806,12 +2007,6 @@ func _finalize_conversation(pet1: PetEntity, pet2: PetEntity, trigger: String,
 		var rel_boost: float = 0.02 + emotion_intensity * 0.03
 		pf.update_relationship(pet1.pet_id, pet2.pet_id, rel_boost)
 
-	# PetBook投稿を生成
-	var posts := _generate_conversation_posts(pet1, pet2, current_conversation)
-	if GameManager.instance and GameManager.instance.has_method("queue_petbook_posts"):
-		for post in posts:
-			GameManager.instance.queue_petbook_posts(post)
-
 	# 関係性更新（会話品質 = 感情強度ベース）
 	var conversation_quality: float = clampf(emotion_intensity, 0.1, 1.0)
 	_update_relationship(pet1.pet_id, pet2.pet_id, conversation_quality)
@@ -1822,6 +2017,12 @@ func _finalize_conversation(pet1: PetEntity, pet2: PetEntity, trigger: String,
 		msg["highlight_score"] = highlight_data.get("score", 0.0)
 		msg["highlight_type"] = highlight_data.get("highlight_type", "ordinary")
 		msg["highlight_reason"] = highlight_data.get("highlight_reason", "")
+
+	# PetBook投稿を生成（highlight_data利用のためスコアリング後に実行）
+	var posts := _generate_conversation_posts(pet1, pet2, current_conversation, trigger, highlight_data)
+	if GameManager.instance and GameManager.instance.has_method("queue_petbook_posts"):
+		for post in posts:
+			GameManager.instance.queue_petbook_posts(post)
 
 	# 傍観者リアクション（3匹以上いる場合）
 	_trigger_observer_reactions(pet1, pet2, dominant_emotion, current_conversation)
@@ -2233,6 +2434,7 @@ func to_dict() -> Dictionary:
 		"last_daily_reset": last_daily_reset,
 		"pet_relationships": pet_relationships,
 		"conversation_memory": conversation_memory,
+		"next_conversation_id": _next_conversation_id,
 	}
 
 
@@ -2249,6 +2451,7 @@ func from_dict(data: Dictionary) -> void:
 	if data.has("pet_relationships"):
 		pet_relationships = data["pet_relationships"]
 	conversation_memory = data.get("conversation_memory", {})
+	_next_conversation_id = data.get("next_conversation_id", 0)
 
 	# 日付が変わっていればリセット
 	var current_day := int(Time.get_unix_time_from_system() / 86400)

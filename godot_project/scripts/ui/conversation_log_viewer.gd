@@ -16,6 +16,7 @@ var _refresh_timer: float = 0.0
 var _relationships_container: VBoxContainer
 var _highlights_container: VBoxContainer
 var _last_displayed_pet_name: String = ""
+var _thread_containers: Dictionary = {}  # conversation_id -> VBoxContainer (message area)
 
 
 func _ready() -> void:
@@ -247,6 +248,7 @@ func _rebuild_log() -> void:
 
 
 func _add_conversation_log() -> void:
+	_thread_containers.clear()
 	if not GameManager.instance or not GameManager.instance.a2a_system:
 		var empty_label: Label = Label.new()
 		empty_label.text = "No conversations yet. Pets will start talking when emotions run high!"
@@ -266,25 +268,286 @@ func _add_conversation_log() -> void:
 		_vbox.add_child(empty_label)
 		return
 
+	# グループ化: conversation_id でスレッドにまとめる
+	var threads: Dictionary = {}  # conversation_id -> Array[Dictionary]
+	var thread_order: Array[int] = []  # 出現順を保持
+	var unthreaded: Array[Dictionary] = []  # conversation_id なしのメッセージ
+
+	for msg: Variant in log:
+		if not msg is Dictionary:
+			continue
+		var d: Dictionary = msg as Dictionary
+		if d.has("conversation_id"):
+			var cid: int = int(d["conversation_id"])
+			if not threads.has(cid):
+				threads[cid] = []
+				thread_order.append(cid)
+			threads[cid].append(d)
+		else:
+			unthreaded.append(d)
+
 	# セクションタイトル
+	var thread_count: int = threads.size() + (1 if not unthreaded.is_empty() else 0)
 	var log_title: Label = Label.new()
-	log_title.text = "📜 Recent Conversations (%d total)" % log.size()
+	log_title.text = "📜 Conversations (%d threads, %d messages)" % [thread_count, log.size()]
 	log_title.add_theme_font_size_override("font_size", 14)
 	log_title.add_theme_color_override("font_color", Color(0.7, 0.7, 0.85))
 	_vbox.add_child(log_title)
 
-	# 最新20件を逆順で表示
-	var display_log: Array = log.slice(-20)
-	display_log.reverse()
+	# 最新20スレッドを逆順で表示
+	var display_thread_ids: Array[int] = []
+	var start_idx: int = maxi(thread_order.size() - 20, 0)
+	for i: int in range(start_idx, thread_order.size()):
+		display_thread_ids.append(thread_order[i])
+	display_thread_ids.reverse()
 
-	_last_displayed_pet_name = ""
-	for msg: Variant in display_log:
-		if not msg is Dictionary:
-			continue
-		_add_message_bubble(msg as Dictionary)
+	# 最新3件は展開、残りは折りたたみ
+	var expanded_count: int = 0
+	for cid: int in display_thread_ids:
+		var msgs: Array = threads[cid]
+		var is_expanded: bool = expanded_count < 3
+		_add_conversation_thread(cid, msgs, is_expanded)
+		expanded_count += 1
+
+	# conversation_id なしのメッセージ（フラット表示、後方互換）
+	if not unthreaded.is_empty():
+		var flat_title: Label = Label.new()
+		flat_title.text = "📝 Older Messages (no thread)"
+		flat_title.add_theme_font_size_override("font_size", 12)
+		flat_title.add_theme_color_override("font_color", Color(0.5, 0.5, 0.65))
+		_vbox.add_child(flat_title)
+
+		var display_unthreaded: Array = unthreaded.slice(-10)
+		display_unthreaded.reverse()
+		_last_displayed_pet_name = ""
+		for msg: Variant in display_unthreaded:
+			if msg is Dictionary:
+				_add_message_bubble(msg as Dictionary)
 
 	# 会話統計サマリー
 	_add_conversation_stats(log)
+
+
+func _add_conversation_thread(conv_id: int, messages: Array, expanded: bool) -> void:
+	## 1つの会話スレッドを折りたたみ可能なセクションとして追加
+	if messages.is_empty():
+		return
+
+	# スレッドコンテナ
+	var thread_panel: VBoxContainer = VBoxContainer.new()
+	thread_panel.add_theme_constant_override("separation", 2)
+	_vbox.add_child(thread_panel)
+
+	# ヘッダー情報を収集
+	var participants: Array[String] = []
+	var first_timestamp: String = ""
+	var highlight_score: float = 0.0
+	var summary: String = ""
+	for msg: Variant in messages:
+		if not msg is Dictionary:
+			continue
+		var d: Dictionary = msg as Dictionary
+		var pname: String = d.get("pet_name", "")
+		if not pname.is_empty() and not participants.has(pname):
+			participants.append(pname)
+		if first_timestamp.is_empty():
+			first_timestamp = d.get("timestamp", "")
+		var hs: float = d.get("highlight_score", 0.0)
+		if hs > highlight_score:
+			highlight_score = hs
+		if summary.is_empty():
+			summary = d.get("summary", "")
+
+	# ヘッダーボタン（クリックで展開/折りたたみ）
+	var header_btn: Button = Button.new()
+	var arrow: String = "▼" if expanded else "▶"
+	var participants_text: String = ", ".join(participants) if not participants.is_empty() else "Unknown"
+	var header_text: String = "%s #%d  %s" % [arrow, conv_id, participants_text]
+	if not first_timestamp.is_empty():
+		header_text += "  %s" % first_timestamp
+	if highlight_score > 0.4:
+		header_text += "  ⭐%.0f" % (highlight_score * 100.0)
+	header_text += "  (%d msgs)" % messages.size()
+	header_btn.text = header_text
+	header_btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
+
+	# ヘッダースタイル
+	var header_style: StyleBoxFlat = StyleBoxFlat.new()
+	header_style.bg_color = Color(0.1, 0.12, 0.18)
+	header_style.corner_radius_top_left = 6
+	header_style.corner_radius_top_right = 6
+	header_style.corner_radius_bottom_left = 2
+	header_style.corner_radius_bottom_right = 2
+	header_style.content_margin_left = 8
+	header_style.content_margin_right = 8
+	header_style.content_margin_top = 4
+	header_style.content_margin_bottom = 4
+	if highlight_score > 0.4:
+		header_style.border_width_left = 3
+		header_style.border_color = Color(0.85, 0.75, 0.25, 0.6)
+	header_btn.add_theme_stylebox_override("normal", header_style)
+	var header_hover: StyleBoxFlat = header_style.duplicate()
+	header_hover.bg_color = Color(0.14, 0.16, 0.24)
+	header_btn.add_theme_stylebox_override("hover", header_hover)
+	var header_pressed: StyleBoxFlat = header_style.duplicate()
+	header_pressed.bg_color = Color(0.08, 0.09, 0.14)
+	header_btn.add_theme_stylebox_override("pressed", header_pressed)
+	header_btn.add_theme_color_override("font_color", Color(0.7, 0.75, 0.9))
+	header_btn.add_theme_font_size_override("font_size", 11)
+	thread_panel.add_child(header_btn)
+
+	# サマリープレビュー（折りたたみ時のみ表示、最初のメッセージを60文字で切り詰め）
+	var preview_label: Label = Label.new()
+	var first_msg_text: String = ""
+	if not messages.is_empty() and messages[0] is Dictionary:
+		first_msg_text = (messages[0] as Dictionary).get("message", "")
+	if first_msg_text.length() > 60:
+		first_msg_text = first_msg_text.substr(0, 60) + "..."
+	preview_label.text = "  \"%s\"" % first_msg_text if not first_msg_text.is_empty() else ""
+	preview_label.add_theme_font_size_override("font_size", 10)
+	preview_label.add_theme_color_override("font_color", Color(0.45, 0.48, 0.6))
+	preview_label.autowrap_mode = TextServer.AUTOWRAP_WORD
+	preview_label.visible = not expanded
+	thread_panel.add_child(preview_label)
+
+	# メッセージコンテナ（展開時に表示）
+	var msg_container: VBoxContainer = VBoxContainer.new()
+	msg_container.add_theme_constant_override("separation", 4)
+	msg_container.visible = expanded
+	thread_panel.add_child(msg_container)
+
+	# メッセージバブルをコンテナ内に追加
+	_last_displayed_pet_name = ""
+	for msg: Variant in messages:
+		if not msg is Dictionary:
+			continue
+		_add_message_bubble_to(msg as Dictionary, msg_container)
+
+	# スレッドコンテナを記録
+	_thread_containers[conv_id] = msg_container
+
+	# ヘッダークリックで展開/折りたたみトグル
+	header_btn.pressed.connect(func() -> void:
+		var is_visible: bool = msg_container.visible
+		msg_container.visible = not is_visible
+		preview_label.visible = is_visible
+		# 矢印を更新
+		var new_arrow: String = "▼" if not is_visible else "▶"
+		header_btn.text = header_btn.text.substr(0, 0) + new_arrow + header_btn.text.substr(1)
+	)
+
+
+func _add_message_bubble_to(msg: Dictionary, container: VBoxContainer) -> void:
+	## メッセージバブルを指定コンテナに追加（スレッド内表示用）
+	var pet_name: String = msg.get("pet_name", "???")
+	var text: String = msg.get("message", "...")
+	var emotion: String = msg.get("emotion", "neutral")
+	var is_template: bool = msg.get("is_template", false)
+
+	# 連続メッセージ間の関係性インジケーター
+	if not _last_displayed_pet_name.is_empty() and _last_displayed_pet_name != pet_name:
+		var rel_indicator: Label = _build_relationship_indicator(_last_displayed_pet_name, pet_name)
+		if rel_indicator:
+			container.add_child(rel_indicator)
+	_last_displayed_pet_name = pet_name
+
+	var bubble: PanelContainer = PanelContainer.new()
+	var bubble_style: StyleBoxFlat = StyleBoxFlat.new()
+
+	var emotion_colors: Dictionary = {
+		"joy": Color(0.15, 0.18, 0.1),
+		"love": Color(0.18, 0.12, 0.15),
+		"excitement": Color(0.18, 0.16, 0.08),
+		"sadness": Color(0.1, 0.12, 0.18),
+		"fear": Color(0.14, 0.1, 0.16),
+		"neutral": Color(0.1, 0.11, 0.16),
+	}
+	bubble_style.bg_color = emotion_colors.get(emotion, Color(0.1, 0.11, 0.16))
+	bubble_style.corner_radius_top_left = 10
+	bubble_style.corner_radius_top_right = 10
+	bubble_style.corner_radius_bottom_left = 10
+	bubble_style.corner_radius_bottom_right = 10
+	bubble_style.content_margin_left = 10
+	bubble_style.content_margin_right = 10
+	bubble_style.content_margin_top = 6
+	bubble_style.content_margin_bottom = 6
+
+	if is_template:
+		bubble_style.border_width_left = 1
+		bubble_style.border_color = Color(0.4, 0.35, 0.2, 0.3)
+
+	bubble.add_theme_stylebox_override("panel", bubble_style)
+	container.add_child(bubble)
+
+	var content: VBoxContainer = VBoxContainer.new()
+	content.add_theme_constant_override("separation", 2)
+	bubble.add_child(content)
+
+	var emotion_icons: Dictionary = {
+		"joy": "☀", "love": "♥", "excitement": "⚡",
+		"sadness": "💧", "fear": "👁", "neutral": "·",
+	}
+	var header: Label = Label.new()
+	var tag: String = ""
+	var compliance: Dictionary = msg.get("language_compliance", {})
+	var has_invented_words: bool = false
+	if is_template:
+		tag = " [T]"
+	else:
+		var score: float = compliance.get("score", -1.0)
+		if score >= 0.0:
+			tag = " [%.0f%%]" % (score * 100.0)
+	var checks: Dictionary = compliance.get("checks", {})
+	if checks.get("uses_vocabulary", false):
+		has_invented_words = true
+		tag += " ✨"
+	header.text = "%s %s%s" % [emotion_icons.get(emotion, "·"), pet_name, tag]
+	header.add_theme_font_size_override("font_size", 11)
+	header.add_theme_color_override("font_color", Color(0.6, 0.65, 0.8))
+	content.add_child(header)
+
+	var summary_text: String = msg.get("summary", "")
+	if not summary_text.is_empty():
+		var summary_label: Label = Label.new()
+		summary_label.text = "📋 %s" % summary_text
+		summary_label.add_theme_font_size_override("font_size", 10)
+		summary_label.add_theme_color_override("font_color", Color(0.45, 0.5, 0.65))
+		content.add_child(summary_label)
+
+	var body: Label = Label.new()
+	if has_invented_words:
+		body.text = "✨ %s" % text
+	else:
+		body.text = text
+	body.add_theme_font_size_override("font_size", 13)
+	body.add_theme_color_override("font_color", Color(0.85, 0.85, 0.9))
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD
+	content.add_child(body)
+
+	var reactions: Array = msg.get("reactions", [])
+	if not reactions.is_empty():
+		var reactions_text: String = ""
+		for reaction: Variant in reactions:
+			if reaction is Dictionary:
+				var r: Dictionary = reaction
+				reactions_text += "%s %s  " % [r.get("emoji", ""), r.get("reactor_name", "")]
+		if not reactions_text.is_empty():
+			var reactions_label: Label = Label.new()
+			reactions_label.text = reactions_text.strip_edges()
+			reactions_label.add_theme_font_size_override("font_size", 9)
+			reactions_label.add_theme_color_override("font_color", Color(0.5, 0.55, 0.65))
+			content.add_child(reactions_label)
+
+	var word_teaching: Variant = msg.get("word_teaching", {})
+	if word_teaching is Dictionary and not (word_teaching as Dictionary).is_empty():
+		var wt: Dictionary = word_teaching as Dictionary
+		var wt_context: String = wt.get("teaching_context", "")
+		if not wt_context.is_empty():
+			var wt_label: Label = Label.new()
+			wt_label.text = "📚 %s" % wt_context
+			wt_label.add_theme_font_size_override("font_size", 9)
+			wt_label.add_theme_color_override("font_color", Color(0.5, 0.7, 0.45))
+			content.add_child(wt_label)
 
 
 func _add_message_bubble(msg: Dictionary) -> void:
