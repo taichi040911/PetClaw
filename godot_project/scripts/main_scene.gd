@@ -580,6 +580,14 @@ func _on_evolution_chosen(pet_id: int, form_id: String) -> void:
 			"pet_id": pet_id,
 		})
 
+	# イベント会話トリガー: 進化
+	if GameManager.instance and GameManager.instance.a2a_system:
+		var evolved_name: String = "Pet"
+		if GameManager.instance.pets.has(pet_id):
+			evolved_name = GameManager.instance.pets[pet_id].pet_name
+		GameManager.instance.a2a_system.trigger_event_conversation(
+			"evolution", {"pet_name": evolved_name})
+
 
 func _on_evolution_cancelled() -> void:
 	_evolution_screen = null
@@ -618,6 +626,13 @@ func _on_conversation_ended(participants: Array, summary: String) -> void:
 	# 会話終了時のサマリー通知
 	_show_language_toast("🗣️ %s" % summary, Color(0.5, 0.7, 0.9))
 
+	# イベント会話トリガー: マイルストーン（10会話ごと）
+	if GameManager.instance and GameManager.instance.a2a_system:
+		var total: int = GameManager.instance.a2a_system.daily_conversation_count
+		if total > 0 and total % 10 == 0:
+			GameManager.instance.a2a_system.trigger_event_conversation(
+				"milestone", {"count": total})
+
 
 # === Language Evolution Notifications ===
 
@@ -625,6 +640,10 @@ func _on_word_invented(word_data: Dictionary) -> void:
 	var ai_term: String = word_data.get("ai_term", "???")
 	var human_word: String = word_data.get("human_word", "???")
 	_show_language_toast("✨ New word: %s = '%s'" % [ai_term, human_word], Color(0.7, 0.6, 1.0))
+
+	# イベント会話トリガー: 新語発明
+	if GameManager.instance and GameManager.instance.a2a_system:
+		GameManager.instance.a2a_system.trigger_event_conversation("first_word")
 
 
 func _on_language_stage_up(new_stage: int, stage_name: String) -> void:
