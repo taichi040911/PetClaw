@@ -308,6 +308,9 @@ func _build_conversation_context(pet1: PetEntity, pet2: PetEntity, trigger: Stri
 			pet1.pet_id, pet2.pet_id
 		)
 
+	# 過去の会話履歴サマリーを取得（同じペアの最近の会話）
+	var past_summaries: Array[String] = _get_past_conversation_summaries(pet1.pet_id, pet2.pet_id, 3)
+
 	return {
 		"trigger": trigger,
 		"environment": pet1.current_environment,
@@ -324,7 +327,34 @@ func _build_conversation_context(pet1: PetEntity, pet2: PetEntity, trigger: Stri
 		"bio_memories_2": bio_memories_2,
 		"shared_memories": shared_memories,
 		"field_context": field_context,
+		"past_summaries": past_summaries,
 	}
+
+
+func _get_past_conversation_summaries(pet1_id: int, pet2_id: int, max_count: int) -> Array[String]:
+	## 過去のログから同じペアの会話サマリーを抽出
+	var summaries: Array[String] = []
+	var pair_ids: Array[int] = [pet1_id, pet2_id]
+
+	# ログを逆順に走査（新しい順）
+	for i: int in range(conversation_log.size() - 1, -1, -1):
+		if summaries.size() >= max_count:
+			break
+		var entry: Dictionary = conversation_log[i]
+		var entry_pid: int = entry.get("pet_id", -1)
+		if entry_pid in pair_ids:
+			var summary: String = entry.get("summary", "")
+			if not summary.is_empty() and summary not in summaries:
+				summaries.append(summary)
+			elif summary.is_empty():
+				# サマリーがなければメッセージの冒頭を使う
+				var msg: String = entry.get("message", "")
+				if msg.length() > 10:
+					var short_msg: String = msg.substr(0, 50) + "..."
+					if short_msg not in summaries:
+						summaries.append(short_msg)
+
+	return summaries
 
 
 func _build_turn_prompt(
@@ -377,13 +407,22 @@ func _build_turn_prompt(
 			for adv in recent_advs:
 				field_context_str += "%s " % adv.get("discovery", "")
 
+	# 過去の会話履歴
+	var past_context := ""
+	var past_summaries: Array = context.get("past_summaries", [])
+	if not past_summaries.is_empty():
+		past_context = "\nPrevious conversations with %s:\n" % listener.pet_name
+		for ps: Variant in past_summaries:
+			past_context += "- %s\n" % str(ps)
+
 	return """You are %s. Your personality: %s. Your current emotions: %s.
 You're talking to %s in a %s environment.
 Topics around you: %s
-%s%s%s
+%s%s%s%s
 %s
 
 Respond naturally as %s. Weave your memories into conversation naturally.
+Reference past conversations when relevant — you remember talking before.
 Express your feelings using your evolving pet language.
 Turn %d of the conversation.""" % [
 		speaker.pet_name, str(speaker.personality), str(speaker.emotions),
@@ -392,6 +431,7 @@ Turn %d of the conversation.""" % [
 		memory_context,
 		shared_context,
 		field_context_str,
+		past_context,
 		recent_messages if recent_messages else "(Start the conversation)",
 		speaker.pet_name, turn + 1,
 	]
@@ -857,6 +897,33 @@ func _get_participants_from_messages(messages: Array[Dictionary]) -> Array[PetEn
 	return result
 
 
+func _generate_conversation_summary(pet1: PetEntity, pet2: PetEntity, trigger: String) -> String:
+	## 会話の短いサマリーを生成（将来の会話で参照可能）
+	var dominant_emotion: String = _get_dominant_emotion(pet1)
+	var turn_count: int = current_conversation.size()
+
+	# メッセージから最も長い発言を抽出
+	var longest_msg: String = ""
+	for msg: Dictionary in current_conversation:
+		var text: String = msg.get("message", "")
+		if text.length() > longest_msg.length():
+			longest_msg = text
+
+	var summary_parts: Array[String] = []
+	summary_parts.append("%s & %s" % [pet1.pet_name, pet2.pet_name])
+
+	match trigger:
+		"spontaneous": summary_parts.append("chatted spontaneously")
+		"player_triggered": summary_parts.append("had a conversation")
+		"grief": summary_parts.append("mourned together")
+		"breeding_celebration": summary_parts.append("celebrated new life")
+		_: summary_parts.append("talked about %s" % trigger)
+
+	summary_parts.append("(%d turns, mood: %s)" % [turn_count, dominant_emotion])
+
+	return " ".join(summary_parts)
+
+
 # === 会話中の感情処理 ===
 func _process_conversation_emotion(speaker: PetEntity, listener: PetEntity, _message: String) -> void:
 	# 会話自体がaffection/joyを少し上げる
@@ -869,6 +936,11 @@ func _process_conversation_emotion(speaker: PetEntity, listener: PetEntity, _mes
 func _finalize_conversation(pet1: PetEntity, pet2: PetEntity, trigger: String,
 		conv_context: Dictionary = {}) -> void:
 	is_conversation_active = false
+
+	# 会話サマリーを生成してログエントリに付与
+	var conv_summary: String = _generate_conversation_summary(pet1, pet2, trigger)
+	for msg: Dictionary in current_conversation:
+		msg["summary"] = conv_summary
 
 	# ログに保存
 	conversation_log.append_array(current_conversation)
