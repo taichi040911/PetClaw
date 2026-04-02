@@ -112,6 +112,8 @@ func _ready() -> void:
 	pets_button.pressed.connect(_on_pets_pressed)
 	mute_button.pressed.connect(_on_mute_pressed)
 	settings_button.pressed.connect(_on_settings_pressed)
+	pet_name_label.gui_input.connect(_on_pet_name_tapped)
+	pet_name_label.mouse_filter = Control.MOUSE_FILTER_STOP
 
 	# スプラッシュスクリーン
 	$PetArea.visible = false
@@ -1057,6 +1059,19 @@ func _style_mute_button() -> void:
 	style.corner_radius_bottom_right = 8
 	mute_button.add_theme_stylebox_override("normal", style)
 	mute_button.add_theme_font_size_override("font_size", 16)
+
+
+# ========================================================
+# Pet Info Popup (Round 39)
+# ========================================================
+
+func _on_pet_name_tapped(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.pressed and current_pet:
+		if _sfx:
+			_sfx.play(SfxManager.SfxType.TAP)
+		var popup: PetInfoPopup = PetInfoPopup.new()
+		popup.setup(current_pet)
+		add_child(popup)
 
 
 # ========================================================
