@@ -1,18 +1,29 @@
 ## ConversationLogViewer — AtoA会話ログをスクロール可能なUIで表示
-## メイン画面のPetBookボタン隣に「💬 Chat」ボタンを追加し、
-## ペット同士の過去の会話を閲覧 + 言語進化状況を可視化
+## ペット同士の過去の会話を閲覧 + 言語進化状況を可視化 + 手動会話トリガー
 class_name ConversationLogViewer
 extends Control
 
 signal back_requested
+signal conversation_triggered  ## 手動会話トリガー時にMainSceneに通知
 
 var _vbox: VBoxContainer
 var _scroll: ScrollContainer
+var _trigger_button: Button
+var _status_label: Label
+var _refresh_timer: float = 0.0
 
 
 func _ready() -> void:
 	set_anchors_preset(PRESET_FULL_RECT)
 	_build_ui()
+
+
+func _process(delta: float) -> void:
+	# ステータス表示を定期更新
+	_refresh_timer += delta
+	if _refresh_timer >= 2.0:
+		_refresh_timer = 0.0
+		_update_status()
 
 
 func _build_ui() -> void:
@@ -66,7 +77,118 @@ func _build_ui() -> void:
 	# 言語進化ステータスカード
 	_add_language_status_card()
 
+	# 会話トリガーボタン + ステータス
+	_add_conversation_controls()
+
 	# 会話ログを表示
+	_add_conversation_log()
+
+
+func _add_conversation_controls() -> void:
+	var controls: HBoxContainer = HBoxContainer.new()
+	controls.alignment = BoxContainer.ALIGNMENT_CENTER
+	controls.add_theme_constant_override("separation", 12)
+	_vbox.add_child(controls)
+
+	# トリガーボタン
+	_trigger_button = Button.new()
+	_trigger_button.text = "⚡ Trigger Conversation"
+	_trigger_button.custom_minimum_size = Vector2(220, 48)
+	var btn_style: StyleBoxFlat = StyleBoxFlat.new()
+	btn_style.bg_color = Color(0.2, 0.35, 0.55)
+	btn_style.corner_radius_top_left = 12
+	btn_style.corner_radius_top_right = 12
+	btn_style.corner_radius_bottom_left = 12
+	btn_style.corner_radius_bottom_right = 12
+	_trigger_button.add_theme_stylebox_override("normal", btn_style)
+	var btn_hover: StyleBoxFlat = btn_style.duplicate()
+	btn_hover.bg_color = Color(0.25, 0.45, 0.7)
+	_trigger_button.add_theme_stylebox_override("hover", btn_hover)
+	var btn_pressed: StyleBoxFlat = btn_style.duplicate()
+	btn_pressed.bg_color = Color(0.15, 0.25, 0.4)
+	_trigger_button.add_theme_stylebox_override("pressed", btn_pressed)
+	_trigger_button.add_theme_color_override("font_color", Color(0.9, 0.95, 1.0))
+	_trigger_button.add_theme_font_size_override("font_size", 14)
+	_trigger_button.pressed.connect(_on_trigger_pressed)
+	controls.add_child(_trigger_button)
+
+	# ステータスラベル
+	_status_label = Label.new()
+	_status_label.add_theme_font_size_override("font_size", 11)
+	_status_label.add_theme_color_override("font_color", Color(0.5, 0.6, 0.75))
+	controls.add_child(_status_label)
+	_update_status()
+
+
+func _on_trigger_pressed() -> void:
+	if not GameManager.instance or not GameManager.instance.a2a_system:
+		return
+
+	var a2a: AtoAConversationSystem = GameManager.instance.a2a_system
+	var status: Dictionary = a2a.get_conversation_status()
+
+	if status["is_active"]:
+		_trigger_button.text = "⏳ In progress..."
+		_trigger_button.disabled = true
+		return
+
+	_trigger_button.text = "⏳ Starting..."
+	_trigger_button.disabled = true
+	conversation_triggered.emit()
+
+	# 会話をトリガー
+	a2a.trigger_conversation_now()
+
+	# 少し待ってからUI更新
+	await get_tree().create_timer(3.0).timeout
+	_trigger_button.text = "⚡ Trigger Conversation"
+	_trigger_button.disabled = false
+	_update_status()
+	# ログを再構築（新しい会話が追加されている可能性）
+	_rebuild_log()
+
+
+func _update_status() -> void:
+	if not _status_label:
+		return
+	if not GameManager.instance or not GameManager.instance.a2a_system:
+		_status_label.text = "System not ready"
+		return
+
+	var a2a: AtoAConversationSystem = GameManager.instance.a2a_system
+	var status: Dictionary = a2a.get_conversation_status()
+
+	var active_text: String = "🟢 Active" if status["is_active"] else "⚪ Idle"
+	_status_label.text = "%s | Budget: $%.2f | Today: %d/%d" % [
+		active_text,
+		status["budget_remaining"],
+		status["daily_count"],
+		status["max_daily"],
+	]
+
+	# 会話中はボタンを無効化
+	if _trigger_button:
+		_trigger_button.disabled = status["is_active"]
+		if status["is_active"]:
+			_trigger_button.text = "⏳ In progress..."
+		else:
+			_trigger_button.text = "⚡ Trigger Conversation"
+
+
+func _rebuild_log() -> void:
+	## 会話ログ部分のみ再構築（言語カードは維持）
+	# _vboxの子を逆順にチェックし、会話ログ部分を削除
+	var children: Array[Node] = []
+	for child: Node in _vbox.get_children():
+		children.append(child)
+
+	# 最初の3つ（言語カード、コントロール、ログタイトル以降）を残し、ログ部分を削除
+	var remove_start: int = 3  # language card + controls + (log section starts)
+	for i: int in range(remove_start, children.size()):
+		children[i].queue_free()
+
+	# 少し待ってからログを再追加
+	await get_tree().process_frame
 	_add_conversation_log()
 
 

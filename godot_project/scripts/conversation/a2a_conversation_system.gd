@@ -917,3 +917,51 @@ func _on_language_evolution(event_type: String, _data: Dictionary) -> void:
 	# 言語進化時にもリアクション会話のチャンス
 	if randf() < 0.3:
 		conversation_timer = AUTO_CONVERSATION_INTERVAL - 5.0
+
+
+# === 手動会話トリガー（UI用） ===
+func trigger_conversation_now() -> void:
+	## プレイヤーが手動で会話をトリガーする
+	## 感情閾値を無視して即座に会話を開始
+	if is_conversation_active:
+		push_warning("[AtoA] Conversation already in progress")
+		return
+
+	var pets := GameManager.get_all_pets()
+	var alive_pets: Array[PetEntity] = []
+	for pet in pets:
+		if pet.is_alive:
+			alive_pets.append(pet)
+
+	if alive_pets.size() < 2:
+		push_warning("[AtoA] Need at least 2 alive pets for conversation")
+		return
+
+	# 感情が最も高い2匹を選択（閾値なし）
+	alive_pets.sort_custom(func(a: Variant, b: Variant) -> bool:
+		return _get_emotion_intensity(a) > _get_emotion_intensity(b)
+	)
+
+	var pet1: PetEntity = alive_pets[0]
+	var pet2: PetEntity = alive_pets[1]
+
+	# バジェットチェック — 超過時はテンプレート
+	if not _check_budget():
+		print("[AtoA] Manual trigger: budget exhausted — using template")
+		_run_template_conversation(pet1, pet2, "player_triggered")
+		return
+
+	print("[AtoA] Manual trigger: starting conversation between %s and %s" % [pet1.pet_name, pet2.pet_name])
+	await start_conversation(pet1, pet2, "player_triggered")
+
+
+func get_conversation_status() -> Dictionary:
+	## UI表示用のステータス情報を返す
+	return {
+		"is_active": is_conversation_active,
+		"budget_remaining": DAILY_CONVERSATION_BUDGET - daily_conversation_cost,
+		"daily_count": daily_conversation_count,
+		"max_daily": MAX_DAILY_CONVERSATIONS,
+		"total_conversations": conversation_log.size(),
+		"timer_progress": conversation_timer / AUTO_CONVERSATION_INTERVAL,
+	}
