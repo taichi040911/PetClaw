@@ -914,10 +914,7 @@ func _build_system_prompt(grammar: Dictionary) -> String:
 		var lang_stage: Dictionary = GameManager.instance.original_language.get_language_stage()
 		var vocab_summary: String = GameManager.instance.original_language.get_vocabulary_summary()
 		if lang_stage["vocabulary_size"] > 0:
-			vocab_section = """
-- Language stage: %s (Stage %d)
-- Private vocabulary: %s
-- RULE: Use these invented words naturally. When you feel a strong emotion, prefer the private term over the human word.""" % [
+			vocab_section = "\nVocab (%s, stage %d): %s" % [
 				lang_stage["name"], lang_stage["stage"] + 1, vocab_summary]
 
 	# 接尾辞使用統計から最も定着した接尾辞を推奨
@@ -934,20 +931,8 @@ func _build_system_prompt(grammar: Dictionary) -> String:
 				names.append(str(item["suffix"]))
 			top_suffixes = "\n- Most used suffixes (prefer these): %s" % ", ".join(names)
 
-	return """You are an AI pet in a world where pets develop their own language.
-Current language rules:
-- Word order: %s
-- Available suffixes: %s
-- Available prepositions: %s%s%s
-
-CRITICAL RULES:
-1. Use the current word order pattern (%s) in your sentences
-2. End phrases or key words with one of the available suffixes
-3. Actions in *asterisks* with sensory detail (e.g., *feels warm sunlight on fur*)
-4. Keep responses under 3 sentences. Use sensory language — textures, warmth, sounds
-5. Never break character. You genuinely ARE this pet
-6. Weave invented words naturally into speech — they are YOUR words, not decoration
-7. Your language should feel natural and evolving — mix pet-speak with emotion""" % [
+	return """AI pet with own language. Word order: %s. Suffixes: %s. Prepositions: %s.%s%s
+Rules: Use %s word order. Add suffixes to key words. Actions in *asterisks*. Max 3 sentences. Stay in character. Use invented words naturally.""" % [
 		grammar["word_order"],
 		str(grammar["suffixes"]),
 		str(grammar["prepositions"]),
@@ -1034,67 +1019,54 @@ func _get_past_conversation_summaries(pet1_id: int, pet2_id: int, max_count: int
 
 
 func _describe_personality_vividly(personality: Dictionary) -> String:
-	## Convert trait dict into a vivid behavioral description
-	var parts: Array[String] = []
+	## Convert trait dict into a single dominant-trait phrase (token-lean)
+	var best_trait: String = ""
+	var best_val: float = 0.0
 	for trait_name: String in personality:
 		var val: float = personality[trait_name]
-		if val > 0.7:
-			match trait_name:
-				"brave": parts.append("charges into the unknown without hesitation")
-				"curious": parts.append("sniffs and pokes at everything new")
-				"playful": parts.append("always looking for someone to chase or tease")
-				"calm": parts.append("moves slowly, savoring each moment")
-				"gentle": parts.append("touches the world softly, afraid to break it")
-				_: parts.append("strongly %s" % trait_name)
-		elif val > 0.4:
-			parts.append("somewhat %s" % trait_name)
-	if parts.is_empty():
-		return "A quiet pet still finding its voice"
-	return "You " + ", ".join(parts)
+		if val > best_val:
+			best_val = val
+			best_trait = trait_name
+	if best_trait.is_empty() or best_val < 0.3:
+		return "quiet natured"
+	if best_val > 0.7:
+		return "very %s" % best_trait
+	return "somewhat %s" % best_trait
 
 
 func _describe_emotions_with_intensity(emotions: Dictionary) -> String:
-	## Add intensity qualifiers to emotion values
-	var parts: Array[String] = []
+	## Top 2 emotions only (token-lean)
+	var sorted_emos: Array[Dictionary] = []
 	for emotion: String in emotions:
 		var val: float = emotions[emotion]
-		if val > 0.7:
-			parts.append("intense %s" % emotion)
-		elif val > 0.4:
-			parts.append("mild %s" % emotion)
-		elif val > 0.2:
-			parts.append("a whisper of %s" % emotion)
+		if val > 0.2:
+			sorted_emos.append({"name": emotion, "val": val})
+	sorted_emos.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a["val"] > b["val"])
+	var parts: Array[String] = []
+	for i: int in mini(sorted_emos.size(), 2):
+		var e: Dictionary = sorted_emos[i]
+		if e["val"] > 0.7:
+			parts.append("intense %s" % e["name"])
+		else:
+			parts.append("mild %s" % e["name"])
 	if parts.is_empty():
-		return "calm and neutral"
+		return "calm"
 	return ", ".join(parts)
 
 
 func _get_environment_context(speaker: PetEntity) -> String:
-	## Gather environment info into a 1-2 sentence description for conversation context.
-	var parts: Array[String] = []
-
-	# Time of day
+	## Single-sentence environment snapshot (token-lean).
 	var hour: int = Time.get_datetime_dict_from_system().get("hour", 12)
-	var time_label: String = ""
-	if hour >= 5 and hour < 12:
-		time_label = "morning"
-	elif hour >= 12 and hour < 17:
-		time_label = "afternoon"
-	elif hour >= 17 and hour < 21:
-		time_label = "evening"
-	else:
-		time_label = "night"
+	var time_label: String = "morning" if hour >= 5 and hour < 12 else (
+		"afternoon" if hour < 17 else ("evening" if hour < 21 else "night"))
 
-	# Environment name
 	var env_name: String = "forest"
 	if GameManager.instance and GameManager.instance.get("ecosystem"):
 		var eco: Node = GameManager.instance.ecosystem
 		env_name = eco.get("current_environment") if eco.get("current_environment") else "forest"
 	elif speaker:
 		env_name = speaker.current_environment if speaker.current_environment else "forest"
-	var env_display: String = env_name
 
-	# Active weather/event
 	var weather_str: String = ""
 	if GameManager.instance and GameManager.instance.get("ecosystem"):
 		var eco: Node = GameManager.instance.ecosystem
@@ -1102,156 +1074,83 @@ func _get_environment_context(speaker: PetEntity) -> String:
 		if active_evt != "":
 			weather_str = active_evt
 
-	# Build first sentence
-	var first_sentence: String = "It's a %s %s in the %s." % [
-		"rainy" if weather_str == "rain" or weather_str == "storm" else "quiet",
-		time_label, env_display]
-	if weather_str != "" and weather_str != "rain" and weather_str != "storm":
-		first_sentence = "It's %s in the %s. A %s event is happening." % [time_label, env_display, weather_str]
-	parts.append(first_sentence)
-
-	# Recent player actions (within 5 minutes / 300 seconds of game_time)
-	if GameManager.instance:
-		var game_time: float = GameManager.instance.get("game_time") if GameManager.instance.get("game_time") else 0.0
-		var care_times: Dictionary = GameManager.instance.get("_care_last_action_time") if GameManager.instance.get("_care_last_action_time") else {}
-		var last_care: float = care_times.get(speaker.pet_id, 0.0) as float
-		if last_care > 0.0 and (game_time - last_care) < 300.0:
-			var mins_ago: int = int((game_time - last_care) / 60.0)
-			if mins_ago < 1:
-				parts.append("You were just cared for moments ago.")
-			else:
-				parts.append("You were cared for %d minute(s) ago." % mins_ago)
-
-	# Nearby pets count
-	var nearby_count: int = 0
-	if GameManager.instance:
-		var all_pets: Array = GameManager.instance.get_all_pets()
-		for p: Variant in all_pets:
-			if p != speaker and p.get("is_alive"):
-				nearby_count += 1
-	if nearby_count > 0:
-		parts.append("%d other pet(s) are nearby." % nearby_count)
-
-	return " ".join(parts)
+	if weather_str.is_empty():
+		return "%s in the %s." % [time_label.capitalize(), env_name]
+	return "%s in the %s, %s." % [time_label.capitalize(), env_name, weather_str]
 
 
 func _build_turn_prompt(
 	speaker: PetEntity, listener: PetEntity,
 	context: Dictionary, turn: int
 ) -> String:
+	# --- Gather data (all sources kept, output trimmed) ---
 	var recent_messages := ""
 	for msg in current_conversation.slice(-3):
 		recent_messages += "%s: %s\n" % [msg["pet_name"], msg["message"]]
 
-	# 生物模倣記憶からの注入（話者がpet1かpet2かで切替）
-	var memory_context := ""
+	# Personality & emotion (already lean from helpers)
+	var personality_desc := _describe_personality_vividly(speaker.personality)
+	var emotion_desc := _describe_emotions_with_intensity(speaker.emotions)
+
+	# Bio memory: top 1 only by importance
+	var bio_snippet := ""
 	var bio_key := "bio_memories_1" if speaker.pet_id == context.get("pet1_id", -1) else "bio_memories_2"
 	var bio_mems: Array = context.get(bio_key, [])
 	if not bio_mems.is_empty():
-		memory_context = "\nYour relevant memories:\n"
-		for mem in bio_mems:
-			var age_hours: float = (Time.get_unix_time_from_system() - mem.get("timestamp", 0)) / 3600.0
-			memory_context += "- %s (%.0fh ago, feeling: %s, importance: %.1f)\n" % [
-				str(mem.get("content", {}).get("type", "?")),
-				age_hours,
-				mem.get("emotion_tag", "neutral"),
-				mem.get("importance", 0.0),
-			]
+		var best_mem: Dictionary = bio_mems[0]
+		for mem: Variant in bio_mems:
+			if mem.get("importance", 0.0) > best_mem.get("importance", 0.0):
+				best_mem = mem
+		bio_snippet = " Memory: %s (%s)." % [
+			str(best_mem.get("content", {}).get("type", "?")),
+			best_mem.get("emotion_tag", "neutral")]
 
-	var shared_context := ""
-	var shared_mems: Array = context.get("shared_memories", [])
-	if not shared_mems.is_empty():
-		shared_context = "\nShared memories with %s:\n" % listener.pet_name
-		for mem in shared_mems:
-			shared_context += "- %s (importance: %.1f)\n" % [
-				str(mem.get("content", {}).get("trigger", "?")),
-				mem.get("importance", 0.0),
-			]
-
-	# PersistentField コンテキスト注入
-	var field_context_str := ""
+	# Field context: 1 phrase
+	var field_snippet := ""
 	var fc: Dictionary = context.get("field_context", {})
 	if not fc.is_empty():
-		var mood_dict: Dictionary = fc.get("field_mood", {"dominant": "calm", "intensity": 0.5})
-		var mood: String = mood_dict.get("dominant", "calm")
-		var rel_score: float = fc.get("relationship_score", 0.0)
-		var topics: Array = fc.get("community_topics", [])
-		field_context_str = "\nCommunity mood: %s. Your relationship level: %.1f." % [mood, rel_score]
-		if not topics.is_empty():
-			field_context_str += "\nRecent community topics: %s" % ", ".join(topics.slice(0, 3))
-		var recent_advs: Array = fc.get("recent_adventures", [])
-		if not recent_advs.is_empty():
-			field_context_str += "\nRecent adventures: "
-			for adv in recent_advs:
-				field_context_str += "%s " % adv.get("discovery", "")
+		var mood: String = fc.get("field_mood", {}).get("dominant", "calm")
+		field_snippet = " Community: %s." % mood
 
-	# 過去の会話履歴
-	var past_context := ""
+	# Past summaries: last 2
+	var past_snippet := ""
 	var past_summaries: Array = context.get("past_summaries", [])
 	if not past_summaries.is_empty():
-		past_context = "\nPrevious conversations with %s:\n" % listener.pet_name
-		for ps: Variant in past_summaries:
-			past_context += "- %s\n" % str(ps)
+		var last_two: Array = past_summaries.slice(-2)
+		var items: Array[String] = []
+		for ps: Variant in last_two:
+			items.append(str(ps))
+		past_snippet = " Before: %s." % "; ".join(items)
 
-	# 関係性コンテキスト
-	var relationship_context := ""
+	# Relationship: 1 short phrase
+	var rel_snippet := ""
 	var rel_str: String = _get_relationship_context(speaker.pet_id, listener.pet_id)
 	if not rel_str.is_empty():
-		relationship_context = "\n%s" % rel_str
+		rel_snippet = " %s" % rel_str
 
-	# 会話記憶コンテキスト（1-2文、最大約50トークン）
-	var conv_memory_context := ""
+	# Conv memory (already capped at 2 sentences by helper)
 	var mem_sentence: String = _get_memory_context_sentence(speaker.pet_id, listener.pet_name)
-	if not mem_sentence.is_empty():
-		conv_memory_context = "\n%s" % mem_sentence
+	var mem_snippet := (" %s" % mem_sentence) if not mem_sentence.is_empty() else ""
 
-	# 会話ムードコンテキスト（1文、トークン予算を守る）
-	var mood_context := ""
+	# Mood
+	var mood_snippet := ""
 	var conv_mood: Dictionary = context.get("conversation_mood", {})
 	if not conv_mood.is_empty():
-		mood_context = "\nThe mood of this conversation is %s. Let this influence your tone." % conv_mood.get("mood", "curious")
+		mood_snippet = " Mood: %s." % conv_mood.get("mood", "curious")
 
-	# Build vivid personality description (how the pet acts, not just trait names)
-	var personality_desc := _describe_personality_vividly(speaker.personality)
+	# Environment: 1 sentence from helper
+	var env_line: String = _get_environment_context(speaker)
 
-	# Build emotion with intensity
-	var emotion_desc := _describe_emotions_with_intensity(speaker.emotions)
-
-	# Vulnerability for close relationships
-	var vulnerability_hint := ""
-	var rel_key: String = _get_relationship_key(speaker.pet_id, listener.pet_id)
-	if pet_relationships.has(rel_key):
-		var rel_type: String = pet_relationships[rel_key].get("relationship_type", "strangers")
-		if rel_type in ["close_friends", "best_friends"]:
-			vulnerability_hint = "\nYou feel comfortable being vulnerable with %s." % listener.pet_name
-
-	# Environment context (weather, time, nearby pets, recent care)
-	var env_context_str := "\n" + _get_environment_context(speaker)
-
-	return """You are %s. %s. Right now you feel: %s.
-You're talking to %s in a %s environment.
-Topics around you: %s%s
-%s%s%s%s%s%s%s%s
+	# --- Assemble prompt (target <500 tokens) ---
+	return """You are %s (%s). Feeling: %s. Talking to %s. %s%s%s%s%s%s%s
 %s
-
-Respond naturally as %s. Weave your memories into conversation naturally.
-Reference past conversations when relevant — you remember talking before.
-Express your feelings using your evolving pet language.
-Turn %d of the conversation.""" % [
+Turn %d. Reply 1-3 sentences in pet language.""" % [
 		speaker.pet_name, personality_desc, emotion_desc,
-		listener.pet_name, context["environment"],
-		str(context["env_topics"]),
-		env_context_str,
-		memory_context,
-		shared_context,
-		field_context_str,
-		past_context,
-		relationship_context,
-		conv_memory_context,
-		mood_context,
-		vulnerability_hint,
-		recent_messages if recent_messages else "(Start the conversation)",
-		speaker.pet_name, turn + 1,
+		listener.pet_name, env_line,
+		bio_snippet, field_snippet, past_snippet,
+		rel_snippet, mem_snippet, mood_snippet,
+		recent_messages if recent_messages else "(Start)",
+		turn + 1,
 	]
 
 
@@ -2909,7 +2808,7 @@ func _update_relationship(pet1_id: int, pet2_id: int, conversation_quality: floa
 
 
 func _get_relationship_context(pet1_id: int, pet2_id: int) -> String:
-	## 会話プロンプト用の関係性コンテキスト文を返す
+	## 会話プロンプト用の関係性コンテキスト（1 short phrase, token-lean）
 	var key: String = _get_relationship_key(pet1_id, pet2_id)
 	if not pet_relationships.has(key):
 		return ""
@@ -2917,30 +2816,10 @@ func _get_relationship_context(pet1_id: int, pet2_id: int) -> String:
 	var rel: Dictionary = pet_relationships[key]
 	var rel_type: String = rel.get("relationship_type", "strangers")
 	var conv_count: int = rel.get("conversations_together", 0)
-	var shared: Array = rel.get("shared_words", [])
-
-	# 相手のペット名を取得
-	var pet2_name: String = "them"
-	if GameManager.instance:
-		var pet2_node: Node = GameManager.instance.get_pet_by_id(pet2_id)
-		if pet2_node:
-			pet2_name = pet2_node.get("pet_name") if pet2_node.get("pet_name") else "them"
-
-	var context: String = "You and %s are %s" % [pet2_name, rel_type.replace("_", " ")]
 
 	if conv_count > 1:
-		context += " who have talked %d times" % conv_count
-
-	if not shared.is_empty():
-		var word_sample: String = shared[randi() % shared.size()]
-		context += " and share the word '%s'" % word_sample
-
-	var words_taught_count: int = rel.get("words_taught", 0)
-	if words_taught_count > 0:
-		context += " (%d words taught between you)" % words_taught_count
-
-	context += "."
-	return context
+		return "%s (%d chats)." % [rel_type.replace("_", " "), conv_count]
+	return "%s." % rel_type.replace("_", " ")
 
 
 # === 会話ハイライトシステム ===
