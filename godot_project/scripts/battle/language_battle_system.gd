@@ -38,26 +38,77 @@ const THEME_NAMES: Dictionary = {
 	RoundTheme.STORYTELLING: "storytelling",
 }
 
-# === Battle Templates (3 themes x 4 patterns = 12) ===
+# === Battle Templates (3 themes x 12 patterns = 36) ===
 # Placeholders: {word}, {suffix}, {emotion}, {name}
 const BATTLE_TEMPLATES: Dictionary = {
 	RoundTheme.GREETING: [
+		# Original 4
 		"{word} {word}{suffix}! I feel {emotion} to meet you{suffix}!",
 		"Hello{suffix}! My heart says {word} and {word}{suffix}. {emotion} fills me{suffix}!",
 		"{word}{suffix}... {word}{suffix}... the {emotion} of a new dawn{suffix}!",
 		"With {emotion}{suffix}, I say {word}! {word} {word}{suffix} to all!",
+		# Formal
+		"Greetings{suffix}. I present {word} and {word}{suffix} with deepest {emotion}{suffix}.",
+		# Casual
+		"Hey{suffix}! {word} {word}{suffix}! Feeling so {emotion} right now{suffix}!",
+		# Excited
+		"{word}{suffix}! {word}{suffix}! {word}{suffix}! Oh the {emotion}{suffix}! Amazing{suffix}!",
+		# Shy
+		"Um{suffix}... {word}{suffix}... I think {word}{suffix}... my {emotion} is quiet{suffix}...",
+		# Morning
+		"Good morning{suffix}! {word} rises like {word}{suffix}. {emotion} greets the day{suffix}!",
+		# Night
+		"Under the stars{suffix}, {word} whispers {word}{suffix}. Gentle {emotion}{suffix}...",
+		# Seasonal
+		"The season brings {word}{suffix} and {word}{suffix}. Nature hums with {emotion}{suffix}!",
+		# Group
+		"Everyone{suffix}! Let us share {word} and {word}{suffix}! Together in {emotion}{suffix}!",
 	],
 	RoundTheme.ARGUMENT: [
+		# Original 4
 		"{word}{suffix}! You don't understand {word}{suffix}! I feel {emotion}{suffix}!",
 		"No{suffix}! {word} means {word}{suffix}, not what you think{suffix}! Such {emotion}{suffix}!",
 		"Listen{suffix}! {word} and {word}{suffix} prove my point{suffix}! Feel my {emotion}{suffix}!",
 		"{word}{suffix}! {word}{suffix}! I won't back down{suffix}! {emotion} burns inside{suffix}!",
+		# Philosophical
+		"But what IS {word}{suffix}? Can {word}{suffix} truly exist without {emotion}{suffix}?",
+		# Practical
+		"Facts{suffix}! {word} works better than {word}{suffix}! That is {emotion} truth{suffix}!",
+		# Emotional
+		"You hurt my {word}{suffix}! How could {word}{suffix} betray such {emotion}{suffix}!",
+		# Playful
+		"Ha{suffix}! My {word} beats your {word}{suffix} any day{suffix}! Pure {emotion}{suffix}!",
+		# Competitive
+		"I challenge your {word}{suffix}! My {word}{suffix} is stronger{suffix}! Feel this {emotion}{suffix}!",
+		# Nostalgic
+		"Remember when {word}{suffix} meant something{suffix}? Now {word}{suffix}... only {emotion}{suffix} remains.",
+		# Absurd
+		"A {word}{suffix} told me that {word}{suffix} is secretly made of {emotion}{suffix}! Explain that{suffix}!",
+		# Intense
+		"{word}{suffix}! {word}{suffix}! Enough talk{suffix}! My {emotion}{suffix} will settle this now{suffix}!",
 	],
 	RoundTheme.STORYTELLING: [
+		# Original 4
 		"Once upon a {word}{suffix}, there was a {word}{suffix}... full of {emotion}{suffix}...",
 		"In the land of {word}{suffix}, the {word} sang with {emotion}{suffix}. Beautiful{suffix}!",
 		"{word}{suffix} traveled far to find {word}{suffix}. The journey was {emotion}{suffix}.",
 		"They say {word} and {word}{suffix} danced under the moon{suffix}. Such {emotion}{suffix}!",
+		# Mystery
+		"Nobody knew where {word}{suffix} came from{suffix}. Only {word}{suffix} held the {emotion} secret{suffix}.",
+		# Epic
+		"The great {word}{suffix} rose against {word}{suffix}! A battle of pure {emotion}{suffix} shook the world{suffix}!",
+		# Fable
+		"Wise old {word}{suffix} taught young {word}{suffix} that {emotion}{suffix} is the greatest treasure{suffix}.",
+		# Dream
+		"In a dream{suffix}, {word} became {word}{suffix}... everything shimmered with {emotion}{suffix}...",
+		# Comedy
+		"So {word}{suffix} walked into {word}{suffix} and said{suffix}: where is the {emotion}{suffix}? Everyone laughed{suffix}!",
+		# Tragedy
+		"Alas{suffix}, {word}{suffix} was lost forever{suffix}. {word}{suffix} wept with endless {emotion}{suffix}.",
+		# Origin
+		"Long ago{suffix}, the first {word}{suffix} was born from {word}{suffix} and pure {emotion}{suffix}.",
+		# Adventure
+		"Beyond the horizon{suffix}, {word} and {word}{suffix} set sail{suffix}. {emotion}{suffix} guided their way{suffix}!",
 	],
 }
 
