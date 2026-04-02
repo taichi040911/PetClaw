@@ -13,6 +13,8 @@ enum NotifyType {
 	LOW_ENERGY,   ## エネルギー低下
 	SAD,          ## 悲しい
 	LONELY,       ## 放置されている
+	CONVERSATION, ## AtoA会話が発生
+	NEW_WORD,     ## 新しい単語が発明された
 }
 
 ## 通知データ
@@ -42,6 +44,16 @@ const NOTIFY_DATA: Dictionary = {
 		"text": "Your pet misses you!",
 		"color": Color(0.8, 0.4, 0.6),
 	},
+	NotifyType.CONVERSATION: {
+		"icon": "🗣️",
+		"text": "",  # 動的に設定
+		"color": Color(0.3, 0.7, 0.5),
+	},
+	NotifyType.NEW_WORD: {
+		"icon": "📚",
+		"text": "",  # 動的に設定
+		"color": Color(0.6, 0.4, 0.8),
+	},
 }
 
 ## 状態
@@ -56,6 +68,8 @@ const SLIDE_DURATION: float = 0.3
 
 var _container: VBoxContainer
 var _next_y_offset: float = 0.0
+## 動的テキスト用: NotifyType → String のキー
+var _dynamic_text_queue: Dictionary = {}
 
 
 func _ready() -> void:
@@ -70,6 +84,9 @@ func _ready() -> void:
 	_container.add_theme_constant_override("separation", 4)
 	_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_container)
+
+	# AtoA会話・言語エンジンのシグナルに接続（利用可能な場合のみ）
+	_connect_external_signals.call_deferred()
 
 
 func _process(delta: float) -> void:
@@ -180,3 +197,137 @@ func _dismiss_notification(notify_type: NotifyType, panel: PanelContainer) -> vo
 	var tween: Tween = create_tween()
 	tween.tween_property(panel, "modulate:a", 0.0, 0.2)
 	tween.tween_callback(panel.queue_free)
+
+
+## --- 外部シグナル接続 ---
+
+func _connect_external_signals() -> void:
+	if not GameManager.instance:
+		return
+
+	# AtoAConversationSystem の conversation_ended に接続
+	var a2a_system: Node = _find_system_node("AtoAConversationSystem")
+	if a2a_system and a2a_system.has_signal("conversation_ended"):
+		a2a_system.conversation_ended.connect(_on_conversation_ended)
+
+	# OriginalLanguageEngine の word_invented に接続
+	var lang_engine: Node = _find_system_node("OriginalLanguageEngine")
+	if lang_engine and lang_engine.has_signal("word_invented"):
+		lang_engine.word_invented.connect(_on_word_invented)
+
+
+func _find_system_node(class_name_str: String) -> Node:
+	## GameManager の子ノードからシステムを探す
+	if not GameManager.instance:
+		return null
+	for child: Node in GameManager.instance.get_children():
+		if child.get_class() == class_name_str or child.get_script() != null:
+			# class_name ベースのチェック
+			if child is AtoAConversationSystem and class_name_str == "AtoAConversationSystem":
+				return child
+			if child is OriginalLanguageEngine and class_name_str == "OriginalLanguageEngine":
+				return child
+	return null
+
+
+## --- AtoA 会話通知 ---
+
+func _on_conversation_ended(participants: Array[int], _summary: String) -> void:
+	if participants.size() < 2:
+		return
+	if not GameManager.instance:
+		return
+
+	var name_a: String = _get_pet_name(participants[0])
+	var name_b: String = _get_pet_name(participants[1])
+	var text: String = "%s just chatted with %s!" % [name_a, name_b]
+	show_dynamic_notification(NotifyType.CONVERSATION, text)
+
+
+func _get_pet_name(pet_id: int) -> String:
+	if not GameManager.instance:
+		return "Pet"
+	if GameManager.instance.pets.has(pet_id):
+		var pet: PetEntity = GameManager.instance.pets[pet_id]
+		if pet:
+			return pet.pet_name
+	return "Pet"
+
+
+## --- 言語新語通知 ---
+
+func _on_word_invented(word_data: Dictionary) -> void:
+	var ai_term: String = word_data.get("ai_term", "???")
+	var text: String = "New word invented: %s!" % ai_term
+	show_dynamic_notification(NotifyType.NEW_WORD, text)
+
+
+## --- 動的テキスト通知（公開API） ---
+
+## AtoA会話が発生したことを通知する
+func notify_conversation(pet_name_a: String, pet_name_b: String) -> void:
+	var text: String = "%s just chatted with %s!" % [pet_name_a, pet_name_b]
+	show_dynamic_notification(NotifyType.CONVERSATION, text)
+
+
+## 新しい単語が発明されたことを通知する
+func notify_new_word(word: String) -> void:
+	var text: String = "New word invented: %s!" % word
+	show_dynamic_notification(NotifyType.NEW_WORD, text)
+
+
+## 動的テキストを持つ通知を表示する
+func show_dynamic_notification(notify_type: NotifyType, dynamic_text: String) -> void:
+	# クールダウン中なら表示しない
+	if _cooldowns.has(notify_type) and _cooldowns[notify_type] > 0.0:
+		return
+	# 既に表示中なら重複しない
+	if _active_notifications.has(notify_type):
+		return
+
+	var data: Dictionary = NOTIFY_DATA[notify_type]
+	_cooldowns[notify_type] = COOLDOWN_DURATION
+
+	# 通知パネル作成
+	var panel: PanelContainer = PanelContainer.new()
+	var style: StyleBoxFlat = StyleBoxFlat.new()
+	style.bg_color = Color(data["color"].r, data["color"].g, data["color"].b, 0.85)
+	style.corner_radius_top_left = 10
+	style.corner_radius_top_right = 10
+	style.corner_radius_bottom_left = 10
+	style.corner_radius_bottom_right = 10
+	style.content_margin_left = 12
+	style.content_margin_right = 12
+	style.content_margin_top = 8
+	style.content_margin_bottom = 8
+	panel.add_theme_stylebox_override("panel", style)
+
+	var label: Label = Label.new()
+	label.text = "%s %s" % [data["icon"], dynamic_text]
+	label.add_theme_font_size_override("font_size", 16)
+	label.add_theme_color_override("font_color", Color.WHITE)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	panel.add_child(label)
+
+	# タッチ対応
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	panel.gui_input.connect(func(event: InputEvent) -> void:
+		if event is InputEventMouseButton and event.pressed:
+			notification_tapped.emit(dynamic_text)
+			_dismiss_notification(notify_type, panel)
+	)
+
+	_container.add_child(panel)
+	_active_notifications[notify_type] = panel
+
+	# スライドインアニメーション
+	panel.modulate.a = 0.0
+	panel.position.y = -30
+	var tween: Tween = create_tween().set_parallel(true)
+	tween.tween_property(panel, "modulate:a", 1.0, SLIDE_DURATION)
+	tween.tween_property(panel, "position:y", 0.0, SLIDE_DURATION).set_trans(Tween.TRANS_BACK)
+
+	# 自動消去
+	await get_tree().create_timer(DISPLAY_DURATION).timeout
+	if _active_notifications.has(notify_type):
+		_dismiss_notification(notify_type, panel)
