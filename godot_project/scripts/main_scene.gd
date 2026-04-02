@@ -7,6 +7,7 @@ extends Control
 
 # === UI References ===
 @onready var emotion_label: Label = $UIPanel/VBox/EmotionLabel
+@onready var stage_label: Label = $UIPanel/VBox/StageLabel
 @onready var hunger_bar: ProgressBar = $UIPanel/VBox/StatsBar/HungerBar
 @onready var health_bar: ProgressBar = $UIPanel/VBox/StatsBar/HealthBar
 @onready var pet_name_label: Label = $UIPanel/VBox/PetNameLabel
@@ -245,6 +246,9 @@ func _update_ui() -> void:
 		hunger_bar.modulate = Color(1.0, 0.4, 0.4).lerp(Color.WHITE, hunger_ratio / 0.3)
 	else:
 		hunger_bar.modulate = Color.WHITE
+
+	# ステージ・年齢表示
+	_update_stage_display()
 
 	# BGMのムード更新
 	var dominant_emotion: String = _get_dominant_emotion()
@@ -742,6 +746,42 @@ func _style_progress_bar(bar: ProgressBar, fill_color: Color) -> void:
 	fill_style.corner_radius_bottom_left = 6
 	fill_style.corner_radius_bottom_right = 6
 	bar.add_theme_stylebox_override("fill", fill_style)
+
+
+# ========================================================
+# Stage & Age Display
+# ========================================================
+
+const STAGE_ICONS: Array = ["🥚", "🐣", "🐥", "🐾", "🐺", "👑"]
+const STAGE_NAMES: Array = ["Egg", "Baby", "Child", "Teen", "Adult", "Elder"]
+
+func _update_stage_display() -> void:
+	if not current_pet or not stage_label:
+		return
+	var stage: int = clampi(current_pet.evolution_stage, 0, 5)
+	var icon: String = STAGE_ICONS[stage]
+	var name: String = STAGE_NAMES[stage]
+
+	# 年齢表示
+	var age_text: String = ""
+	if current_pet.age < 1.0:
+		age_text = "%dm" % int(current_pet.age * 60.0)
+	else:
+		age_text = "%.1fh" % current_pet.age
+
+	stage_label.text = "%s %s · %s" % [icon, name, age_text]
+
+	# ステージに応じた色
+	var stage_colors: Array = [
+		Color(0.6, 0.6, 0.7),    # Egg - gray
+		Color(0.8, 0.8, 0.5),    # Baby - yellow
+		Color(0.5, 0.8, 0.5),    # Child - green
+		Color(0.5, 0.6, 0.9),    # Teen - blue
+		Color(0.8, 0.5, 0.7),    # Adult - purple
+		Color(0.9, 0.75, 0.3),   # Elder - gold
+	]
+	stage_label.add_theme_color_override("font_color", stage_colors[stage])
+	stage_label.add_theme_font_size_override("font_size", 13)
 
 
 # ========================================================
