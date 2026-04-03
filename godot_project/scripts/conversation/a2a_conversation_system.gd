@@ -82,6 +82,10 @@ const MAX_MEMORY_INVENTED_WORDS: int = 30
 # === References ===
 var claude_client: ClaudeAPIClient  # Claude API連携クラス
 
+# === Learning Model Bridge (lazy-initialized) ===
+const _LearningModelBridgeScript := preload("res://scripts/inference/learning_model_bridge.gd")
+var learning_bridge: RefCounted  # LearningModelBridge — 会話後学習パイプライン
+
 # === テンプレート会話（APIバジェット切れ時用） ===
 const TEMPLATE_CONVERSATIONS: Array[Dictionary] = [
 	{
@@ -2594,6 +2598,20 @@ func _finalize_conversation(pet1: PetEntity, pet2: PetEntity, trigger: String,
 				msg["word_teaching"] = teaching_2
 				break
 
+	# Learning Model Bridge: Active Inference → BCM → Oja 学習パイプライン
+	if GameManager.instance and GameManager.instance.get("original_language"):
+		if learning_bridge == null:
+			learning_bridge = _LearningModelBridgeScript.new()
+		var vocab: Dictionary = GameManager.instance.original_language.get_full_vocabulary()
+		if not vocab.is_empty():
+			var pet_state: Dictionary = {
+				"pet_id": pet1.pet_id,
+				"emotion": dominant_emotion,
+				"vocab_size": vocab.size(),
+			}
+			learning_bridge.process_conversation(
+				vocab, current_conversation, pet_state, emotion_intensity, trigger)
+
 	# 記憶に追加（BiologicalMemorySystem経由で自動的に海馬にも格納される）
 	var summary := "Talked with %s about %s" % [pet2.pet_name, trigger]
 	pet1.add_memory({"type": "conversation", "with": pet2.pet_id, "trigger": trigger,
@@ -3049,6 +3067,7 @@ func to_dict() -> Dictionary:
 		"pet_relationships": pet_relationships,
 		"conversation_memory": conversation_memory,
 		"next_conversation_id": _next_conversation_id,
+		"learning_bridge": learning_bridge.to_dict() if learning_bridge != null else {},
 	}
 
 
@@ -3067,6 +3086,13 @@ func from_dict(data: Dictionary) -> void:
 	conversation_memory = data.get("conversation_memory", {})
 	_next_conversation_id = data.get("next_conversation_id", 0)
 	daily_event_conversation_count = data.get("daily_event_count", 0)
+
+	# Learning Bridge 復元
+	var lb_data: Dictionary = data.get("learning_bridge", {})
+	if not lb_data.is_empty():
+		if learning_bridge == null:
+			learning_bridge = _LearningModelBridgeScript.new()
+		learning_bridge.from_dict(lb_data)
 
 	# 日付が変わっていればリセット
 	var current_day := int(Time.get_unix_time_from_system() / 86400)
