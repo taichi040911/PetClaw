@@ -1,6 +1,6 @@
 {
   "form_id": "bond_master_adult",
-  "sprite_size": 32,
+  "sprite_size": 64,
   "palette": {
     "body": [
       233,
@@ -33,7 +33,7 @@
     "DOT",
     "SPARKLE"
   ],
-  "eye_frame_width": 32,
+  "eye_frame_width": 64,
   "mouth_sheet": "bond_master_adult_mouths.png",
   "mouth_shapes": [
     "NEUTRAL",
@@ -47,8 +47,8 @@
     "WHISTLE",
     "TINY_SMILE"
   ],
-  "mouth_frame_width": 32,
-  "mouth_frame_height": 16,
+  "mouth_frame_width": 64,
+  "mouth_frame_height": 32,
   "preset_sheet": "bond_master_adult_presets.png",
   "presets": [
     "idle",
@@ -60,5 +60,5 @@
     "sleepy",
     "angry"
   ],
-  "preset_frame_width": 32
+  "preset_frame_width": 64
 }

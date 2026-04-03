@@ -231,9 +231,9 @@ func _process_trauma_decay(delta: float) -> void:
 				to_process.append(i)
 		for i: int in range(to_process.size() - 1, -1, -1):
 			var idx: int = to_process[i]
-			var trait: String = GROWTH_TRAITS.get(markers[idx]["event_type"], "resilience")
-			_add_personality_modifier(pet_id, trait, 0.05)
-			trauma_processed.emit(pet_id, trait)
+			var growth_trait: String = GROWTH_TRAITS.get(markers[idx]["event_type"], "resilience")
+			_add_personality_modifier(pet_id, growth_trait, 0.05)
+			trauma_processed.emit(pet_id, growth_trait)
 			markers[idx]["intensity"] = 0.0
 
 

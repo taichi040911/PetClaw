@@ -25,11 +25,28 @@ if ! command -v "$GODOT" &>/dev/null; then
     exit 2
 fi
 
-# Collect test files (sorted for stable ordering)
+# Tests that work in headless --script mode (no GameManager dependency)
+# Other tests require full Godot project autoloads to compile.
+HEADLESS_SAFE=(
+    "test_active_inference.gd"
+    "test_bcm_oja.gd"
+    "test_learning_bridge.gd"
+    "test_sub_molt_themes.gd"
+)
+
+# Collect test files
 TEST_FILES=()
-while IFS= read -r f; do
-    TEST_FILES+=("$f")
-done < <(find "$PROJECT_DIR/tests" -maxdepth 1 -name 'test_*.gd' -type f | sort)
+if [[ "${1:-}" == "--safe-only" ]]; then
+    for f in "${HEADLESS_SAFE[@]}"; do
+        if [[ -f "$PROJECT_DIR/tests/$f" ]]; then
+            TEST_FILES+=("$PROJECT_DIR/tests/$f")
+        fi
+    done
+else
+    while IFS= read -r f; do
+        TEST_FILES+=("$f")
+    done < <(find "$PROJECT_DIR/tests" -maxdepth 1 -name 'test_*.gd' -type f | sort)
+fi
 
 if [[ ${#TEST_FILES[@]} -eq 0 ]]; then
     echo -e "${RED}No test files found in $PROJECT_DIR/tests/${RESET}"
@@ -60,10 +77,25 @@ for test_file in "${TEST_FILES[@]}"; do
 
     echo -e "${CYAN}── Running: ${test_name} ──${RESET}"
 
-    # Run test, capture output and exit code
+    # Run test with timeout (30s) to prevent hanging on GameManager init
+    TIMEOUT_CMD=""
+    if command -v gtimeout &>/dev/null; then
+        TIMEOUT_CMD="gtimeout 30"
+    elif command -v timeout &>/dev/null; then
+        TIMEOUT_CMD="timeout 30"
+    fi
+
     set +e
-    output=$("$GODOT" --headless --path "$PROJECT_DIR" --script "tests/$test_name" 2>&1)
-    exit_code=$?
+    if [[ -n "$TIMEOUT_CMD" ]]; then
+        output=$($TIMEOUT_CMD "$GODOT" --headless --path "$PROJECT_DIR" --script "tests/$test_name" 2>&1)
+        exit_code=$?
+        if [[ $exit_code -eq 124 ]]; then
+            output="${output}"$'\n'"TIMEOUT: Test exceeded 30s (likely GameManager hang)"
+        fi
+    else
+        output=$("$GODOT" --headless --path "$PROJECT_DIR" --script "tests/$test_name" 2>&1)
+        exit_code=$?
+    fi
     set -e
 
     # Count PASS/FAIL lines in output
