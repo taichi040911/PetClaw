@@ -9,6 +9,7 @@
 ##   godot --headless --script tests/test_evolution.gd
 ##   godot --headless --script tests/test_language.gd
 ##   godot --headless --script tests/test_life_breeding.gd
+##   godot --headless --script tests/test_hebbian_language.gd
 class_name RunTests
 extends SceneTree
 
@@ -223,6 +224,70 @@ func _init() -> void:
 	total_passed += 1
 	eco.queue_free()
 	ecr.queue_free()
+
+	# === Hebbian Language ===
+	print("\n── Hebbian Language ──")
+
+	var ole: OriginalLanguageEngine = OriginalLanguageEngine.new()
+
+	# Word invention
+	var ole_entry: Dictionary = ole.invent_word("happy", {
+		"emotion": "joy", "pet_id": 1, "situation": "test",
+	})
+	if ole_entry.get("strength", 0.0) == 0.5 and ole_entry.get("ai_term", "") != "":
+		print("  [PASS] Word invention (strength=0.5)")
+		total_passed += 1
+	else:
+		print("  [FAIL] Word invention")
+		total_failed += 1
+
+	# Hebbian LTP
+	ole.strengthen_word("happy")
+	ole.strengthen_word("happy")
+	var ole_str: float = ole.vocabulary["happy"]["strength"]
+	if absf(ole_str - 0.8) < 0.01:
+		print("  [PASS] Hebbian LTP (0.5→0.8)")
+		total_passed += 1
+	else:
+		print("  [FAIL] Hebbian LTP (got %.2f)" % ole_str)
+		total_failed += 1
+
+	# Hebbian LTD
+	ole.weaken_word("happy")
+	var ole_weak: float = ole.vocabulary["happy"]["strength"]
+	if absf(ole_weak - 0.75) < 0.01:
+		print("  [PASS] Hebbian LTD (0.8→0.75)")
+		total_passed += 1
+	else:
+		print("  [FAIL] Hebbian LTD (got %.2f)" % ole_weak)
+		total_failed += 1
+
+	# Stage advancement
+	var ole_stage: OriginalLanguageEngine = OriginalLanguageEngine.new()
+	for si in 10:
+		ole_stage.invent_word("w%d" % si, {"emotion": "neutral", "pet_id": 1, "situation": "t"})
+	ole_stage._check_stage_advancement()
+	if ole_stage.current_stage == OriginalLanguageEngine.LanguageStage.MORPHOLOGICAL:
+		print("  [PASS] Stage BORROWING→MORPHOLOGICAL at 10 words")
+		total_passed += 1
+	else:
+		print("  [FAIL] Stage advancement (got %d)" % ole_stage.current_stage)
+		total_failed += 1
+
+	# Round-trip
+	var ole_d: Dictionary = ole.to_dict()
+	var ole_r: OriginalLanguageEngine = OriginalLanguageEngine.new()
+	ole_r.from_dict(ole_d)
+	if ole_r.vocabulary.has("happy") and ole_r.total_words_invented == ole.total_words_invented:
+		print("  [PASS] OriginalLanguageEngine round-trip")
+		total_passed += 1
+	else:
+		print("  [FAIL] OriginalLanguageEngine round-trip")
+		total_failed += 1
+
+	ole.queue_free()
+	ole_stage.queue_free()
+	ole_r.queue_free()
 
 	# === Summary ===
 	print("")
