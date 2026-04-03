@@ -113,7 +113,7 @@ def phase1_patterns(file_path: Path, lines: List[str], result: DesloppingResult)
     
     # REDUNDANT_NULL_CHECK
     for i, line in enumerate(lines, 1):
-        if re.search(r'if\s+\w+\s*!=\s*null\s+and\s+\1\.', line):
+        if re.search(r'if\s+(\w+)\s*!=\s*null\s+and\s+\1\.', line):
             result.add_issue('INFO', 'REDUNDANT_NULL_CHECK', str(file_path), i,
                             f"Redundant null check: {line.strip()[:60]}")
     
