@@ -665,6 +665,8 @@ func save_game() -> void:
 		"cultural_system": cultural_system.to_dict(),
 		"team_orchestrator": team_orchestrator.to_dict(),
 		"memory_bridge": memory_bridge.to_dict(),
+		"a2a_community": a2a_community.to_dict(),
+		"a2a_system": a2a_system.to_dict(),
 	}
 
 	for pet_id in pets:
@@ -747,6 +749,8 @@ func _load_game_data() -> void:
 	cultural_system.from_dict(data.get("cultural_system", {}))
 	team_orchestrator.from_dict(data.get("team_orchestrator", {}))
 	memory_bridge.from_dict(data.get("memory_bridge", {}))
+	a2a_community.from_dict(data.get("a2a_community", {}))
+	a2a_system.from_dict(data.get("a2a_system", {}))
 
 	# ペット復元
 	for pet_id_str in data.get("pets", {}):

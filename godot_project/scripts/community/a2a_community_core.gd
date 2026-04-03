@@ -532,3 +532,54 @@ class SharedField:
 		if summary.is_empty():
 			return "A young community just beginning to form."
 		return summary
+
+	func to_dict() -> Dictionary:
+		return {"events": events.duplicate(true), "summary": summary}
+
+	func from_dict(data: Dictionary) -> void:
+		events = []
+		var raw_events: Array = data.get("events", [])
+		for e: Variant in raw_events:
+			if e is Dictionary:
+				events.append(e)
+		summary = data.get("summary", "")
+
+
+# ============================
+# セーブ / ロード
+# ============================
+
+func to_dict() -> Dictionary:
+	return {
+		"factions": factions.duplicate(true),
+		"cultural_artifacts": cultural_artifacts.duplicate(true),
+		"community_log": community_log.slice(-50),  # 最新50件のみ保存
+		"emergent_events": emergent_events.slice(-20),
+		"shared_field": shared_field.to_dict(),
+	}
+
+
+func from_dict(data: Dictionary) -> void:
+	factions = data.get("factions", {})
+
+	cultural_artifacts = []
+	var raw_artifacts: Array = data.get("cultural_artifacts", [])
+	for a: Variant in raw_artifacts:
+		if a is Dictionary:
+			cultural_artifacts.append(a)
+
+	community_log = []
+	var raw_log: Array = data.get("community_log", [])
+	for l: Variant in raw_log:
+		if l is Dictionary:
+			community_log.append(l)
+
+	emergent_events = []
+	var raw_events: Array = data.get("emergent_events", [])
+	for e: Variant in raw_events:
+		if e is Dictionary:
+			emergent_events.append(e)
+
+	var sf_data: Dictionary = data.get("shared_field", {})
+	if not sf_data.is_empty():
+		shared_field.from_dict(sf_data)
