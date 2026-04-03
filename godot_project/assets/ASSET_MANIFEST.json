@@ -1,7 +1,12 @@
 {
   "project": "PetClaw",
-  "version": "0.1.0",
-  "last_updated": "2026-04-01",
+  "version": "1.1.0",
+  "last_updated": "2026-04-03",
+  "notes": {
+    "audio_status": "SFX and BGM are procedurally generated in code (SfxManager.gd, AmbientBGM.gd). External audio files listed below are optional enhancements, not required for gameplay.",
+    "sprite_status": "All 22 evolution form PNGs and 66 expression sprite sheets are present. SpritePlaceholderGenerator provides additional fallback.",
+    "ui_tile_status": "Game uses Godot built-in UI theming. External UI packs listed below are optional visual enhancements."
+  },
   "sources": {
     "kenney": {
       "url": "https://kenney.nl/assets",

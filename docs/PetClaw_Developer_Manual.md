@@ -187,7 +187,7 @@ PetClaw/
 │   │   ├── progression/          #   AchievementSystem
 │   │   ├── field/                #   PersistentField
 │   │   ├── visual/               #   VFX, Sprites, Expressions, Animations
-│   │   ├── audio/                #   SFX, BGM, AudioManager
+│   │   ├── audio/                #   SfxManager(プロシージャルSFX), AmbientBGM(プロシージャルBGM)
 │   │   └── ui/                   #   20+ UIコンポーネント
 │   ├── scenes/                   # .tscnシーンファイル
 │   ├── assets/                   # スプライト・音声・タイル・UI素材
@@ -301,6 +301,9 @@ GameManager.save_game() → JSON → user://save_data.json
 | AtoACommunityCore | community/a2a_community_core.gd | コミュニティ全体のオーケストレーション |
 | LanguageBattleSystem | battle/language_battle_system.gd | 言語バトル |
 | AchievementSystem | progression/achievement_system.gd | 実績追跡 |
+| **SfxManager** | audio/sfx_manager.gd (387行) | **プロシージャルSFX** — 波形合成で14種のチップチューン効果音を生成。外部ファイル不要 |
+| **AmbientBGM** | audio/ambient_bgm.gd (155行) | **プロシージャルBGM** — ペンタトニックスケールで感情・時間帯連動のBGMを動的生成 |
+| AudioManager | audio/audio_manager.gd (91行) | ファイルベース音声再生（予備システム、現在未使用。将来の外部ファイル対応用） |
 
 ---
 

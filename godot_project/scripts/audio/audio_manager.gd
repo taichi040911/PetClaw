@@ -1,6 +1,11 @@
-## AudioManager — サウンド管理
+## AudioManager — ファイルベース・サウンド管理（予備システム）
 ## BGM・SE・環境音の再生を統合管理
 ## 実際のオーディオファイルがなくてもクラッシュしない（silent fallback）
+##
+## 注意: 現在のPetClawではこのシステムは使用されていません。
+## 実際の音声再生は SfxManager.gd（プロシージャルSFX）と
+## AmbientBGM.gd（プロシージャルBGM）が担当しています。
+## 将来的に外部オーディオファイルに切り替える場合に使用する予備システムです。
 class_name AudioManager
 extends Node
 
