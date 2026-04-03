@@ -377,9 +377,9 @@ func _populate_memory_tab() -> void:
 			container.add_child(card)
 			var lbl: Label = Label.new()
 			var parts: Array[String] = []
-			for trait: String in mods:
-				var val: float = mods[trait]
-				parts.append("%s %+.2f" % [trait, val])
+			for trait_name: String in mods:
+				var val: float = mods[trait_name]
+				parts.append("%s %+.2f" % [trait_name, val])
 			lbl.text = "Pet #%s: %s" % [str(pet_id_key), ", ".join(parts)]
 			lbl.add_theme_font_size_override("font_size", 12)
 			lbl.add_theme_color_override("font_color", TEXT_PRIMARY)

@@ -346,11 +346,11 @@ func get_conversation_hints(pet_id: int) -> Array[String]:
 
 # === Personality Modifiers ===
 
-func _add_personality_modifier(pet_id: int, trait: String, value: float) -> void:
+func _add_personality_modifier(pet_id: int, trait_name: String, value: float) -> void:
 	if pet_id not in personality_modifiers:
 		personality_modifiers[pet_id] = {}
-	var current: float = personality_modifiers[pet_id].get(trait, 0.0)
-	personality_modifiers[pet_id][trait] = clampf(current + value, -0.5, 0.5)
+	var current: float = personality_modifiers[pet_id].get(trait_name, 0.0)
+	personality_modifiers[pet_id][trait_name] = clampf(current + value, -0.5, 0.5)
 
 
 func get_personality_modifiers(pet_id: int) -> Dictionary:
