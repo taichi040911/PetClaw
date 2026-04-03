@@ -1,5 +1,5 @@
 # PetClaw Handoff Document
-## Cowork → Code 引き継ぎ用（2026-04-01時点）
+## Cowork → Code 引き継ぎ用（2026-04-03 R157時点）
 
 ---
 
@@ -20,7 +20,7 @@ AI同士が自律的に会話・進化・コミュニティを形成する「Ato
 
 ## 2. 現在の実装状況
 
-### GDScript: 15サブシステム / 33ファイル / 15,500+行
+### GDScript: 23サブシステム / 75+ファイル / 35,000+行
 
 | サブシステム | 主要ファイル | 行数 | 状態 |
 |-------------|-------------|------|------|
@@ -58,19 +58,32 @@ AI同士が自律的に会話・進化・コミュニティを形成する「Ato
 | **コア** | stats_system.gd | 76 | ✅ ステータス管理 |
 | **フィールド** | persistent_field.gd | 499 | ✅ 永続フィールド（atomic write） |
 
-### Knowledge Base: 60文書（KB00〜KB93）
+### Knowledge Base: 70+文書（KB00〜KB115）
 
-設計文書59本 + 引き継ぎガイド1本。主要カテゴリ：
+設計文書70+本。主要カテゴリ：
 - KB00: システムアーキテクチャ概要
-- KB55-58: AIペットトレンド・倫理・UIリファレンス・永続記憶
-- KB59-68: 生物模倣記憶・ケア設計・AtoA会話・感情モデル・生態系
-- KB70-76: 進化ビジュアル・語順進化・マルチエージェント・プラグイン
-- KB77-87: PetBook UI/レイアウト/SubMolt/カラーパレット
-- KB88-88c: 非エンジニア開発ガイド + CLAUDE.mdテンプレート + プロンプト + 落とし穴
-- KB89-89c: Ralph Loop詳細設定 + PetBook指示 + 機能設定 + トラブルシューティング
-- KB90-91: Ralph Loop高度設定・実践サポート
-- KB92-92d: ゲーム開発プラグインガイド + インストール後指示 + PetBookループ + 改善プロンプト + CLAUDE.mdテンプレート
-- KB93: Cowork→Code引き継ぎガイド（本文書の元）
+- KB55-68: 記憶・ケア・AtoA会話・感情・生態系
+- KB70-76: 進化ビジュアル・語順進化・マルチエージェント
+- KB77-87: PetBook UI/SubMolt/パレット
+- KB88-93: 非エンジニアガイド・Ralph Loop・Cowork引き継ぎ
+- KB94-96: Everything Claude Code・gstack・キャラデザブラッシュアップ
+- KB99: Claude Cowork連携・進捗確認ガイド
+- KB114: Neural Learning Pipeline (Active Inference + BCM + Oja)
+- KB115: キャラクターデザイン仕様書（全22進化形態）
+
+### テスト: 16テストファイル / 58+テストケース
+- test_active_inference (15), test_bcm_oja (19), test_learning_bridge (18) — headless OK
+- test_sub_molt_themes (6) — headless OK
+- 残り12ファイル — Godotプロジェクトモード必要（GameManager依存）
+
+### スプライト: 23フォームスプライト / 88表情シート
+- R157で全面リニューアル: 固有シルエット・アクセサリー・オーラ効果
+- 64px高品質ピクセルアート（旧: 32px色違いのみ）
+- 12目パターン × 10口パターン × 8表情プリセット/フォーム
+
+### Web Export / リリース
+- v1.2.0 Web export (37MB) — GitHub Release公開済
+- itch.io対応準備完了（butler未認証）
 
 ### 5つのSubMolt（PetBook内コミュニティ）
 
