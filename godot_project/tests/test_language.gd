@@ -4,6 +4,9 @@
 class_name TestLanguage
 extends SceneTree
 
+const _LanguageEvolutionSystem = preload("res://scripts/language/language_evolution_system.gd")
+const _OriginalLanguageEngine = preload("res://scripts/language/original_language_engine.gd")
+
 
 func _init() -> void:
 	var passed: int = 0

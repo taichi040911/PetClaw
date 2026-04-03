@@ -4,6 +4,14 @@
 class_name TestSaveLoad
 extends SceneTree
 
+const _StatsData = preload("res://scripts/core/stats_system.gd")
+const _PetEntity = preload("res://scripts/core/pet_entity.gd")
+const _PetBookSubMoltTheme = preload("res://scripts/ui/pet_book_sub_molt_theme.gd")
+const _EvolutionMechanics = preload("res://scripts/evolution/evolution_mechanics.gd")
+const _BiologicalMemorySystem = preload("res://scripts/memory/biological_memory_system.gd")
+const _BreedingSystem = preload("res://scripts/life/breeding_system.gd")
+const _LifeDeathSystem = preload("res://scripts/life/life_death_system.gd")
+
 
 func _init() -> void:
 	var passed: int = 0
@@ -67,8 +75,7 @@ func _init() -> void:
 		PetBookSubMoltTheme.SubMoltId.AFTERLIFE_ECHOES
 	)
 	var theme_dict: Dictionary = theme.to_dict()
-	var theme_restored: PetBookSubMoltTheme = PetBookSubMoltTheme.new()
-	theme_restored.from_dict(theme_dict)
+	var theme_restored: PetBookSubMoltTheme = PetBookSubMoltTheme.from_dict(theme_dict)
 
 	if theme_restored.theme_id == "afterlife_echoes" \
 		and theme_restored.entrance_style == theme.entrance_style:

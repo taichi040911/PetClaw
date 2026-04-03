@@ -16,12 +16,11 @@ func _init() -> void:
 	var tree: EvolutionTree = EvolutionTree.new()
 
 	# Stage 2 (Blob→Infant) のパスを取得
-	var stage2_paths: Dictionary = tree.get_stage_2_paths()
+	var stage2_paths: Array[Dictionary] = tree.get_stage_2_paths()
 	if stage2_paths.size() >= 3:
 		print("  OK: Stage 2 has %d paths" % stage2_paths.size())
-		for path_id: String in stage2_paths:
-			var path: Dictionary = stage2_paths[path_id]
-			print("    - %s: %s" % [path_id, path.get("display_name", "?")])
+		for path: Dictionary in stage2_paths:
+			print("    - %s: %s" % [path.get("id", "?"), path.get("display_name", "?")])
 		print("  PASS: Stage 2 paths defined")
 		passed += 1
 	else:
@@ -34,9 +33,9 @@ func _init() -> void:
 	var evo: EvolutionMechanics = EvolutionMechanics.new()
 
 	# ケアミスを記録
-	evo.record_care_miss(1, "hunger")
-	evo.record_care_miss(1, "hunger")
-	evo.record_care_miss(1, "health")
+	evo.record_care_miss(1)
+	evo.record_care_miss(1)
+	evo.record_care_miss(1)
 
 	var quality: String = evo.get_care_quality(1)
 	if quality in ["excellent", "good", "average", "poor"]:

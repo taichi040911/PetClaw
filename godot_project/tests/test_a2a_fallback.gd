@@ -4,6 +4,9 @@
 class_name TestA2AFallback
 extends SceneTree
 
+const _AtoAConversationSystem = preload("res://scripts/conversation/a2a_conversation_system.gd")
+const _ClaudeAPIClient = preload("res://scripts/conversation/claude_api_client.gd")
+
 
 func _init() -> void:
 	var passed: int = 0

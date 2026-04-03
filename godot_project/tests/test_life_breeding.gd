@@ -4,6 +4,10 @@
 class_name TestLifeBreeding
 extends SceneTree
 
+const LifeDeathSystem := preload("res://scripts/life/life_death_system.gd")
+const BreedingSystem := preload("res://scripts/life/breeding_system.gd")
+const PetLifecycleFSM := preload("res://scripts/life/pet_lifecycle_fsm.gd")
+const PetEntity := preload("res://scripts/core/pet_entity.gd")
 
 func _init() -> void:
 	var passed: int = 0
@@ -27,7 +31,7 @@ func _init() -> void:
 	# === Test 3: PetLifecycleFSM 初期化 ===
 	total += 1
 	print("\nTest 3: PetLifecycleFSM initialization...")
-	var fsm: PetLifecycleFSM = PetLifecycleFSM.new()
+	var fsm: PetLifecycleFSM = PetLifecycleFSM.new(100)
 	print("  PASS: Created")
 	passed += 1
 
@@ -83,7 +87,7 @@ func _init() -> void:
 	total += 1
 	print("\nTest 7: PetLifecycleFSM serialization...")
 	var fsm_data: Dictionary = fsm.to_dict()
-	var fsm_restored: PetLifecycleFSM = PetLifecycleFSM.new()
+	var fsm_restored: PetLifecycleFSM = PetLifecycleFSM.new(100)
 	fsm_restored.from_dict(fsm_data)
 	print("  OK: Keys: %s" % str(fsm_data.keys()))
 	print("  PASS: Round-trip OK")

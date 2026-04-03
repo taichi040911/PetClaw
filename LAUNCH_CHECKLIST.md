@@ -27,20 +27,27 @@
 ### Build
 - [ ] Export presets point to correct path (`exports/web/index.html`)
 - [ ] `upload_itch.sh` tested with dry run
-- [ ] Version strings updated to v1.0.0
+- [x] Version strings updated to v1.2.0
+
+### Neural Learning Pipeline (v1.2.0)
+- [x] Active Inference Core: 15/15 tests passing
+- [x] BCM Theory: 19/19 tests passing (incl. Oja)
+- [x] Learning Model Bridge: 18/18 tests passing
+- [x] Bridge wired into AtoA _finalize_conversation()
+- [x] Save/load includes all 21+ subsystems
 
 ## Launch
 
-- [ ] `butler login` (interactive -- opens browser for one-time auth)
-- [ ] `./tools/upload_itch.sh v1.0.0`
+- [ ] `~/bin/butler login` (interactive -- opens browser for one-time auth)
+- [ ] `./tools/upload_itch.sh 1.2.0`
 - [ ] Verify itch.io page renders correctly (https://taichi040911.itch.io/petclaw)
 - [ ] Test web build in Chrome
 - [ ] Test web build in Firefox
 - [ ] Test web build in Safari
-- [ ] itch.io page description matches `itch_page.md`
+- [ ] itch.io page description matches `tools/itch_page_content.md`
 - [ ] Screenshots/GIFs uploaded to itch.io page
-- [ ] Tags set: virtual-pet, ai, language, evolution, tamagotchi, pixel-art
-- [ ] GitHub release v1.0.0 created
+- [ ] Tags set: virtual-pet, ai, simulation, evolution, language, emergent-gameplay
+- [x] GitHub release v1.2.0 created
 
 ## Post-Launch
 
@@ -48,4 +55,4 @@
 - [ ] Run Karpathy Loop iteration on launch-day conversation data
 - [ ] Community feedback collection (itch.io comments)
 - [ ] Check save/load compatibility if hotfix needed
-- [ ] Plan v1.1.0 based on feedback
+- [ ] Plan v1.3.0 based on feedback

@@ -70,8 +70,7 @@ func _init() -> void:
 
 	for theme: PetBookSubMoltTheme in themes:
 		var data: Dictionary = theme.to_dict()
-		var restored: PetBookSubMoltTheme = PetBookSubMoltTheme.new()
-		restored.from_dict(data)
+		var restored: PetBookSubMoltTheme = PetBookSubMoltTheme.from_dict(data)
 
 		if restored.theme_id != theme.theme_id:
 			print("  FAIL: theme_id mismatch after round-trip: '%s' != '%s'" % [restored.theme_id, theme.theme_id])
@@ -134,7 +133,7 @@ func _init() -> void:
 
 	# PetBookPost が利用可能かチェック
 	var test_post: PetBookPost = PetBookPost.new()
-	test_post.post_type = "memorial"
+	test_post.post_type = PetBookPost.PostType.MEMORIAL
 	var recommended: String = PetBookSubMoltTheme.new().recommend_for_post(test_post)
 	if recommended.is_empty():
 		print("  WARN: recommend_for_post returned empty (may need full system)")

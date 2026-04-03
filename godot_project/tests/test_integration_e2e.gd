@@ -4,6 +4,16 @@
 class_name TestIntegrationE2E
 extends SceneTree
 
+const _PetEntity = preload("res://scripts/core/pet_entity.gd")
+const _OriginalLanguageEngine = preload("res://scripts/language/original_language_engine.gd")
+const _EvolutionMechanics = preload("res://scripts/evolution/evolution_mechanics.gd")
+const _AtoAConversationSystem = preload("res://scripts/conversation/a2a_conversation_system.gd")
+const _BiologicalMemorySystem = preload("res://scripts/memory/biological_memory_system.gd")
+const _EthicalSafeguard = preload("res://scripts/ethics/ethical_safeguard.gd")
+const _PetBookCore = preload("res://scripts/social/pet_book_core.gd")
+const _LanguageEvolutionSystem = preload("res://scripts/language/language_evolution_system.gd")
+const _EvolutionTree = preload("res://scripts/evolution/evolution_tree.gd")
+
 
 func _init() -> void:
 	var passed: int = 0

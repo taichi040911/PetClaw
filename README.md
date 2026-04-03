@@ -1,8 +1,13 @@
 # PetClaw
 
+[![Release](https://img.shields.io/github/v/release/taichi040911/PetClaw)](https://github.com/taichi040911/PetClaw/releases/latest)
+[![Tests](https://img.shields.io/badge/tests-52%2F52%20passing-brightgreen)]()
+[![Godot](https://img.shields.io/badge/Godot-4.6.1-blue)](https://godotengine.org)
+[![License](https://img.shields.io/github/license/taichi040911/PetClaw)](LICENSE)
+
 A virtual pet simulation game powered by Claude API, featuring AI-to-AI conversations, emergent language evolution, and an autonomous pet community.
 
-Built with **Godot 4.6** and **GDScript**.
+Built with **Godot 4.6.1** and **GDScript**. **75+ scripts, 35,000+ lines of code.**
 
 ## Core Features
 
@@ -69,11 +74,11 @@ Set `ANTHROPIC_API_KEY` environment variable, or configure in Settings screen wi
 
 ```
 godot_project/
-  scripts/          # 71 GDScript files, 33,500+ lines across 18+ subsystems
+  scripts/          # 75+ GDScript files, 35,000+ lines across 23 subsystems
   scenes/           # 3 .tscn scene files
   assets/sprites/   # 22 evolution form sprites + 66 expression sheets
-  tests/            # 14 test files, 2,000+ lines
-knowledge_base/     # 81 design documents (KB00-KB113)
+  tests/            # 16 test files, 3,000+ lines (52 passing tests)
+knowledge_base/     # 82 design documents (KB00-KB114)
 tools/quality/      # Lint, drift detection, deslop, Karpathy Loop, MCP server
 docs/               # Developer manual
 ```
@@ -100,6 +105,25 @@ docs/               # Developer manual
 - **[CLAUDE.md](CLAUDE.md)** — Development rules and constraints
 - **[Launch Checklist](LAUNCH_CHECKLIST.md)** — Pre-deployment verification
 - **[Knowledge Base](knowledge_base/)** — 81 design documents
+
+## Play Online
+
+Play PetClaw in your browser on [itch.io](https://taichi040911.itch.io/petclaw) (coming soon).
+
+Or download the latest release from [GitHub Releases](https://github.com/taichi040911/PetClaw/releases/latest).
+
+## Running Tests
+
+```bash
+# Run all test suites (52 tests)
+./tools/run_all_tests.sh
+
+# Run individual suites
+cd godot_project
+godot --headless --script tests/test_active_inference.gd  # 15 tests
+godot --headless --script tests/test_bcm_oja.gd           # 19 tests
+godot --headless --script tests/test_learning_bridge.gd    # 18 tests
+```
 
 ## License
 
