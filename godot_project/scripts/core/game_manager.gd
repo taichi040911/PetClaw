@@ -49,6 +49,11 @@ var _care_miss_timer: float = 0.0
 
 func _ready() -> void:
 	instance = self
+	# Skip full initialization when running headless with --script (unit tests).
+	# Tests preload only the systems they need; the full subsystem chain
+	# (ClaudeAPIClient → HTTPRequest) would block indefinitely.
+	if DisplayServer.get_name() == "headless" and OS.get_cmdline_args().has("--script"):
+		return
 	# Defer initialization to allow all class_names to register first
 	call_deferred("_deferred_init")
 
