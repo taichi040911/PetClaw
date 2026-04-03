@@ -16,14 +16,18 @@
 class_name LearningModelBridge
 extends RefCounted
 
+const _AIC := preload("res://scripts/inference/active_inference_core.gd")
+const _BCM := preload("res://scripts/inference/bcm_language_core.gd")
+const _OJA := preload("res://scripts/inference/oja_language_core.gd")
+
 # ─── シグナル ───
 signal learning_completed(result: Dictionary)
 signal vocabulary_warning(warning: String)
 
 # ─── 学習モデルインスタンス ───
-var active_inference: ActiveInferenceCore
-var bcm_core: BCMLanguageCore
-var oja_core: OjaLanguageCore
+var active_inference: RefCounted  # ActiveInferenceCore
+var bcm_core: RefCounted          # BCMLanguageCore
+var oja_core: RefCounted          # OjaLanguageCore
 
 # ─── パラメータ ───
 const ENABLE_AI: bool = true
@@ -42,9 +46,9 @@ var cumulative_stats: Dictionary = {
 
 
 func _init() -> void:
-	active_inference = ActiveInferenceCore.new()
-	bcm_core = BCMLanguageCore.new()
-	oja_core = OjaLanguageCore.new()
+	active_inference = _AIC.new()
+	bcm_core = _BCM.new()
+	oja_core = _OJA.new()
 
 
 # ==========================================

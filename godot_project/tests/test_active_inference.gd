@@ -5,6 +5,8 @@
 class_name TestActiveInference
 extends SceneTree
 
+const AIC := preload("res://scripts/inference/active_inference_core.gd")
+
 
 func _init() -> void:
 	var passed: int = 0
@@ -17,7 +19,7 @@ func _init() -> void:
 
 	# ─── Test 1: 基本推論ループ ───
 	print("\nTest 1: Basic inference loop...")
-	var ai: ActiveInferenceCore = ActiveInferenceCore.new()
+	var ai: AIC = AIC.new()
 	var r1: Dictionary = ai.run(
 		[{"message": "hello!", "emotion": "joy", "pet_id": 1}],
 		{"pet_id": 2, "emotion": "neutral", "vocab_size": 10},
@@ -32,7 +34,7 @@ func _init() -> void:
 
 	# ─── Test 2: 空の会話でクラッシュしない ───
 	print("\nTest 2: Empty conversation...")
-	var ai2: ActiveInferenceCore = ActiveInferenceCore.new()
+	var ai2: AIC = AIC.new()
 	var r2: Dictionary = ai2.run([], {}, 0.0)
 	if r2.has("action") and r2["error"] is float:
 		print("  PASS: action='%s'" % r2["action"])
@@ -43,7 +45,7 @@ func _init() -> void:
 
 	# ─── Test 3: 語彙へのHebbian反映 ───
 	print("\nTest 3: Apply to vocabulary (Hebbian LTP)...")
-	var ai3: ActiveInferenceCore = ActiveInferenceCore.new()
+	var ai3: AIC = AIC.new()
 	var vocab: Dictionary = {
 		"greeting": {"ai_term": "hello!", "strength": 0.5, "usage_count": 1,
 			"last_used": Time.get_unix_time_from_system()},
@@ -120,7 +122,7 @@ func _init() -> void:
 	# ─── Test 8: セーブ/ロード往復 ───
 	print("\nTest 8: Save/load round-trip...")
 	var saved: Dictionary = ai.to_dict()
-	var restored: ActiveInferenceCore = ActiveInferenceCore.new()
+	var restored: AIC = AIC.new()
 	restored.from_dict(saved)
 	if (restored.model.get("conversation_count", 0) == ai.model.get("conversation_count", 0)
 			and restored.memory.get("last_action", "") == ai.memory.get("last_action", "")):
@@ -132,7 +134,7 @@ func _init() -> void:
 
 	# ─── Test 9: 空データからの復元（後方互換性） ───
 	print("\nTest 9: Restore from empty data (backward compat)...")
-	var empty_restore: ActiveInferenceCore = ActiveInferenceCore.new()
+	var empty_restore: AIC = AIC.new()
 	empty_restore.from_dict({})
 	if (empty_restore.model.get("emotion_accuracy", 0.0) == 0.3
 			and empty_restore.history.size() == 0):
@@ -143,15 +145,15 @@ func _init() -> void:
 		failed += 1
 
 	# ─── Test 10: 履歴の上限 ───
-	print("\nTest 10: History limit (max=%d)..." % ActiveInferenceCore.MAX_HISTORY)
-	var ai10: ActiveInferenceCore = ActiveInferenceCore.new()
+	print("\nTest 10: History limit (max=%d)..." % AIC.MAX_HISTORY)
+	var ai10: AIC = AIC.new()
 	for i: int in 30:
 		ai10.run(
 			[{"message": "msg%d" % i, "emotion": "neutral", "pet_id": 1}],
 			{"pet_id": 2, "emotion": "neutral", "vocab_size": i},
 			0.3
 		)
-	if ai10.history.size() == ActiveInferenceCore.MAX_HISTORY:
+	if ai10.history.size() == AIC.MAX_HISTORY:
 		print("  PASS: history=%d" % ai10.history.size())
 		passed += 1
 	else:
@@ -163,7 +165,7 @@ func _init() -> void:
 	var sad_count: int = 0
 	var total_runs: int = 100
 	for i: int in total_runs:
-		var ai_sad: ActiveInferenceCore = ActiveInferenceCore.new()
+		var ai_sad: AIC = AIC.new()
 		var r_sad: Dictionary = ai_sad.run(
 			[{"message": "farewell...", "emotion": "sadness", "pet_id": 1}],
 			{"pet_id": 2, "emotion": "sadness", "vocab_size": 5},
@@ -182,13 +184,13 @@ func _init() -> void:
 
 	# ─── Test 12: Free Energyの計算確認 ───
 	print("\nTest 12: Free energy includes complexity penalty...")
-	var ai12: ActiveInferenceCore = ActiveInferenceCore.new()
+	var ai12: AIC = AIC.new()
 	var r12_small: Dictionary = ai12.run(
 		[{"message": "test", "emotion": "neutral", "pet_id": 1}],
 		{"pet_id": 2, "emotion": "neutral", "vocab_size": 5},
 		0.5
 	)
-	var ai12b: ActiveInferenceCore = ActiveInferenceCore.new()
+	var ai12b: AIC = AIC.new()
 	var r12_large: Dictionary = ai12b.run(
 		[{"message": "test", "emotion": "neutral", "pet_id": 1}],
 		{"pet_id": 2, "emotion": "neutral", "vocab_size": 80},
@@ -205,7 +207,7 @@ func _init() -> void:
 
 	# ─── Test 13: シグナル発火確認 ───
 	print("\nTest 13: Signal emission...")
-	var ai13: ActiveInferenceCore = ActiveInferenceCore.new()
+	var ai13: AIC = AIC.new()
 	var signal_received: Array[bool] = [false]
 	ai13.step_completed.connect(func(a: String, e: float) -> void:
 		signal_received[0] = true
@@ -224,7 +226,7 @@ func _init() -> void:
 
 	# ─── Test 14: 学習による感情精度向上 ───
 	print("\nTest 14: Emotion accuracy improves with correct predictions...")
-	var ai14: ActiveInferenceCore = ActiveInferenceCore.new()
+	var ai14: AIC = AIC.new()
 	var initial_acc: float = ai14.model.get("emotion_accuracy", 0.0)
 	# 感情が一致する会話を繰り返す
 	for i: int in 10:
@@ -243,7 +245,7 @@ func _init() -> void:
 
 	# ─── Test 15: apply_to_words — マッチしない語彙は変更なし ───
 	print("\nTest 15: Unmatched words unchanged...")
-	var ai15: ActiveInferenceCore = ActiveInferenceCore.new()
+	var ai15: AIC = AIC.new()
 	var vocab15: Dictionary = {
 		"rare_word": {"ai_term": "xyzzy", "strength": 0.5, "usage_count": 0,
 			"last_used": 0.0},

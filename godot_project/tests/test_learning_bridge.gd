@@ -1,9 +1,11 @@
-## test_learning_bridge.gd — LearningModelBridge 統合テスト
+## test_learning_bridge.gd — LMB 統合テスト
 ## 実行: godot --headless --script tests/test_learning_bridge.gd
 ##
 ## KB参照: KB108 (Active Inference), KB112 (BCM), KB113 (Oja)
 class_name TestLearningBridge
 extends SceneTree
+
+const LMB := preload("res://scripts/inference/learning_model_bridge.gd")
 
 
 # ─── テスト用語彙ヘルパー ───
@@ -74,12 +76,12 @@ func _init() -> void:
 # ==========================================
 
 func test_bridge_init() -> bool:
-	var bridge := LearningModelBridge.new()
+	var bridge := LMB.new()
 	return bridge.active_inference != null and bridge.bcm_core != null and bridge.oja_core != null
 
 
 func test_empty_conversation() -> bool:
-	var bridge := LearningModelBridge.new()
+	var bridge := LMB.new()
 	var vocab: Dictionary = _make_vocab([
 		{"key": "hello", "ai_term": "helu", "strength": 0.5},
 	])
@@ -91,7 +93,7 @@ func test_empty_conversation() -> bool:
 
 
 func test_full_pipeline() -> bool:
-	var bridge := LearningModelBridge.new()
+	var bridge := LMB.new()
 	var vocab: Dictionary = _make_vocab([
 		{"key": "hello", "ai_term": "helu", "strength": 0.5},
 		{"key": "friend", "ai_term": "furendo", "strength": 0.4},
@@ -109,7 +111,7 @@ func test_full_pipeline() -> bool:
 
 
 func test_pipeline_modifies_vocabulary() -> bool:
-	var bridge := LearningModelBridge.new()
+	var bridge := LMB.new()
 	var vocab: Dictionary = _make_vocab([
 		{"key": "love", "ai_term": "rabu", "strength": 0.5},
 		{"key": "sad", "ai_term": "kanashi", "strength": 0.5},
@@ -129,7 +131,7 @@ func test_pipeline_modifies_vocabulary() -> bool:
 
 
 func test_death_event() -> bool:
-	var bridge := LearningModelBridge.new()
+	var bridge := LMB.new()
 	var vocab: Dictionary = _make_vocab([
 		{"key": "farewell", "ai_term": "sayonara", "strength": 0.3},
 	])
@@ -140,7 +142,7 @@ func test_death_event() -> bool:
 
 
 func test_evolution_event() -> bool:
-	var bridge := LearningModelBridge.new()
+	var bridge := LMB.new()
 	var vocab: Dictionary = _make_vocab([
 		{"key": "grow", "ai_term": "seichou", "strength": 0.5},
 	])
@@ -151,7 +153,7 @@ func test_evolution_event() -> bool:
 
 
 func test_resurrection_event() -> bool:
-	var bridge := LearningModelBridge.new()
+	var bridge := LMB.new()
 	var vocab: Dictionary = _make_vocab([
 		{"key": "return", "ai_term": "modoru", "strength": 0.3},
 	])
@@ -162,7 +164,7 @@ func test_resurrection_event() -> bool:
 
 
 func test_breeding_event() -> bool:
-	var bridge := LearningModelBridge.new()
+	var bridge := LMB.new()
 	var vocab: Dictionary = _make_vocab([
 		{"key": "child", "ai_term": "kodomo", "strength": 0.5},
 	])
@@ -173,7 +175,7 @@ func test_breeding_event() -> bool:
 
 
 func test_petbook_data() -> bool:
-	var bridge := LearningModelBridge.new()
+	var bridge := LMB.new()
 	var vocab: Dictionary = _make_vocab([
 		{"key": "hello", "ai_term": "helu", "strength": 0.5},
 	])
@@ -185,7 +187,7 @@ func test_petbook_data() -> bool:
 
 
 func test_vfx_data() -> bool:
-	var bridge := LearningModelBridge.new()
+	var bridge := LMB.new()
 	var vocab: Dictionary = _make_vocab([
 		{"key": "hello", "ai_term": "helu", "strength": 0.5},
 	])
@@ -197,7 +199,7 @@ func test_vfx_data() -> bool:
 
 
 func test_analyze_vocabulary() -> bool:
-	var bridge := LearningModelBridge.new()
+	var bridge := LMB.new()
 	var vocab: Dictionary = _make_vocab([
 		{"key": "a", "strength": 0.8},
 		{"key": "b", "strength": 0.3},
@@ -213,7 +215,7 @@ func test_analyze_vocabulary() -> bool:
 
 
 func test_multi_agent_merge() -> bool:
-	var bridge := LearningModelBridge.new()
+	var bridge := LMB.new()
 	var my_state: Dictionary = {"emotion": "joy"}
 	var others: Array[Dictionary] = [
 		{"emotion": "joy", "confidence": 0.5},
@@ -225,7 +227,7 @@ func test_multi_agent_merge() -> bool:
 
 
 func test_health_check() -> bool:
-	var bridge := LearningModelBridge.new()
+	var bridge := LMB.new()
 	# Normal vocabulary → healthy
 	var vocab: Dictionary = _make_vocab([
 		{"key": "a", "strength": 0.5},
@@ -240,7 +242,7 @@ func test_health_check() -> bool:
 
 
 func test_cumulative_stats() -> bool:
-	var bridge := LearningModelBridge.new()
+	var bridge := LMB.new()
 	var vocab: Dictionary = _make_vocab([
 		{"key": "word1", "ai_term": "w1", "strength": 0.5},
 		{"key": "word2", "ai_term": "w2", "strength": 0.5},
@@ -255,7 +257,7 @@ func test_cumulative_stats() -> bool:
 
 
 func test_save_load_roundtrip() -> bool:
-	var bridge := LearningModelBridge.new()
+	var bridge := LMB.new()
 	var vocab: Dictionary = _make_vocab([
 		{"key": "test", "ai_term": "tesuto", "strength": 0.5},
 	])
@@ -265,7 +267,7 @@ func test_save_load_roundtrip() -> bool:
 
 	var data: Dictionary = bridge.to_dict()
 
-	var bridge2 := LearningModelBridge.new()
+	var bridge2 := LMB.new()
 	bridge2.from_dict(data)
 
 	return (
@@ -275,7 +277,7 @@ func test_save_load_roundtrip() -> bool:
 
 
 func test_signal_emitted() -> bool:
-	var bridge := LearningModelBridge.new()
+	var bridge := LMB.new()
 	var signal_received: Array[bool] = [false]
 	bridge.learning_completed.connect(func(_r: Dictionary) -> void: signal_received[0] = true)
 
@@ -290,7 +292,7 @@ func test_signal_emitted() -> bool:
 
 
 func test_strength_bounds_after_pipeline() -> bool:
-	var bridge := LearningModelBridge.new()
+	var bridge := LMB.new()
 	var vocab: Dictionary = _make_vocab([
 		{"key": "strong", "ai_term": "s", "strength": 0.95},
 		{"key": "weak", "ai_term": "w", "strength": 0.08},
@@ -312,7 +314,7 @@ func test_strength_bounds_after_pipeline() -> bool:
 
 
 func test_multiple_cycles() -> bool:
-	var bridge := LearningModelBridge.new()
+	var bridge := LMB.new()
 	var vocab: Dictionary = _make_vocab([
 		{"key": "alpha", "ai_term": "a", "strength": 0.5},
 		{"key": "beta", "ai_term": "b", "strength": 0.5},
